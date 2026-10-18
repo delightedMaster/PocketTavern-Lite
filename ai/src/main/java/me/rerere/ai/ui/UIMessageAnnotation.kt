@@ -29,4 +29,9 @@ sealed class UIMessageAnnotation {
     @Serializable
     @SerialName("cache_breakpoint")
     data class CacheBreakpoint(val point: String) : UIMessageAnnotation()
+
+    /** Which group member produced this reply. Display only; not part of the prompt prefix. */
+    @Serializable
+    @SerialName("group_speaker")
+    data class GroupSpeaker(val memberId: String, val name: String) : UIMessageAnnotation()
 }

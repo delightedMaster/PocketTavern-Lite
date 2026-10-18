@@ -28,6 +28,12 @@ import me.rerere.ai.provider.Model
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.ai.ui.isEmptyInputMessage
+import me.rerere.rikkahub.data.ai.cards.CardMessage
+import me.rerere.rikkahub.data.ai.cards.CardWorld
+import me.rerere.rikkahub.data.ai.cards.SlashAction
+import me.rerere.rikkahub.data.ai.cards.SlashContext
+import me.rerere.rikkahub.data.ai.cards.compileSlashScript
+import me.rerere.rikkahub.data.ai.cards.handleCardRequest
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
@@ -68,6 +74,12 @@ class ChatVM(
 
     // 聊天输入状态 - 保存在 ViewModel 中避免 TransactionTooLargeException
     val inputState = ChatInputState()
+    var pendingSlashInput by mutableStateOf<String?>(null)
+        private set
+    private val cardLock = Any()
+    private var chatVarOverlay: Map<String, String>? = null
+    private var globalVarOverlay: Map<String, String>? = null
+    private var messageVarOverlay: Map<String, Map<String, String>>? = null
 
     val voiceSession = VoiceSessionController(viewModelScope, context::getString) {
         chatService.enqueueVoiceMessage(_conversationId, it)
@@ -402,4 +414,130 @@ class ChatVM(
         }
     }
 
+    /**
+     * Called from the card WebView. The JSON result is returned immediately.
+     * Variable writes are kept in memory first, then stored: chat and global
+     * variables in settings, message variables on the conversation.
+     */
+    fun handleCard(messageId: String, requestJson: String): String {
+        val effect = synchronized(cardLock) {
+            val current = conversation.value
+            val prefs = settings.value
+            val chatKey = _conversationId.toString()
+            val world = CardWorld(
+                messages = current.currentMessages.map { message ->
+                    CardMessage(
+                        id = message.id.toString(),
+                        role = message.role.name.lowercase(),
+                        text = message.toText(),
+                    )
+                },
+                chatVariables = chatVarOverlay ?: prefs.macroChatVariables[chatKey].orEmpty(),
+                globalVariables = globalVarOverlay ?: prefs.macroGlobalVariables,
+                messageVariables = messageVarOverlay ?: current.promptState.messageVariables,
+                currentMessageId = messageId,
+            )
+            handleCardRequest(world, requestJson).also { result ->
+                if (result.chatVariables != null) chatVarOverlay = result.chatVariables
+                if (result.globalVariables != null) globalVarOverlay = result.globalVariables
+                if (result.messageVariables != null) messageVarOverlay = result.messageVariables
+            }
+        }
+        val chat = effect.chatVariables
+        val global = effect.globalVariables
+        if (chat != null || global != null) {
+            viewModelScope.launch {
+                settingsStore.update { current ->
+                    var next = current
+                    if (chat != null) {
+                        val all = current.macroChatVariables.toMutableMap()
+                        all[_conversationId.toString()] = chat
+                        next = next.copy(macroChatVariables = all)
+                    }
+                    if (global != null) next = next.copy(macroGlobalVariables = global)
+                    next
+                }
+            }
+        }
+        effect.messageVariables?.let { variables ->
+            viewModelScope.launch {
+                chatService.updateMessageVariables(_conversationId, variables)
+            }
+        }
+        effect.slash?.let { command ->
+            viewModelScope.launch { runQuickReply(command) }
+        }
+        return effect.responseJson
+    }
+
+    fun runQuickReply(script: String) {
+        viewModelScope.launch {
+            val prefs = settings.value
+            val chatKey = _conversationId.toString()
+            val variables = synchronized(cardLock) {
+                chatVarOverlay ?: prefs.macroChatVariables[chatKey].orEmpty()
+            }
+            val replies = prefs.quickMessages.map { it.title to it.content }
+            val actions = compileSlashScript(
+                script,
+                SlashContext(replies = replies, variables = variables),
+            )
+            actions.forEach { action ->
+                when (action) {
+                    is SlashAction.Send -> {
+                        if (action.text.isNotBlank()) {
+                            handleMessageSend(listOf(UIMessagePart.Text(action.text)))
+                        }
+                    }
+                    is SlashAction.Generate -> {
+                        if (action.text.isNullOrBlank()) {
+                            chatService.generateReply(_conversationId)
+                        } else {
+                            handleMessageSend(listOf(UIMessagePart.Text(action.text)))
+                        }
+                    }
+                    is SlashAction.SetVar -> writeChatVariable(action.key, action.value)
+                    is SlashAction.FillInput -> inputState.setMessageText(action.text)
+                    is SlashAction.AskInput -> pendingSlashInput = action.prompt.ifBlank { "" }
+                    is SlashAction.Unknown -> Unit
+                }
+            }
+        }
+    }
+
+    fun submitSlashInput(text: String) {
+        pendingSlashInput = null
+        if (text.isNotBlank()) inputState.setMessageText(text)
+    }
+
+    fun dismissSlashInput() {
+        pendingSlashInput = null
+    }
+
+    fun updateQuickReplyIds(ids: Set<Uuid>) {
+        viewModelScope.launch {
+            chatService.updateQuickReplyIds(_conversationId, ids)
+        }
+    }
+
+    fun setGroupSpeaker(speakerId: Uuid) {
+        viewModelScope.launch {
+            chatService.setGroupSpeaker(_conversationId, speakerId)
+        }
+    }
+
+    private suspend fun writeChatVariable(key: String, value: String) {
+        val chatKey = _conversationId.toString()
+        val stored = synchronized(cardLock) {
+            val base = chatVarOverlay ?: settings.value.macroChatVariables[chatKey].orEmpty()
+            (base + (key to value)).also { chatVarOverlay = it }
+        }
+        settingsStore.update { current ->
+            val all = current.macroChatVariables.toMutableMap()
+            val bucket = all[chatKey].orEmpty().toMutableMap()
+            bucket.putAll(stored)
+            all[chatKey] = bucket
+            current.copy(macroChatVariables = all)
+        }
+    }
 }

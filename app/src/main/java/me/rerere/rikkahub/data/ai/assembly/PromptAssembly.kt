@@ -70,6 +70,8 @@ data class PromptCacheState(
     val prefixDivergeAt: Int = -1,
     val divergePrevious: String = "",
     val divergeCurrent: String = "",
+    /** Per-message variables written by HTML cards. The assembler copies only the latest into the tail. */
+    val messageVariables: Map<String, Map<String, String>> = emptyMap(),
 )
 
 data class HistoryMessage(
@@ -103,6 +105,8 @@ data class AssemblyRequest(
     val memoryText: String? = null,
     val toolText: String? = null,
     val stateVars: String? = null,
+    /** Who speaks this turn. Kept beside the other tail lines so member cards can stay put. */
+    val speakerText: String? = null,
     /** Live history messages that trigger a trim. 0 disables trimming. */
     val contextLimit: Int = 0,
     val depthMode: DepthInjectionMode = DepthInjectionMode.ANCHORED,
@@ -229,6 +233,7 @@ fun assemblePrompt(request: AssemblyRequest): AssemblyOutput {
     tail(request.timeText)
     tail(request.memoryText)
     tail(request.toolText)
+    tail(request.speakerText)
     user?.let { pieces += PromptPiece(PromptLayer.USER, rendered(it), it.id, role = "user") }
 
     val full = pieces.map { it.text }

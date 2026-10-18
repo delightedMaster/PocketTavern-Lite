@@ -200,6 +200,7 @@ internal val SETTINGS_FIELDS: List<SettingsField<*, *>> = with(SettingsStore) {
             decode = { Uuid.parse(it) },
         ),
         plain(SUMMARY_PROMPT, Settings::summaryPrompt) { copy(summaryPrompt = it) },
+        json(HTML_CARD_ALLOWLIST, Settings::htmlCardAllowlist) { copy(htmlCardAllowlist = it) },
         SettingsField(
             AUTHOR_NOTE_ENTRIES, Settings::authorNoteEntries, { copy(authorNoteEntries = it) },
             encode = { entries -> entries?.let { JsonInstant.encodeToString(it) } },

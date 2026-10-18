@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.data.export.SillyTavernQuickRepliesImporter
 import me.rerere.rikkahub.data.model.QuickMessage
 import kotlin.uuid.Uuid
 
@@ -31,6 +32,13 @@ class QuickMessagesVM(
                 if (quickMessage.id == updated.id) updated else quickMessage
             }
         )
+    }
+
+    fun parseImport(json: String): List<QuickMessage> = SillyTavernQuickRepliesImporter.parse(json)
+
+    fun addImported(messages: List<QuickMessage>) {
+        if (messages.isEmpty()) return
+        updateQuickMessages(settings.value.quickMessages + messages)
     }
 
     fun deleteQuickMessage(id: Uuid) {

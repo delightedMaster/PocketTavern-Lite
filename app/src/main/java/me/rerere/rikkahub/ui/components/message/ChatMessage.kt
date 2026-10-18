@@ -72,6 +72,7 @@ import me.rerere.rikkahub.data.datastore.allRegexesOf
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantAffectScope
 import me.rerere.rikkahub.data.model.MessageNode
+import me.rerere.rikkahub.data.ai.cards.looksLikeCardHtml
 import me.rerere.rikkahub.data.model.replaceRegexes
 import me.rerere.rikkahub.ui.components.richtext.MarkdownBlock
 import me.rerere.rikkahub.ui.components.richtext.ZoomableAsyncImage
@@ -142,6 +143,13 @@ fun ChatMessage(
         horizontalAlignment = if (message.role == MessageRole.USER) Alignment.End else Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+        message.annotations.filterIsInstance<UIMessageAnnotation.GroupSpeaker>().firstOrNull()?.let { speaker ->
+            Text(
+                text = speaker.name,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
         if (!message.parts.isEmptyUIMessage()) {
             Row(
                 modifier = Modifier
@@ -166,6 +174,7 @@ fun ChatMessage(
         }
         ProvideTextStyle(textStyle) {
             MessagePartsBlock(
+                messageId = message.id.toString(),
                 assistant = assistant,
                 role = message.role,
                 parts = message.parts,
@@ -274,6 +283,7 @@ fun ChatMessage(
 @OptIn(FlowPreview::class)
 @Composable
 private fun MessagePartsBlock(
+    messageId: String,
     assistant: Assistant?,
     role: MessageRole,
     model: Model?,
@@ -381,6 +391,32 @@ private fun MessagePartsBlock(
             is MessagePartBlock.ContentBlock -> key(block.index) {
                 when (val part = block.part) {
                     is UIMessagePart.Text -> {
+                        val scope = if (role == MessageRole.USER) {
+                            AssistantAffectScope.USER
+                        } else {
+                            AssistantAffectScope.ASSISTANT
+                        }
+                        val renderedText = @Composable { textModifier: Modifier ->
+                            val displayText = part.text.replaceRegexes(
+                                regexes = displayRegexes,
+                                scope = scope,
+                                visual = true,
+                                depth = depth,
+                            )
+                            if (!loading && looksLikeCardHtml(displayText) && LocalTavernCardBridge.current != null) {
+                                HtmlCardView(
+                                    messageId = messageId,
+                                    html = displayText,
+                                    modifier = textModifier,
+                                )
+                            } else {
+                                MarkdownBlock(
+                                    content = displayText,
+                                    onClickCitation = handleClickCitation,
+                                    modifier = textModifier,
+                                )
+                            }
+                        }
                         val textContent = @Composable {
                             if (role == MessageRole.USER) {
                                 ChatMessageBubble(
@@ -392,15 +428,7 @@ private fun MessagePartsBlock(
                                         .padding(start = 48.dp)
                                         .animateContentSize(),
                                 ) {
-                                    MarkdownBlock(
-                                        content = part.text.replaceRegexes(
-                                            regexes = displayRegexes,
-                                            scope = AssistantAffectScope.USER,
-                                            visual = true,
-                                            depth = depth,
-                                        ),
-                                        onClickCitation = handleClickCitation
-                                    )
+                                    renderedText(Modifier)
                                 }
                             } else {
                                 if (settings.displaySetting.showAssistantBubble) {
@@ -409,28 +437,10 @@ private fun MessagePartsBlock(
                                         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = settings.displaySetting.bubbleOpacity),
                                         modifier = Modifier.animateContentSize(),
                                     ) {
-                                        MarkdownBlock(
-                                            content = part.text.replaceRegexes(
-                                                regexes = displayRegexes,
-                                                scope = AssistantAffectScope.ASSISTANT,
-                                                visual = true,
-                                                depth = depth,
-                                            ),
-                                            onClickCitation = handleClickCitation,
-                                        )
+                                        renderedText(Modifier)
                                     }
                                 } else {
-                                    MarkdownBlock(
-                                        content = part.text.replaceRegexes(
-                                            regexes = displayRegexes,
-                                            scope = AssistantAffectScope.ASSISTANT,
-                                            visual = true,
-                                            depth = depth,
-                                        ),
-                                        onClickCitation = handleClickCitation,
-                                        modifier = Modifier
-                                            .animateContentSize()
-                                    )
+                                    renderedText(Modifier.animateContentSize())
                                 }
                             }
                         }

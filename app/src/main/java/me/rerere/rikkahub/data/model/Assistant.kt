@@ -67,6 +67,9 @@ data class QuickMessage(
     val id: Uuid = Uuid.random(),
     val title: String = "",
     val content: String = "",
+    /** Set name from a SillyTavern quick-reply JSON file. Empty for a single button. */
+    val setName: String = "",
+    val hidden: Boolean = false,
 )
 
 @Serializable

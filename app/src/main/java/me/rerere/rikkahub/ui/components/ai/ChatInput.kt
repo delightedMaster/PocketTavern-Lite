@@ -41,6 +41,7 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -93,7 +94,6 @@ import me.rerere.hugeicons.stroke.Fullscreen
 import me.rerere.hugeicons.stroke.Zap
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.Settings
-import me.rerere.rikkahub.data.datastore.getQuickMessagesOfAssistant
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.QuickMessage
@@ -145,6 +145,12 @@ fun ChatInput(
     onStartVoiceMode: (() -> Unit)? = null,
     voiceState: VoiceSessionState = VoiceSessionState(),
     onStopVoiceMode: () -> Unit = {},
+    extraQuickReplyIds: Set<Uuid> = emptySet(),
+    onRunQuickReply: (String) -> Unit = {},
+    onBindQuickReplies: (() -> Unit)? = null,
+    speakerChoices: List<Pair<Uuid, String>> = emptyList(),
+    selectedSpeakerId: Uuid? = null,
+    onSelectSpeaker: (Uuid) -> Unit = {},
 ) {
     val toaster = LocalToaster.current
     val containerColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -164,6 +170,10 @@ fun ChatInput(
         providers = settings.providers,
         type = ModelType.CHAT,
     )
+    val quickMessages = remember(settings.quickMessages, assistant.quickMessageIds, extraQuickReplyIds) {
+        val ids = assistant.quickMessageIds + extraQuickReplyIds
+        settings.quickMessages.filter { it.id in ids && !it.hidden }
+    }
 
     fun sendMessage() {
         focusManager.clearFocus(force = true)
@@ -237,6 +247,41 @@ fun ChatInput(
                 onFinishEdit = onFinishEditQueuedMessage,
                 onResume = onResumeMessageQueue,
             )
+            if (speakerChoices.isNotEmpty() || quickMessages.isNotEmpty() || onBindQuickReplies != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    speakerChoices.forEach { (id, name) ->
+                        FilterChip(
+                            selected = id == selectedSpeakerId,
+                            onClick = { onSelectSpeaker(id) },
+                            label = { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        )
+                    }
+                    quickMessages.forEach { quickMessage ->
+                        FilterChip(
+                            selected = false,
+                            onClick = { onRunQuickReply(quickMessage.content) },
+                            label = {
+                                Text(
+                                    text = quickReplyLabel(quickMessage),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                        )
+                    }
+                    if (onBindQuickReplies != null) {
+                        TextButton(onClick = onBindQuickReplies) {
+                            Text(stringResource(R.string.chat_page_bind_quick_replies))
+                        }
+                    }
+                }
+            }
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -272,9 +317,10 @@ fun ChatInput(
 
                     TextInputRow(
                         state = state,
-                        assistant = assistant,
+                        quickMessages = quickMessages,
                         completionProviders = completionProviders,
                         onSendMessage = { sendMessage() },
+                        onRunQuickReply = onRunQuickReply,
                     )
 
                     Row(
@@ -462,18 +508,21 @@ private fun ActionIconButton(
     }
 }
 
+private fun quickReplyLabel(quickMessage: QuickMessage): String {
+    val title = quickMessage.title.ifBlank { quickMessage.content }
+    return if (quickMessage.setName.isBlank()) title else "${quickMessage.setName} · $title"
+}
+
 @Composable
 private fun TextInputRow(
     state: ChatInputState,
-    assistant: Assistant,
+    quickMessages: List<QuickMessage>,
     completionProviders: List<ChatCompletionProvider>,
     onSendMessage: () -> Unit,
+    onRunQuickReply: (String) -> Unit,
 ) {
     val settings = LocalSettings.current
     val filesManager: FilesManager = koinInject()
-    val quickMessages = remember(settings.quickMessages, assistant.quickMessageIds) {
-        settings.getQuickMessagesOfAssistant(assistant)
-    }
 
     var isEditingReasoning by remember { mutableStateOf(false) }
 
@@ -643,7 +692,7 @@ private fun TextInputRow(
             },
             leadingIcon = if (quickMessages.isNotEmpty()) {
                 {
-                    QuickMessageButton(quickMessages = quickMessages, state = state)
+                    QuickMessageButton(quickMessages = quickMessages, onRun = onRunQuickReply)
                 }
             } else null,
         )
@@ -748,7 +797,7 @@ private fun ChatInputState.applyCompletion(
 @Composable
 private fun QuickMessageButton(
     quickMessages: List<QuickMessage>,
-    state: ChatInputState,
+    onRun: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     IconButton(
@@ -765,7 +814,7 @@ private fun QuickMessageButton(
             quickMessages.forEach { quickMessage ->
                 Surface(
                     onClick = {
-                        state.appendText(quickMessage.content)
+                        onRun(quickMessage.content)
                         expanded = false
                     },
                     color = Color.Transparent,
@@ -775,7 +824,7 @@ private fun QuickMessageButton(
                         modifier = Modifier.padding(8.dp)
                     ) {
                         Text(
-                            text = quickMessage.title,
+                            text = quickReplyLabel(quickMessage),
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,

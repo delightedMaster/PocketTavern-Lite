@@ -17,6 +17,8 @@ import me.rerere.ai.provider.TextGenerationParams
 import me.rerere.ai.core.MessageRole
 import me.rerere.ai.ui.UIMessage
 import me.rerere.rikkahub.R
+import me.rerere.rikkahub.data.ai.group.groupCardLines
+import me.rerere.rikkahub.data.ai.group.toGroupMember
 import me.rerere.rikkahub.data.ai.tools.ChatToolFactory
 import me.rerere.rikkahub.data.ai.transformers.Base64ImageToLocalFileTransformer
 import me.rerere.rikkahub.data.ai.transformers.DocumentAsPromptTransformer
@@ -34,6 +36,7 @@ import me.rerere.rikkahub.data.ai.transformers.transforms
 import me.rerere.rikkahub.data.ai.transformers.visualTransforms
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.findProvider
+import me.rerere.rikkahub.data.datastore.getAssistantById
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.MemoryFile
@@ -66,6 +69,10 @@ class ChatTurnContext(
     val memories: List<MemoryFile>,
     val tools: List<Tool>,
     var promptState: me.rerere.rikkahub.data.ai.assembly.PromptCacheState,
+    /** Member cards in the group's fixed order. Empty for a single-character chat. */
+    val groupCards: List<String> = emptyList(),
+    val speakerName: String? = null,
+    val speakerId: String? = null,
 )
 
 /** 把会话变成发给模型的请求：系统提示词、上下文裁剪、输入输出转换都在这里 */
@@ -98,6 +105,13 @@ class ChatRequestFactory(
         val model = settings.getChatModelOf(conversation)
             ?: throw IllegalStateException("No chat model selected")
         val provider = model.findProvider(settings.providers) ?: error("Provider not found")
+        val group = conversation.config?.groupId?.let { id ->
+            settings.groupChats.firstOrNull { it.id == id && it.enabled }
+        }
+        val members = group?.let { active ->
+            active.memberIds.mapNotNull { settings.getAssistantById(it)?.toGroupMember(active) }
+        }.orEmpty()
+        val speaker = members.firstOrNull { it.id == conversation.config?.groupSpeakerId?.toString() }
         return ChatTurnContext(
             settings = settings,
             assistant = assistant,
@@ -116,6 +130,9 @@ class ChatRequestFactory(
                 workspaceCwd = conversation.workspaceCwd,
             ),
             promptState = conversation.promptState,
+            groupCards = if (members.isEmpty()) emptyList() else groupCardLines(members),
+            speakerName = speaker?.name,
+            speakerId = speaker?.id,
         )
     }
 

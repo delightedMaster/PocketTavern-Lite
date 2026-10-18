@@ -197,6 +197,7 @@ class SettingsStore internal constructor(
         val SUMMARY_USE_CHAT_MODEL = booleanPreferencesKey("summary_use_chat_model")
         val SUMMARY_MODEL_ID = stringPreferencesKey("summary_model_id")
         val SUMMARY_PROMPT = stringPreferencesKey("summary_prompt")
+        val HTML_CARD_ALLOWLIST = stringPreferencesKey("html_card_allowlist")
         val AUTHOR_NOTE_ENTRIES = stringPreferencesKey("author_note_entries")
         val MACRO_GLOBAL_VARIABLES = stringPreferencesKey("macro_global_variables")
         val MACRO_CHAT_VARIABLES = stringPreferencesKey("macro_chat_variables")

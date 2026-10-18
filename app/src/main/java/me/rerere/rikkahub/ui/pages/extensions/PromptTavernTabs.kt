@@ -538,4 +538,14 @@ private fun MemorySummarySettings(
         modifier = Modifier.fillMaxWidth(),
         minLines = 4,
     )
+    OutlinedTextField(
+        value = settings.htmlCardAllowlist.joinToString(", "),
+        onValueChange = { value ->
+            val hosts = value.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            onUpdate { it.copy(htmlCardAllowlist = hosts) }
+        },
+        label = { Text(stringResource(R.string.prompt_page_html_allowlist)) },
+        supportingText = { Text(stringResource(R.string.prompt_page_html_allowlist_desc)) },
+        modifier = Modifier.fillMaxWidth(),
+    )
 }

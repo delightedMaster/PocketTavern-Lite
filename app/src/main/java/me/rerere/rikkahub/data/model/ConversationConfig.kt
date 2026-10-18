@@ -26,6 +26,12 @@ data class ConversationConfig(
     val mcpServers: Set<Uuid> = emptySet(),
     val workspaceId: Uuid? = null,
     val enabledSkills: Set<String> = emptySet(),
+    /** Group chat this conversation belongs to. Null for a single-character chat. */
+    val groupId: Uuid? = null,
+    /** Who speaks next when the group strategy is manual, and the last choice otherwise. */
+    val groupSpeakerId: Uuid? = null,
+    /** Quick replies pinned to this chat, in addition to the character's set. */
+    val quickReplyIds: Set<Uuid> = emptySet(),
 )
 
 // 内置搜索是模型的开关，不在助手上，由调用方另行填入
@@ -70,7 +76,10 @@ fun Conversation.withAssistantUpdate(updated: Assistant, settings: Settings): Co
                 } else {
                     // 内置搜索是模型自身的能力，换模型后跟随新模型的开关
                     settings.findModelById(updated.chatModelId)?.tools?.contains(BuiltInTools.Search) == true
-                }
+                },
+                groupId = config.groupId,
+                groupSpeakerId = config.groupSpeakerId,
+                quickReplyIds = config.quickReplyIds,
             ),
             modeInjectionIds = updated.modeInjectionIds,
             lorebookIds = updated.lorebookIds,

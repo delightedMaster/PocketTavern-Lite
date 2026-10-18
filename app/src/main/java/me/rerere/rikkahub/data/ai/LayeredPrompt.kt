@@ -15,6 +15,8 @@ import me.rerere.rikkahub.data.ai.assembly.PromptPiece
 import me.rerere.rikkahub.data.ai.assembly.assemblePrompt
 import me.rerere.rikkahub.data.ai.assembly.cleanupPromptState
 import me.rerere.rikkahub.data.ai.assembly.firstDivergence
+import me.rerere.rikkahub.data.ai.group.GROUP_PREAMBLE
+import me.rerere.rikkahub.data.ai.group.speakerCue
 import me.rerere.rikkahub.data.ai.prompts.buildMemoryPrompt
 import me.rerere.rikkahub.data.ai.transformers.collectInjections
 import me.rerere.rikkahub.data.datastore.authorNoteEntriesOrLegacy
@@ -91,7 +93,8 @@ internal fun ChatTurnContext.layeredPrompt(
             timeText = tailTime(),
             memoryText = memoryText(),
             toolText = toolText(messages),
-            stateVars = stateVarText(),
+            stateVars = stateVarText(promptMessages.lastOrNull { !it.archived }?.id?.toString()),
+            speakerText = speakerName?.let { speakerCue(it) },
             state = state.copy(
                 frozenTurnId = turnId,
                 frozenConstant = constant,
@@ -211,10 +214,15 @@ private fun ChatTurnContext.staticLayers(
         else -> assistant.systemPrompt
     }
     return buildList {
-        if (system.isNotBlank()) add(system)
-        if (tavern) {
-            addAll(assistant.assembleCharacterCardMessages().map { it.toText() })
-            addAll(assistant.buildExampleMessages(userName).map { it.toText() })
+        if (groupCards.isNotEmpty()) {
+            add(GROUP_PREAMBLE)
+            addAll(groupCards)
+        } else {
+            if (system.isNotBlank()) add(system)
+            if (tavern) {
+                addAll(assistant.assembleCharacterCardMessages().map { it.toText() })
+                addAll(assistant.buildExampleMessages(userName).map { it.toText() })
+            }
         }
         addAll(constant)
     }
@@ -257,14 +265,16 @@ private fun ChatTurnContext.toolText(messages: List<UIMessage>): String? {
     return lines.joinToString("\n")
 }
 
-private fun ChatTurnContext.stateVarText(): String? {
+private fun ChatTurnContext.stateVarText(latestMessageId: String?): String? {
     val id = conversationId.toString()
     val chat = settings.macroChatVariables[id].orEmpty().toSortedMap()
     val global = settings.macroGlobalVariables.toSortedMap()
-    if (chat.isEmpty() && global.isEmpty()) return null
+    val message = latestMessageId?.let { promptState.messageVariables[it] }.orEmpty().toSortedMap()
+    if (chat.isEmpty() && global.isEmpty() && message.isEmpty()) return null
     return buildString {
         global.forEach { (key, value) -> appendLine("global.$key=$value") }
         chat.forEach { (key, value) -> appendLine("chat.$key=$value") }
+        message.forEach { (key, value) -> appendLine("message.$key=$value") }
     }.trim()
 }
 

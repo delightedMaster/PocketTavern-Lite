@@ -34,6 +34,7 @@ import me.rerere.ai.provider.Model
 import me.rerere.ai.provider.ModelAbility
 import me.rerere.ai.ui.ToolApprovalState
 import me.rerere.ai.ui.UIMessage
+import me.rerere.ai.ui.UIMessageAnnotation
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.ai.ui.isEmptyInputMessage
 import me.rerere.common.android.Logging
@@ -60,6 +61,9 @@ import me.rerere.rikkahub.data.ai.ConversationMetaGenerator
 import me.rerere.rikkahub.data.ai.MemoryConsolidationScheduler
 import me.rerere.rikkahub.data.ai.TranslationHandler
 import me.rerere.rikkahub.data.ai.mcp.McpManager
+import me.rerere.rikkahub.data.ai.group.SpeakerChoice
+import me.rerere.rikkahub.data.ai.group.nextGroupSpeaker
+import me.rerere.rikkahub.data.ai.group.toGroupMember
 import me.rerere.rikkahub.data.ai.prompts.buildCompressPrompt
 import me.rerere.rikkahub.data.ai.tools.InvalidMcpServerNamesException
 import me.rerere.rikkahub.data.ai.tools.shouldUseExternalWebSearch
@@ -67,12 +71,14 @@ import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.datastore.findModelById
 import me.rerere.rikkahub.data.datastore.findProvider
+import me.rerere.rikkahub.data.datastore.getAssistantById
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.data.event.AppEvent
 import me.rerere.rikkahub.data.event.AppEventBus
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Conversation
+import me.rerere.rikkahub.data.model.ConversationConfig
 import me.rerere.rikkahub.data.model.archiveMessages
 import me.rerere.rikkahub.data.model.bindConfig
 import me.rerere.rikkahub.data.model.deleteMessages
@@ -626,7 +632,17 @@ class ChatService(
                         )
                     }
             }
-            val conversation = session.state.value
+            var conversation = session.state.value
+            if (regenerateNodeId == null && conversation.currentMessages.lastOrNull()?.role == MessageRole.USER) {
+                val choice = chooseGroupSpeaker(settings, conversation)
+                if (choice != null && conversation.config?.groupSpeakerId?.toString() != choice.id) {
+                    session.update { latest ->
+                        val config = latest.config ?: return@update latest
+                        latest.copy(config = config.copy(groupSpeakerId = Uuid.parse(choice.id)))
+                    }
+                    conversation = session.state.value
+                }
+            }
             val turn = requestFactory.createContext(settings, conversation)
             senderName = if (turn.assistant.useAssistantAvatar) {
                 turn.assistant.name.ifEmpty { context.getString(R.string.assistant_page_default_assistant) }
@@ -657,7 +673,20 @@ class ChatService(
                         is AgentEvent.MessageUpdated -> {
                             // 生成过程中只有网络重试的提示会留着，收到新内容说明重试已经成功
                             session.processingStatus.value = null
-                            session.update { it.upsertMessage(replyNodeId, event.message) }
+                            val speakerId = turn.speakerId
+                            val speakerName = turn.speakerName
+                            val tagged = if (
+                                speakerId != null && speakerName != null &&
+                                event.message.annotations.none { it is UIMessageAnnotation.GroupSpeaker }
+                            ) {
+                                event.message.copy(
+                                    annotations = event.message.annotations +
+                                        UIMessageAnnotation.GroupSpeaker(speakerId, speakerName),
+                                )
+                            } else {
+                                event.message
+                            }
+                            session.update { it.upsertMessage(replyNodeId, tagged) }
                             // 通知等边缘副作用由 ChatNotificationManager 消费；
                             // tryEmit 不挂起，事件丢失只影响单次通知更新，不能反压生成链
                             appEventBus.tryEmit(
@@ -840,6 +869,109 @@ class ChatService(
             check(!session.isGenerating) { context.getString(R.string.chat_page_summary_busy) }
             summarizeConversation(session, force = true)
         }
+    }
+
+    suspend fun setGroupSpeaker(conversationId: Uuid, speakerId: Uuid) {
+        val settings = settingsStore.awaitLoaded()
+        withLoadedSession(conversationId) { session ->
+            session.updateMetadata(
+                transform = { latest ->
+                    val bound = if (latest.config == null) latest.bindConfig(settings) else latest
+                    bound.copy(config = bound.config?.copy(groupSpeakerId = speakerId))
+                },
+                persist = conversationRepo::updateConversationConfig,
+            )
+        }
+    }
+
+    suspend fun updateQuickReplyIds(conversationId: Uuid, ids: Set<Uuid>) {
+        val settings = settingsStore.awaitLoaded()
+        withLoadedSession(conversationId) { session ->
+            session.updateMetadata(
+                transform = { latest ->
+                    val bound = if (latest.config == null) latest.bindConfig(settings) else latest
+                    bound.copy(config = bound.config?.copy(quickReplyIds = ids))
+                },
+                persist = conversationRepo::updateConversationConfig,
+            )
+        }
+    }
+
+    suspend fun updateMessageVariables(conversationId: Uuid, variables: Map<String, Map<String, String>>) {
+        mutate(conversationId) { it.copy(promptState = it.promptState.copy(messageVariables = variables)) }
+    }
+
+    /**
+     * `/gen` with no text. Starts a turn only when the user is already the last speaker.
+     */
+    fun generateReply(conversationId: Uuid) {
+        val session = sessionManager.getOrCreate(conversationId)
+        synchronized(session) {
+            if (session.getJob() != null) return
+            val job = launchGenerationJob(conversationId) {
+                try {
+                    ensureInitialized(session)
+                    val last = session.state.value.currentMessages.lastOrNull()
+                    check(last?.role == MessageRole.USER) {
+                        context.getString(R.string.chat_page_gen_needs_user)
+                    }
+                    runTurn(session)
+                    _generationDoneFlow.emit(conversationId)
+                } catch (e: Exception) {
+                    reportFailure(session, e, R.string.chat_page_summary_failed)
+                }
+            }
+            session.setJob(job)
+        }
+    }
+
+    suspend fun openGroupChat(groupId: Uuid): Uuid {
+        val settings = settingsStore.awaitLoaded()
+        val group = settings.groupChats.firstOrNull { it.id == groupId }
+            ?: error("Group not found")
+        group.conversationId?.let { existing ->
+            if (conversationRepo.getConversationById(existing) != null) return existing
+        }
+        val assistantId = group.memberIds.firstOrNull() ?: settings.getCurrentAssistant().id
+        val id = Uuid.random()
+        val draft = Conversation.ofId(id, assistantId)
+        val model = settings.findModelById(group.chatModelId) ?: settings.getChatModelOf(draft)
+        val conversation = draft.copy(
+            title = group.name.ifBlank { "Group" },
+            config = ConversationConfig(
+                groupId = group.id,
+                chatModelId = model?.id,
+                builtInSearch = model != null && BuiltInTools.Search in model.tools,
+            ),
+        )
+        conversationRepo.insertConversation(conversation)
+        settingsStore.update { current ->
+            current.copy(
+                groupChats = current.groupChats.map { item ->
+                    if (item.id == group.id) item.copy(conversationId = id) else item
+                },
+            )
+        }
+        return id
+    }
+
+    private fun chooseGroupSpeaker(settings: Settings, conversation: Conversation): SpeakerChoice? {
+        val groupId = conversation.config?.groupId ?: return null
+        val group = settings.groupChats.firstOrNull { it.id == groupId && it.enabled } ?: return null
+        val members = group.memberIds.mapNotNull { settings.getAssistantById(it)?.toGroupMember(group) }
+        val lastSpeaker = conversation.currentMessages.asReversed().firstNotNullOfOrNull { message ->
+            message.annotations.filterIsInstance<UIMessageAnnotation.GroupSpeaker>().firstOrNull()?.memberId
+        }
+        val lastUser = conversation.currentMessages.lastOrNull { it.role == MessageRole.USER }?.toText().orEmpty()
+        return nextGroupSpeaker(
+            strategy = group.activationStrategy,
+            members = members,
+            lastSpeakerId = lastSpeaker,
+            lastMessage = lastUser,
+            manualSpeakerId = conversation.config?.groupSpeakerId?.toString(),
+            allowSelfResponses = group.allowSelfResponses,
+            randomDraw = kotlin.random.Random.nextInt(0, Int.MAX_VALUE),
+        )
     }
 
     suspend fun restoreArchived(conversationId: Uuid, messageIds: List<Uuid>) {

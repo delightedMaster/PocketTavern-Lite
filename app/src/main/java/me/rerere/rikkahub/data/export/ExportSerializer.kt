@@ -557,6 +557,7 @@ object SillyTavernRegexImporter {
 object SillyTavernQuickRepliesImporter {
     fun parse(json: String): List<QuickMessage> = runCatching {
         val element = Json.parseToJsonElement(json)
+        val setName = (element as? JsonObject)?.get("name")?.jsonPrimitive?.contentOrNull.orEmpty()
         val qrArray: JsonArray = when (element) {
             is JsonArray -> element
             is JsonObject -> (element["qrList"] ?: element["quickReplies"]) as? JsonArray ?: return emptyList()
@@ -567,8 +568,12 @@ object SillyTavernQuickRepliesImporter {
             val message = obj["message"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
             if (message.isBlank()) return@mapNotNull null
             QuickMessage(
-                title = obj["label"]?.jsonPrimitive?.contentOrNull ?: "",
+                title = obj["label"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["title"]?.jsonPrimitive?.contentOrNull
+                    ?: "",
                 content = message,
+                setName = setName,
+                hidden = obj["isHidden"]?.jsonPrimitive?.booleanOrNull ?: false,
             )
         }
     }.getOrDefault(emptyList())

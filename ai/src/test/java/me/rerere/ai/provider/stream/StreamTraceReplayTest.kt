@@ -417,6 +417,7 @@ class StreamTraceReplayTest {
                     })
                     UIMessageAnnotation.CharacterCardData,
                     UIMessageAnnotation.ExampleMessage,
+                    is UIMessageAnnotation.GroupSpeaker,
                     -> Unit
                 }
             }

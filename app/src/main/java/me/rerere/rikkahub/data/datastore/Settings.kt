@@ -113,11 +113,13 @@ data class Settings(
     val summaryModelId: Uuid? = null,
     /** Empty uses the built-in prompt for the current language. */
     val summaryPrompt: String = "",
+    /** Hosts an HTML card may fetch. Empty blocks every network request. */
+    val htmlCardAllowlist: List<String> = emptyList(),
     // null = 尚未物化的新格式，继续兼容旧 authorNote
     val authorNoteEntries: List<AuthorNoteEntry>? = null,
     val macroGlobalVariables: Map<String, String> = emptyMap(),
     val macroChatVariables: Map<String, Map<String, String>> = emptyMap(),
-    // 只给宏 {{groupNotMuted}} 读取。群聊生成是后续步骤，这里不提供入口。
+    // 群聊成员卡按 memberIds 的固定顺序放进前缀。记忆世界书是会话自己的那一份。
     val groupChats: List<GroupChat> = emptyList(),
     val webServerEnabled: Boolean = false,
     val webServerPort: Int = 8080,
