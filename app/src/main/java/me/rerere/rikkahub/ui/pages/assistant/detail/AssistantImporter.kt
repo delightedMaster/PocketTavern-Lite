@@ -734,7 +734,8 @@ private fun materializeEmbeddedBook(assistantName: String, tavData: TavernCharac
         Lorebook(
             name = book.name.ifBlank { assistantName + "世界书" },
             description = book.description,
-            enabled = true,
+            // 内嵌书由卡片现场扫描。这本书默认关闭，打开后扫描器也会跳过它，避免双注入。
+            enabled = false,
             entries = bookEntries,
             isCharacterBook = true,
         )

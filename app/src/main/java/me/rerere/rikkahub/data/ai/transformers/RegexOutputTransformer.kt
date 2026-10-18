@@ -54,15 +54,17 @@ internal fun List<UIMessage>.replaceRegexesForDisplay(
     }
 }
 
-// 提示词层：结果会写回会话，markdownOnly 的正则（前端卡 HTML）必须跳过
-
+/**
+ * Prompt-layer regex is applied to a copy when the request is assembled.
+ * Persisting it here would make a script that is neither prompt-only nor display-only
+ * run a second time on the already rewritten text when the bubble renders.
+ * SillyTavern runs each layer once, both starting from the stored original.
+ */
 object RegexOutputTransformer : OutputMessageTransformer, KoinComponent {
     override suspend fun visualTransform(
         ctx: TransformerContext,
         messages: List<UIMessage>,
-    ): List<UIMessage> = messages.replaceRegexesForDisplay(
-        ctx.assistant, ctx.conversationId, visual = false, globalRegexes = ctx.settings.globalRegexes,
-    )
+    ): List<UIMessage> = messages
 }
 
 // 纯显示层：结果只进渲染

@@ -183,6 +183,23 @@ internal val SETTINGS_FIELDS: List<SettingsField<*, *>> = with(SettingsStore) {
             decode = { name -> runCatching { MessageRole.valueOf(name) }.getOrDefault(MessageRole.SYSTEM) },
         ),
         plain(AUTHOR_NOTE_INTERVAL, Settings::authorNoteInterval) { copy(authorNoteInterval = it) },
+        plain(SUMMARY_ENABLED, Settings::summaryEnabled) { copy(summaryEnabled = it) },
+        plain(SUMMARY_TRIGGER_FLOORS, Settings::summaryTriggerFloors) { copy(summaryTriggerFloors = it) },
+        plain(SUMMARY_KEEP_FLOORS, Settings::summaryKeepFloors) { copy(summaryKeepFloors = it) },
+        plain(SUMMARY_CONSOLIDATION_TOKENS, Settings::summaryConsolidationTokens) {
+            copy(summaryConsolidationTokens = it)
+        },
+        plain(SUMMARY_DELETE_ARCHIVED, Settings::summaryDeleteArchived) { copy(summaryDeleteArchived = it) },
+        plain(SUMMARY_REVIEW_BEFORE_COMMIT, Settings::summaryReviewBeforeCommit) {
+            copy(summaryReviewBeforeCommit = it)
+        },
+        plain(SUMMARY_USE_CHAT_MODEL, Settings::summaryUseChatModel) { copy(summaryUseChatModel = it) },
+        SettingsField(
+            SUMMARY_MODEL_ID, Settings::summaryModelId, { copy(summaryModelId = it) },
+            encode = { it?.toString() },
+            decode = { Uuid.parse(it) },
+        ),
+        plain(SUMMARY_PROMPT, Settings::summaryPrompt) { copy(summaryPrompt = it) },
         SettingsField(
             AUTHOR_NOTE_ENTRIES, Settings::authorNoteEntries, { copy(authorNoteEntries = it) },
             encode = { entries -> entries?.let { JsonInstant.encodeToString(it) } },

@@ -427,8 +427,12 @@ internal fun collectInjections(
     //    官方模型（world-info.js checkWorldInfo）：characterLore（角色卡内嵌书）+ globalLore
     //    （绑定的外置书）合并成一个列表统一扫描，两者始终同时生效、互不覆盖。
     //    内嵌书直接从卡片构建（不物化成外置书），所以不可能与全局书互相改写。
+    // 角色卡内嵌书已经从 tavernData 现场扫描。物化出来的 isCharacterBook 外置书
+    // 再扫一遍会把同一条内容注入两次，所以有内嵌书时跳过那本外置书。
+    val liveCharacterBook = assistant.tavernData?.embeddedBook != null
     val boundLorebooks = lorebooks.filter {
-        it.enabled && effectiveLorebookIds.contains(it.id)
+        it.enabled && effectiveLorebookIds.contains(it.id) &&
+            !(liveCharacterBook && it.isCharacterBook)
     }
     // 角色卡内嵌书始终生效，不受绑定开关影响（解绑外置书不影响卡内书）
     val characterEntries = buildCharacterBookEntries(assistant.tavernData)

@@ -390,6 +390,35 @@ class PromptInjectionTransformerTest {
     }
 
     @Test
+    fun `enabled materialized character book does not double inject the live card`() {
+        val bookId = Uuid.random()
+        val assistant = createAssistant(
+            tavernData = characterCardWithBook(entries = listOf(tavernEntry(keys = listOf("dragon")))),
+            lorebookIds = setOf(bookId),
+        )
+        val materialized = Lorebook(
+            id = bookId,
+            name = "Card Book",
+            enabled = true,
+            isCharacterBook = true,
+            entries = listOf(
+                createRegexInjection(keywords = listOf("dragon"), content = "Dragon lore"),
+            ),
+        )
+        val result = transformMessages(
+            messages = listOf(
+                UIMessage.system("System prompt"),
+                UIMessage.user("Tell me about the dragon"),
+            ),
+            assistant = assistant,
+            modeInjections = emptyList(),
+            lorebooks = listOf(materialized),
+        )
+        val text = result.joinToString("\n") { getMessageText(it) }
+        assertEquals(1, text.split("Dragon lore").size - 1)
+    }
+
+    @Test
     fun `character book and global lorebook both inject together`() {
         // issue #3：内嵌书与全局书必须同时生效，而不是互相覆盖
         val globalId = Uuid.random()

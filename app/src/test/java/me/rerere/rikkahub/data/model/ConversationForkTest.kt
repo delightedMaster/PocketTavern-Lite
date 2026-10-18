@@ -4,10 +4,13 @@ import me.rerere.ai.core.MessageRole
 import me.rerere.ai.core.ReasoningLevel
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.ui.UIMessagePart
+import me.rerere.rikkahub.data.ai.assembly.MemoryBlock
+import me.rerere.rikkahub.data.ai.assembly.PromptCacheState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.uuid.Uuid
 
@@ -91,6 +94,25 @@ class ConversationForkTest {
         assertEquals(remote, (parts[1] as UIMessagePart.Image).url)
         // 两个会话各删各的附件，工具结果里的文件也不能共用
         assertEquals("$nested.copy", ((parts[2] as UIMessagePart.Tool).output.single() as UIMessagePart.Image).url)
+    }
+
+    @Test
+    fun `fork shows archived floors again without the source memory book`() {
+        val message = UIMessage.user("old").copy(archived = true)
+        val source = Conversation(
+            assistantId = Uuid.random(),
+            messageNodes = listOf(message.toMessageNode()),
+            promptState = PromptCacheState(
+                memoryBlocks = listOf(MemoryBlock(startFloor = 1, endFloor = 1, text = "summary")),
+                summarizedIds = setOf(message.id.toString()),
+            ),
+        )
+
+        val fork = source.fork(message.id, emptySet()) { it }!!
+
+        assertFalse(fork.currentMessages.single().archived)
+        assertTrue(fork.promptState.memoryBlocks.isEmpty())
+        assertTrue(fork.promptState.summarizedIds.isEmpty())
     }
 
     @Test

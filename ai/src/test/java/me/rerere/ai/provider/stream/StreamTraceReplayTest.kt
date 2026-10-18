@@ -411,6 +411,13 @@ class StreamTraceReplayTest {
                         put("title", annotation.title)
                         put("url", annotation.url)
                     })
+                    is UIMessageAnnotation.CacheBreakpoint -> add(buildJsonObject {
+                        put("type", "cache_breakpoint")
+                        put("point", annotation.point)
+                    })
+                    UIMessageAnnotation.CharacterCardData,
+                    UIMessageAnnotation.ExampleMessage,
+                    -> Unit
                 }
             }
         }

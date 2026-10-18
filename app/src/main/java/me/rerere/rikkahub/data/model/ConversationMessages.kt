@@ -10,6 +10,34 @@ import kotlin.uuid.Uuid
  * 删除一条消息：节点里没有别的分支时整个节点一起删掉，否则选中的分支向前收拢。
  * 消息不存在时返回 null。
  */
+internal fun Conversation.archiveMessages(messageIds: Set<String>): Conversation = copy(
+    messageNodes = messageNodes.map { node ->
+        node.copy(messages = node.messages.map { message ->
+            if (message.id.toString() in messageIds) message.copy(archived = true) else message
+        })
+    }
+)
+
+internal fun Conversation.restoreMessages(messageIds: Set<String>): Conversation = copy(
+    messageNodes = messageNodes.map { node ->
+        node.copy(messages = node.messages.map { message ->
+            if (message.id.toString() in messageIds) message.copy(archived = false) else message
+        })
+    },
+    promptState = promptState.copy(
+        summarizedIds = promptState.summarizedIds - messageIds,
+    ),
+)
+
+internal fun Conversation.deleteMessages(messageIds: Set<String>): Conversation {
+    var current = this
+    messageIds.forEach { id ->
+        val parsed = runCatching { Uuid.parse(id) }.getOrNull() ?: return@forEach
+        current = current.deleteMessage(parsed) ?: current
+    }
+    return current
+}
+
 internal fun Conversation.deleteMessage(messageId: Uuid): Conversation? {
     val targetNodeIndex = messageNodes.indexOfFirst { node -> node.messages.any { it.id == messageId } }
     if (targetNodeIndex == -1) return null

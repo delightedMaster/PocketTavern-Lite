@@ -241,6 +241,28 @@ class ChatVM(
         }
     }
 
+    val pendingSummaryReview = chatService.pendingSummaryReview
+
+    fun confirmSummaryReview(text: String) {
+        chatService.submitSummaryReview(text)
+    }
+
+    fun cancelSummaryReview() {
+        chatService.submitSummaryReview(null)
+    }
+
+    fun summarizeNow(): Job = viewModelScope.launch {
+        runCatching { chatService.summarizeNow(_conversationId) }.onFailure {
+            chatService.addError(it, title = context.getString(R.string.chat_page_summary_failed))
+        }
+    }
+
+    fun restoreArchived(messageIds: List<kotlin.uuid.Uuid>) {
+        viewModelScope.launch {
+            chatService.restoreArchived(_conversationId, messageIds)
+        }
+    }
+
     fun handleCompressContext(additionalPrompt: String): Job {
         return viewModelScope.launch {
             chatService.compressConversation(_conversationId, additionalPrompt).onFailure {

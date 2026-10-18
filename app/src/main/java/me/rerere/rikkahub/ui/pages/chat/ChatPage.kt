@@ -3,9 +3,13 @@ package me.rerere.rikkahub.ui.pages.chat
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
@@ -70,6 +74,7 @@ import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.service.ChatError
+import me.rerere.rikkahub.service.PendingSummaryReview
 import me.rerere.rikkahub.ui.components.ai.ChatAttachmentPickerActions
 import me.rerere.rikkahub.ui.components.ai.ChatInput
 import me.rerere.rikkahub.ui.components.ai.FilesPicker
@@ -312,6 +317,15 @@ private fun ChatPageContent(
     }
 
     TTSAutoPlay(vm = vm, setting = setting, conversation = conversation)
+    val pendingSummary by vm.pendingSummaryReview.collectAsStateWithLifecycle()
+    val review = pendingSummary?.takeIf { it.conversationId == conversation.id }
+    if (review != null) {
+        SummaryReviewDialog(
+            pending = review,
+            onConfirm = vm::confirmSummaryReview,
+            onCancel = vm::cancelSummaryReview,
+        )
+    }
 
     Surface(
         color = MaterialTheme.colorScheme.background,
@@ -437,6 +451,7 @@ private fun ChatPageContent(
                         navigateToChatPage(navController, chatId = fork.id)
                     }
                 },
+                onRestoreArchived = vm::restoreArchived,
                 onDelete = {
                     if (loadingJob != null) {
                         vm.showDeleteBlockedWhileGeneratingError()
@@ -531,6 +546,7 @@ private fun ChatFilesPickerSheet(
             chatModel = chatModel,
             mcpManager = vm.mcpManager,
             onCompressContext = vm::handleCompressContext,
+            onSummarizeNow = vm::summarizeNow,
             onUpdateAssistant = vm::updateAssistant,
             onUpdateWorkspaceCwd = vm::updateWorkspaceCwd,
             showCompressDialog = showCompressDialog,
@@ -575,6 +591,11 @@ private fun TopBar(
     val titleState = useEditState<String> {
         onUpdateTitle(it)
     }
+    var showPrefixDiff by rememberSaveable { mutableStateOf(false) }
+    val promptTokens = conversation.currentMessages.sumOf { it.usage?.promptTokens ?: 0 }
+    val cachedTokens = conversation.currentMessages.sumOf { it.usage?.cachedTokens ?: 0 }
+    val cachePercent = if (promptTokens > 0) ((cachedTokens.toLong() * 100) / promptTokens).toInt() else 0
+    val hasPrefix = conversation.promptState.lastFullRequest.isNotEmpty()
 
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
@@ -618,6 +639,19 @@ private fun TopBar(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 8.sp,
                             )
+                        )
+                    }
+                    if (promptTokens > 0 || hasPrefix) {
+                        Text(
+                            text = if (promptTokens > 0) {
+                                stringResource(R.string.chat_page_cache_hit_rate, cachePercent)
+                            } else {
+                                stringResource(R.string.chat_page_prefix_diff)
+                            },
+                            modifier = Modifier.clickable { showPrefixDiff = true },
+                            maxLines = 1,
+                            color = LocalContentColor.current.copy(0.65f),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
                         )
                     }
                 }
@@ -677,4 +711,71 @@ private fun TopBar(
             }
         )
     }
+    if (showPrefixDiff) {
+        val state = conversation.promptState
+        AlertDialog(
+            onDismissRequest = { showPrefixDiff = false },
+            title = { Text(stringResource(R.string.chat_page_prefix_diff_title)) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Text(
+                        if (state.prefixDivergeAt < 0) {
+                            stringResource(R.string.chat_page_prefix_diff_stable)
+                        } else {
+                            stringResource(R.string.chat_page_prefix_diff_at, state.prefixDivergeAt)
+                        }
+                    )
+                    if (state.prefixDivergeAt >= 0) {
+                        Text(stringResource(R.string.chat_page_prefix_diff_previous))
+                        Text(state.divergePrevious.take(500))
+                        Text(stringResource(R.string.chat_page_prefix_diff_current))
+                        Text(state.divergeCurrent.take(500))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPrefixDiff = false }) {
+                    Text(stringResource(R.string.chat_page_cancel))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SummaryReviewDialog(
+    pending: PendingSummaryReview,
+    onConfirm: (String) -> Unit,
+    onCancel: () -> Unit,
+) {
+    var text by remember(pending.draft, pending.startFloor, pending.endFloor) { mutableStateOf(pending.draft) }
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = {
+            Text(stringResource(R.string.chat_page_summary_review_title, pending.startFloor, pending.endFloor))
+        },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 360.dp),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(text) }, enabled = text.isNotBlank()) {
+                Text(stringResource(R.string.chat_page_summary_commit))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancel) {
+                Text(stringResource(R.string.chat_page_cancel))
+            }
+        },
+    )
 }

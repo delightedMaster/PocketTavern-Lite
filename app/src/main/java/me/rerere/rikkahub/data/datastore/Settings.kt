@@ -100,6 +100,19 @@ data class Settings(
     val authorNoteDepth: Int = 4,
     val authorNoteRole: MessageRole = MessageRole.SYSTEM,
     val authorNoteInterval: Int = 1,
+    /** Summarize once the live floor count reaches this. 0 disables the automatic pass. */
+    val summaryEnabled: Boolean = true,
+    val summaryTriggerFloors: Int = 40,
+    val summaryKeepFloors: Int = 10,
+    /** When the memory lorebook is larger than this, fold older blocks into a recap. */
+    val summaryConsolidationTokens: Int = 2000,
+    /** False archives the summarized floors. True deletes them. */
+    val summaryDeleteArchived: Boolean = false,
+    val summaryReviewBeforeCommit: Boolean = false,
+    val summaryUseChatModel: Boolean = true,
+    val summaryModelId: Uuid? = null,
+    /** Empty uses the built-in prompt for the current language. */
+    val summaryPrompt: String = "",
     // null = 尚未物化的新格式，继续兼容旧 authorNote
     val authorNoteEntries: List<AuthorNoteEntry>? = null,
     val macroGlobalVariables: Map<String, String> = emptyMap(),

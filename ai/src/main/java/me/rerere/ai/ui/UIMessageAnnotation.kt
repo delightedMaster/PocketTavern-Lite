@@ -21,4 +21,12 @@ sealed class UIMessageAnnotation {
     @Serializable
     @SerialName("character_card")
     data object CharacterCardData : UIMessageAnnotation()
+
+    /**
+     * Ask the provider to put a cache breakpoint on this message.
+     * Claude keeps at most four breakpoints; the provider picks the earliest and latest marks.
+     */
+    @Serializable
+    @SerialName("cache_breakpoint")
+    data class CacheBreakpoint(val point: String) : UIMessageAnnotation()
 }

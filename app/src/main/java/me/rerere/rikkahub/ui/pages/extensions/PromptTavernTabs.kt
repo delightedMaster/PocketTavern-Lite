@@ -40,8 +40,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.rerere.ai.core.MessageRole
+import me.rerere.ai.provider.ModelType
 import me.rerere.rikkahub.R
+import me.rerere.rikkahub.data.ai.prompts.SUMMARY_PROMPT_EN
+import me.rerere.rikkahub.data.ai.prompts.SUMMARY_PROMPT_ZH
 import me.rerere.rikkahub.data.ai.transformers.MacroEngine
+import me.rerere.rikkahub.ui.components.ai.ModelSelector
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.authorNoteEntriesOrLegacy
 import me.rerere.rikkahub.data.export.SillyTavernRegexImporter
@@ -83,6 +87,7 @@ internal fun AuthorNoteTab(
                 },
             )
         }
+        MemorySummarySettings(settings, onUpdate)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -426,4 +431,111 @@ private fun RegexScriptRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+@Composable
+private fun MemorySummarySettings(
+    settings: Settings,
+    onUpdate: ((Settings) -> Settings) -> Unit,
+) {
+    Text(stringResource(R.string.prompt_page_memory_title), style = MaterialTheme.typography.titleSmall)
+    Text(
+        stringResource(R.string.prompt_page_memory_desc),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    CardGroup {
+        item(
+            headlineContent = { Text(stringResource(R.string.prompt_page_memory_enable)) },
+            trailingContent = {
+                Switch(
+                    checked = settings.summaryEnabled,
+                    onCheckedChange = { enabled -> onUpdate { it.copy(summaryEnabled = enabled) } },
+                )
+            },
+        )
+        item(
+            headlineContent = { Text(stringResource(R.string.prompt_page_memory_delete)) },
+            supportingContent = { Text(stringResource(R.string.prompt_page_memory_delete_desc)) },
+            trailingContent = {
+                Switch(
+                    checked = settings.summaryDeleteArchived,
+                    onCheckedChange = { enabled -> onUpdate { it.copy(summaryDeleteArchived = enabled) } },
+                )
+            },
+        )
+        item(
+            headlineContent = { Text(stringResource(R.string.prompt_page_memory_review)) },
+            trailingContent = {
+                Switch(
+                    checked = settings.summaryReviewBeforeCommit,
+                    onCheckedChange = { enabled -> onUpdate { it.copy(summaryReviewBeforeCommit = enabled) } },
+                )
+            },
+        )
+        item(
+            headlineContent = { Text(stringResource(R.string.prompt_page_memory_chat_model)) },
+            supportingContent = { Text(stringResource(R.string.prompt_page_memory_chat_model_desc)) },
+            trailingContent = {
+                Switch(
+                    checked = settings.summaryUseChatModel,
+                    onCheckedChange = { enabled -> onUpdate { it.copy(summaryUseChatModel = enabled) } },
+                )
+            },
+        )
+    }
+    if (!settings.summaryUseChatModel) {
+        ModelSelector(
+            modelId = settings.summaryModelId,
+            providers = settings.providers,
+            type = ModelType.CHAT,
+            onSelect = { model -> onUpdate { it.copy(summaryModelId = model.id) } },
+        )
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = settings.summaryTriggerFloors.toString(),
+            onValueChange = { value ->
+                value.toIntOrNull()?.let { floors -> onUpdate { it.copy(summaryTriggerFloors = floors.coerceAtLeast(1)) } }
+            },
+            label = { Text(stringResource(R.string.prompt_page_memory_trigger)) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.weight(1f),
+        )
+        OutlinedTextField(
+            value = settings.summaryKeepFloors.toString(),
+            onValueChange = { value ->
+                value.toIntOrNull()?.let { floors -> onUpdate { it.copy(summaryKeepFloors = floors.coerceAtLeast(0)) } }
+            },
+            label = { Text(stringResource(R.string.prompt_page_memory_keep)) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.weight(1f),
+        )
+    }
+    OutlinedTextField(
+        value = settings.summaryConsolidationTokens.toString(),
+        onValueChange = { value ->
+            value.toIntOrNull()?.let { tokens ->
+                onUpdate { it.copy(summaryConsolidationTokens = tokens.coerceAtLeast(0)) }
+            }
+        },
+        label = { Text(stringResource(R.string.prompt_page_memory_tokens)) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton(onClick = { onUpdate { it.copy(summaryPrompt = SUMMARY_PROMPT_EN) } }) {
+            Text(stringResource(R.string.prompt_page_memory_prompt_en))
+        }
+        TextButton(onClick = { onUpdate { it.copy(summaryPrompt = SUMMARY_PROMPT_ZH) } }) {
+            Text(stringResource(R.string.prompt_page_memory_prompt_zh))
+        }
+    }
+    OutlinedTextField(
+        value = settings.summaryPrompt,
+        onValueChange = { value -> onUpdate { it.copy(summaryPrompt = value) } },
+        label = { Text(stringResource(R.string.prompt_page_memory_prompt)) },
+        modifier = Modifier.fillMaxWidth(),
+        minLines = 4,
+    )
 }

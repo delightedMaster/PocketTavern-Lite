@@ -54,6 +54,7 @@ import me.rerere.ai.util.configureSessionHeaders
 import me.rerere.ai.util.encodeBase64
 import me.rerere.ai.util.json
 import me.rerere.ai.util.mergeCustomBody
+import me.rerere.ai.util.withSortedKeys
 import me.rerere.ai.util.mergeCustomHeaders
 import me.rerere.ai.util.parseErrorDetail
 import me.rerere.ai.util.stringSafe
@@ -225,12 +226,16 @@ class ResponseAPI(
             }
             if (params.maxTokens != null) put("max_output_tokens", params.maxTokens)
 
-            // system instructions
-            if (messages.any { it.role == MessageRole.SYSTEM }) {
-                val parts = messages.first { it.role == MessageRole.SYSTEM }.parts
-                put(
-                    "instructions",
-                    parts.filterIsInstance<UIMessagePart.Text>().joinToString("\n") { it.text })
+            // Leading system messages fold into instructions. Later system messages
+            // stay in the input as user items so their order is preserved.
+            val leadingSystem = messages.filter { it.isValidToUpload() }.takeWhile { it.role == MessageRole.SYSTEM }
+            if (leadingSystem.isNotEmpty()) {
+                put("instructions", leadingSystem.joinToString("\n\n") { message ->
+                    message.parts.filterIsInstance<UIMessagePart.Text>().joinToString("\n") { it.text }
+                })
+            }
+            if (host == "api.openai.com") {
+                params.sessionId?.let { put("prompt_cache_key", it) }
             }
 
             // messages
@@ -300,24 +305,24 @@ class ResponseAPI(
                     }
                 }
             }
-        }.mergeCustomBody(params.customBody)
+        }.mergeCustomBody(params.customBody).withSortedKeys()
     }
 
     internal fun buildMessages(messages: List<UIMessage>) = buildJsonArray {
         messages
             .filter { message ->
-                message.role != MessageRole.SYSTEM && (
-                    message.isValidToUpload() || message.parts.any { part ->
-                        part is UIMessagePart.Reasoning &&
-                            part.metadataAs<OpenAIReasoningMetadata>()?.encryptedContent != null
-                    }
-                )
+                message.isValidToUpload() || message.parts.any { part ->
+                    part is UIMessagePart.Reasoning &&
+                        part.metadataAs<OpenAIReasoningMetadata>()?.encryptedContent != null
+                }
             }
+            .dropWhile { it.role == MessageRole.SYSTEM }
             .forEach { message ->
-                if (message.role == MessageRole.ASSISTANT) {
-                    addAssistantItems(message)
+                val send = if (message.role == MessageRole.SYSTEM) message.copy(role = MessageRole.USER) else message
+                if (send.role == MessageRole.ASSISTANT) {
+                    addAssistantItems(send)
                 } else {
-                    addUserItems(message)
+                    addUserItems(send)
                 }
             }
     }

@@ -26,6 +26,14 @@ class RegexDisplayLayerTest {
         val messages = listOf(UIMessage.assistant("x"))
         assertEquals("xx", messages.replaceRegexesForDisplay(assistant, null, visual = false)[0].toText())
         assertEquals("xx", messages.replaceRegexesForDisplay(assistant, null, visual = true)[0].toText())
+        val stored = messages
+        val shown = stored.replaceRegexesForDisplay(assistant, null, visual = true)[0].toText()
+        val chained = stored
+            .replaceRegexesForDisplay(assistant, null, visual = false)
+            .replaceRegexesForDisplay(assistant, null, visual = true)[0]
+            .toText()
+        assertEquals("xx", shown)
+        assertEquals("xxxx", chained)
     }
 
     @Test

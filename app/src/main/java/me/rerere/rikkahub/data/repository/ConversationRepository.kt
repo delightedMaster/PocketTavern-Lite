@@ -389,6 +389,7 @@ class ConversationRepository(
             workspaceCwd = conversation.workspaceCwd ?: "",
             folderId = conversation.folderId?.toString() ?: "",
             config = conversation.config?.let { JsonInstant.encodeToString(it) } ?: "",
+            promptState = JsonInstant.encodeToString(conversation.promptState),
         )
     }
 
@@ -411,6 +412,9 @@ class ConversationRepository(
             workspaceCwd = conversationEntity.workspaceCwd.ifEmpty { null },
             folderId = conversationEntity.folderId.ifEmpty { null }?.let { Uuid.parse(it) },
             config = conversationEntity.config.ifEmpty { null }?.let { JsonInstant.decodeFromString(it) },
+            promptState = conversationEntity.promptState.ifBlank { null }?.let {
+                runCatching { JsonInstant.decodeFromString<me.rerere.rikkahub.data.ai.assembly.PromptCacheState>(it) }.getOrNull()
+            } ?: me.rerere.rikkahub.data.ai.assembly.PromptCacheState(),
         )
     }
 
@@ -451,6 +455,10 @@ class ConversationRepository(
     suspend fun updateTitle(conversationId: Uuid, title: String) {
         conversationDAO.updateTitle(conversationId.toString(), title)
         messageFtsManager.updateTitle(conversationId.toString(), title)
+    }
+
+    suspend fun updatePromptState(conversationId: Uuid, promptState: me.rerere.rikkahub.data.ai.assembly.PromptCacheState) {
+        conversationDAO.updatePromptState(conversationId.toString(), JsonInstant.encodeToString(promptState))
     }
 
     suspend fun updateCustomSystemPrompt(conversationId: Uuid, customSystemPrompt: String?) {
