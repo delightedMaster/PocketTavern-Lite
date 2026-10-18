@@ -48,6 +48,7 @@ import me.rerere.rikkahub.data.ai.prompts.buildCompressPrompt
 import me.rerere.rikkahub.data.ai.tools.InvalidMcpServerNamesException
 import me.rerere.rikkahub.data.ai.tools.shouldUseExternalWebSearch
 import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.data.datastore.allRegexesOf
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.data.event.AppEvent
 import me.rerere.rikkahub.data.event.AppEventBus
@@ -418,8 +419,9 @@ class ChatService(
                 ensureInitialized(session)
                 finishInterruptedPendingTools(session)
 
-                val assistant = settingsStore.awaitLoaded().getStoredAssistantOf(session.state.value)
-                val processedContent = queued.parts.replaceUserRegexes(assistant)
+                val settings = settingsStore.awaitLoaded()
+                val assistant = settings.getStoredAssistantOf(session.state.value)
+                val processedContent = queued.parts.replaceUserRegexes(assistant, settings.allRegexesOf(null))
 
                 // 添加消息到列表
                 val previousIds = session.state.value.currentMessages.mapTo(HashSet()) { it.id }
@@ -1141,7 +1143,13 @@ class ChatService(
         val settings = settingsStore.awaitLoaded()
 
         mutate(conversationId) { conversation ->
-            conversation.editMessage(messageId, parts.replaceUserRegexes(settings.getStoredAssistantOf(conversation)))
+            conversation.editMessage(
+                messageId,
+                parts.replaceUserRegexes(
+                    settings.getStoredAssistantOf(conversation),
+                    settings.allRegexesOf(null),
+                ),
+            )
         }
     }
 

@@ -243,7 +243,7 @@ fun AssistantPage(vm: AssistantVM = koinViewModel()) {
         }
     }
 
-    AssistantCreationSheet(createState)
+    AssistantCreationSheet(createState, vm)
 
     RikkaConfirmDialog(
         show = deleteTarget != null,
@@ -352,6 +352,7 @@ private fun AssistantTagsFilterRow(
 @Composable
 private fun AssistantCreationSheet(
     state: EditState<Assistant>,
+    vm: AssistantVM,
 ) {
     state.EditStateContent { assistant, update ->
         ModalBottomSheet(
@@ -383,9 +384,9 @@ private fun AssistantCreationSheet(
                 )
 
                 AssistantImporter(
-                    onUpdate = {
-                        update(it)
-                        state.confirm()
+                    onImport = { result ->
+                        vm.addAssistantWithLorebooks(result.assistant, result.newLorebooks)
+                        state.dismiss()
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )

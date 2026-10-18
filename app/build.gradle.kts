@@ -4,14 +4,25 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.io.FileInputStream
 import java.util.Properties
 
+// Firebase is optional. A normal debug/release build does not need app/google-services.json.
+// Pass -Prikkahub.enableFirebase=true when that file is present.
+val enableFirebase = providers.gradleProperty("rikkahub.enableFirebase")
+    .map { it.equals("true", ignoreCase = true) }
+    .getOrElse(false)
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.google.services)
-    alias(libs.plugins.firebase.crashlytics)
+    alias(libs.plugins.google.services) apply false
+    alias(libs.plugins.firebase.crashlytics) apply false
     alias(libs.plugins.baselineprofile)
+}
+
+if (enableFirebase) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
 }
 
 android {
@@ -23,7 +34,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "me.rerere.rikkahub"
+        applicationId = "io.github.delightedmaster.pockettavern"
         minSdk = 26
         targetSdk = 37
         versionCode = 192
@@ -81,11 +92,13 @@ android {
             }
             buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}\"")
             buildConfigField("String", "VERSION_CODE", "\"${android.defaultConfig.versionCode}\"")
+            buildConfigField("boolean", "ENABLE_FIREBASE", enableFirebase.toString())
         }
         debug {
             applicationIdSuffix = ".debug"
             buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}\"")
             buildConfigField("String", "VERSION_CODE", "\"${android.defaultConfig.versionCode}\"")
+            buildConfigField("boolean", "ENABLE_FIREBASE", enableFirebase.toString())
         }
     }
     compileOptions {

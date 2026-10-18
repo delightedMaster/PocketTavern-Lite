@@ -128,6 +128,8 @@ private fun ReasoningContent(
     scrollState: ScrollState,
     fadeHeight: Float,
     loading: Boolean,
+    depth: Int,
+    regexes: List<me.rerere.rikkahub.data.model.AssistantRegex>,
 ) {
     val isPreview = expandState == ReasoningCardState.Preview
     val reasoningTextStyle = MaterialTheme.typography.bodySmall.copy(
@@ -170,9 +172,10 @@ private fun ReasoningContent(
         val reasoningContent = @Composable {
             MarkdownBlock(
                 content = reasoning.reasoning.replaceRegexes(
-                    assistant = assistant,
+                    regexes = regexes.ifEmpty { assistant?.regexes.orEmpty() },
                     scope = AssistantAffectScope.ASSISTANT,
                     visual = true,
+                    depth = depth,
                 ),
                 style = reasoningTextStyle,
                 modifier = Modifier.fillMaxSize(),
@@ -197,6 +200,8 @@ fun ChainOfThoughtScope.ChatMessageReasoningStep(
     assistant: Assistant?,
     fadeHeight: Float = 64f,
     collapsedAdaptiveWidth: Boolean = false,
+    depth: Int = 0,
+    regexes: List<me.rerere.rikkahub.data.model.AssistantRegex> = assistant?.regexes.orEmpty(),
 ) {
     val (state, loading) = rememberReasoningState(reasoning)
     val thinkingTitle = reasoning.reasoning.extractThinkingTitle()
@@ -249,6 +254,8 @@ fun ChainOfThoughtScope.ChatMessageReasoningStep(
                 scrollState = state.scrollState,
                 fadeHeight = fadeHeight,
                 loading = loading,
+                depth = depth,
+                regexes = regexes,
             )
         },
     )

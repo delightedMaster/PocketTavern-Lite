@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import me.rerere.hugeicons.HugeIcons
@@ -59,10 +60,11 @@ internal fun SectionHeader(
 internal fun SectionAddButton(
     onClick: () -> Unit,
     contentDescription: String = stringResource(R.string.add),
+    icon: ImageVector = HugeIcons.Add01,
 ) {
     FilledTonalIconButton(onClick = onClick) {
         Icon(
-            imageVector = HugeIcons.Add01,
+            imageVector = icon,
             contentDescription = contentDescription,
         )
     }

@@ -4,15 +4,24 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.elementNames
+import me.rerere.ai.core.MessageRole
 import me.rerere.ai.core.ReasoningLevel
 import me.rerere.ai.provider.ProviderSetting
 import me.rerere.asr.ASRProviderSetting
 import me.rerere.mediagen.provider.MediaGenerationProviderSetting
 import me.rerere.rikkahub.data.ai.mcp.McpServerConfig
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.AssistantAffectScope
+import me.rerere.rikkahub.data.model.AssistantRegex
+import me.rerere.rikkahub.data.model.AuthorNoteEntry
+import me.rerere.rikkahub.data.model.AuthorNotePosition
+import me.rerere.rikkahub.data.model.GroupChat
 import me.rerere.rikkahub.data.model.Lorebook
+import me.rerere.rikkahub.data.model.Persona
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.QuickMessage
+import me.rerere.rikkahub.data.model.RegexGroup
+import me.rerere.rikkahub.data.model.RegexGroupSource
 import me.rerere.rikkahub.data.model.Tag
 import me.rerere.rikkahub.data.sync.s3.S3Config
 import me.rerere.rikkahub.ui.theme.CustomTheme
@@ -154,7 +163,37 @@ private val SAMPLE = Settings(
     selectedASRProviderId = id(11),
     modeInjections = listOf(PromptInjection.ModeInjection(id = id(14), name = "mode")),
     lorebooks = listOf(Lorebook(id = id(12), name = "lorebook")),
+    regexGroups = listOf(
+        RegexGroup(
+            id = id(32),
+            name = "scripts",
+            source = RegexGroupSource.PRESET,
+            regexes = listOf(AssistantRegex(id = id(33), affectingScope = setOf(AssistantAffectScope.ASSISTANT))),
+        ),
+    ),
     quickMessages = listOf(QuickMessage(id = id(13), title = "hi")),
+    worldInfoBudget = 200,
+    worldInfoBudgetCap = 512,
+    worldInfoMinActivations = 2,
+    worldInfoMinActivationsDepthMax = 8,
+    worldInfoRecursive = true,
+    worldInfoMaxRecursionSteps = 3,
+    worldInfoDepth = 4,
+    worldInfoCharacterStrategy = 2,
+    worldInfoOverflowAlert = true,
+    worldInfoUseGroupScoring = true,
+    personas = listOf(Persona(id = id(34), name = "persona", description = "desc")),
+    activePersonaId = id(34),
+    authorNote = "note",
+    authorNoteEnabled = true,
+    authorNotePosition = AuthorNotePosition.IN_PROMPT,
+    authorNoteDepth = 2,
+    authorNoteRole = MessageRole.USER,
+    authorNoteInterval = 3,
+    authorNoteEntries = listOf(AuthorNoteEntry(id = "note", content = "body")),
+    macroGlobalVariables = mapOf("hp" to "1"),
+    macroChatVariables = mapOf("chat" to mapOf("mood" to "ok")),
+    groupChats = listOf(GroupChat(id = id(35), name = "table")),
     webServerEnabled = true,
     webServerPort = 9090,
     webServerJwtEnabled = true,
@@ -210,7 +249,30 @@ private val STORED_KEYS = setOf(
     "web_server_localhost_only",
     "mode_injections",
     "lorebooks",
+    "regex_groups",
     "quick_messages",
+    "world_info_budget",
+    "world_info_budget_cap",
+    "world_info_min_activations",
+    "world_info_min_activations_depth_max",
+    "world_info_recursive",
+    "world_info_max_recursion_steps",
+    "world_info_depth",
+    "world_info_character_strategy",
+    "world_info_overflow_alert",
+    "world_info_use_group_scoring",
+    "personas",
+    "active_persona_id",
+    "author_note",
+    "author_note_enabled",
+    "author_note_position",
+    "author_note_depth",
+    "author_note_role",
+    "author_note_interval",
+    "author_note_entries",
+    "macro_global_variables",
+    "macro_chat_variables",
+    "group_chats",
     "backup_reminder_config",
     "sponsor_alert_dismissed_at",
 )

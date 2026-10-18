@@ -52,12 +52,14 @@ val appModule = module {
         TTSManager(get())
     }
 
-    single {
-        Firebase.crashlytics
-    }
+    if (me.rerere.rikkahub.BuildConfig.ENABLE_FIREBASE) {
+        single {
+            Firebase.crashlytics
+        }
 
-    single {
-        Firebase.analytics
+        single {
+            Firebase.analytics
+        }
     }
 
     single {

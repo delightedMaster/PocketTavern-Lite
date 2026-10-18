@@ -28,7 +28,9 @@ import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -42,6 +44,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import me.rerere.ai.ui.UIMessage
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Brain02
 import me.rerere.hugeicons.stroke.Code
@@ -73,7 +76,9 @@ fun AssistantDetailPage(id: String) {
         }
     )
     val assistant by vm.assistant.collectAsStateWithLifecycle()
+    val settings by vm.settings.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
+    var showExport by remember { mutableStateOf(false) }
     val navController = LocalNavController.current
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val listState = rememberLazyListState()
@@ -120,6 +125,45 @@ fun AssistantDetailPage(id: String) {
                     tags = tags.filter { it.id in assistant.tags },
                     modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 16.dp)
                 )
+            }
+
+            if (assistant.tavernData != null) {
+                item {
+                    TavernCharacterCard(
+                        assistant = assistant,
+                        onAssistantUpdate = { vm.update(it) },
+                        settings = settings,
+                        onSettingsUpdate = { updated ->
+                            vm.updateSettings { current ->
+                                current.copy(
+                                    worldInfoDepth = updated.worldInfoDepth,
+                                    worldInfoBudget = updated.worldInfoBudget,
+                                    worldInfoBudgetCap = updated.worldInfoBudgetCap,
+                                    worldInfoMinActivations = updated.worldInfoMinActivations,
+                                    worldInfoMinActivationsDepthMax = updated.worldInfoMinActivationsDepthMax,
+                                    worldInfoRecursive = updated.worldInfoRecursive,
+                                    worldInfoMaxRecursionSteps = updated.worldInfoMaxRecursionSteps,
+                                    worldInfoCharacterStrategy = updated.worldInfoCharacterStrategy,
+                                    worldInfoOverflowAlert = updated.worldInfoOverflowAlert,
+                                    worldInfoUseGroupScoring = updated.worldInfoUseGroupScoring,
+                                )
+                            }
+                        },
+                        onExport = { showExport = true },
+                    )
+                }
+                item {
+                    GreetingSelectorCard(
+                        assistant = assistant,
+                        onSelectGreeting = { greeting ->
+                            vm.update(
+                                assistant.copy(
+                                    presetMessages = listOf(UIMessage.assistant(greeting)),
+                                )
+                            )
+                        },
+                    )
+                }
             }
 
             item {
@@ -183,6 +227,13 @@ fun AssistantDetailPage(id: String) {
                 }
             }
         }
+    }
+
+    if (showExport) {
+        ExportCardDialog(
+            assistant = assistant,
+            onDismiss = { showExport = false },
+        )
     }
 }
 

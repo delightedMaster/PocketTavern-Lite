@@ -68,6 +68,7 @@ import me.rerere.hugeicons.stroke.MusicNote03
 import me.rerere.hugeicons.stroke.Video01
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
+import me.rerere.rikkahub.data.datastore.allRegexesOf
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantAffectScope
 import me.rerere.rikkahub.data.model.MessageNode
@@ -112,6 +113,7 @@ fun ChatMessage(
     onClearTranslation: (UIMessage) -> Unit = {},
     onToolApproval: ((toolCallId: String, approved: Boolean, reason: String) -> Unit)? = null,
     onToolAnswer: ((toolCallId: String, answer: String) -> Unit)? = null,
+    depth: Int = 0,
 ) {
     val message = node.messages[node.selectIndex]
     if (message.isContextCheckpoint) {
@@ -170,6 +172,7 @@ fun ChatMessage(
                 annotations = message.annotations,
                 loading = loading,
                 model = model,
+                depth = depth,
                 onToolApproval = onToolApproval,
                 onToolAnswer = onToolAnswer,
                 onUserMessageClick = if (message.role == MessageRole.USER) onEdit else null,
@@ -277,6 +280,7 @@ private fun MessagePartsBlock(
     parts: List<UIMessagePart>,
     annotations: List<UIMessageAnnotation>,
     loading: Boolean,
+    depth: Int = 0,
     onToolApproval: ((toolCallId: String, approved: Boolean, reason: String) -> Unit)? = null,
     onToolAnswer: ((toolCallId: String, answer: String) -> Unit)? = null,
     onUserMessageClick: (() -> Unit)? = null,
@@ -285,6 +289,7 @@ private fun MessagePartsBlock(
     // 消息输出HapticFeedback
     val hapticFeedback = LocalHapticFeedback.current
     val settings = LocalSettings.current
+    val displayRegexes = settings.allRegexesOf(assistant)
     val partsState by rememberUpdatedState(parts)
 
     val handleClickCitation: (String) -> Unit = remember {
@@ -340,6 +345,8 @@ private fun MessagePartsBlock(
                                         model = model,
                                         assistant = assistant,
                                         collapsedAdaptiveWidth = isReasoningOnlyBlock,
+                                        depth = depth,
+                                        regexes = displayRegexes,
                                     )
                                 }
                             }
@@ -387,9 +394,10 @@ private fun MessagePartsBlock(
                                 ) {
                                     MarkdownBlock(
                                         content = part.text.replaceRegexes(
-                                            assistant = assistant,
+                                            regexes = displayRegexes,
                                             scope = AssistantAffectScope.USER,
                                             visual = true,
+                                            depth = depth,
                                         ),
                                         onClickCitation = handleClickCitation
                                     )
@@ -403,9 +411,10 @@ private fun MessagePartsBlock(
                                     ) {
                                         MarkdownBlock(
                                             content = part.text.replaceRegexes(
-                                                assistant = assistant,
+                                                regexes = displayRegexes,
                                                 scope = AssistantAffectScope.ASSISTANT,
                                                 visual = true,
+                                                depth = depth,
                                             ),
                                             onClickCitation = handleClickCitation,
                                         )
@@ -413,9 +422,10 @@ private fun MessagePartsBlock(
                                 } else {
                                     MarkdownBlock(
                                         content = part.text.replaceRegexes(
-                                            assistant = assistant,
+                                            regexes = displayRegexes,
                                             scope = AssistantAffectScope.ASSISTANT,
                                             visual = true,
+                                            depth = depth,
                                         ),
                                         onClickCitation = handleClickCitation,
                                         modifier = Modifier
@@ -516,9 +526,9 @@ private fun MessagePartsBlock(
         }
     }
 
-    // Annotations (always rendered at the end)
-    if (annotations.isNotEmpty()) {
-        ChatMessageCitations(annotations = annotations)
+    val citations = annotations.filterIsInstance<UIMessageAnnotation.UrlCitation>()
+    if (citations.isNotEmpty()) {
+        ChatMessageCitations(annotations = citations)
     }
 }
 
@@ -569,15 +579,9 @@ private fun ChatMessageBubble(
 }
 
 @Composable
-private fun ChatMessageCitations(annotations: List<UIMessageAnnotation>) {
+private fun ChatMessageCitations(annotations: List<UIMessageAnnotation.UrlCitation>) {
     var expand by remember { mutableStateOf(false) }
-    val urls = remember(annotations) {
-        annotations.map { annotation ->
-            when (annotation) {
-                is UIMessageAnnotation.UrlCitation -> annotation.url
-            }
-        }
-    }
+    val urls = remember(annotations) { annotations.map { it.url } }
     Column(
         modifier = Modifier.animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec()),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -603,22 +607,18 @@ private fun ChatMessageCitations(annotations: List<UIMessageAnnotation>) {
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         annotations.fastForEachIndexed { index, annotation ->
-                            when (annotation) {
-                                is UIMessageAnnotation.UrlCitation -> {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Favicon(annotation.url, modifier = Modifier.size(20.dp))
-                                        Text(
-                                            text = buildAnnotatedString {
-                                                append("${index + 1}. ")
-                                                withLink(LinkAnnotation.Url(annotation.url)) {
-                                                    append(annotation.title.urlDecode())
-                                                }
-                                            }
-                                        )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Favicon(annotation.url, modifier = Modifier.size(20.dp))
+                                Text(
+                                    text = buildAnnotatedString {
+                                        append("${index + 1}. ")
+                                        withLink(LinkAnnotation.Url(annotation.url)) {
+                                            append(annotation.title.urlDecode())
+                                        }
                                     }
-                                }
+                                )
                             }
                         }
                     }
