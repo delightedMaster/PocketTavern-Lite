@@ -1,5 +1,8 @@
 package me.rerere.rikkahub.ui.pages.extensions
 
+import me.rerere.rikkahub.data.export.ImportCompatibility
+import me.rerere.rikkahub.data.export.ImportKind
+import me.rerere.rikkahub.ui.components.ui.ImportReportState
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -307,11 +310,15 @@ internal fun RegexScriptsTab(
                     val text = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
                         ?: error(failedMsg)
                     val parsed = SillyTavernRegexImporter.parse(text)
-                    if (parsed.isEmpty()) error(failedMsg)
-                    parsed
+                    parsed to ImportCompatibility.inspect(ImportKind.REGEX, text, parsed.size)
                 }
             }
-            result.onSuccess { parsed ->
+            result.onSuccess { (parsed, report) ->
+                if (parsed.isEmpty()) {
+                    ImportReportState.show(report)
+                    toaster.show(failedMsg)
+                    return@onSuccess
+                }
                 val existing = current.firstOrNull { it.source == RegexGroupSource.CUSTOM }
                 val updated = if (existing != null) {
                     current.map {
@@ -324,8 +331,10 @@ internal fun RegexScriptsTab(
                 }
                 onUpdate(updated)
                 toaster.show(importedMsg.format(parsed.size))
+                ImportReportState.show(report)
             }.onFailure {
                 toaster.show(failedMsg.format(it.message))
+                ImportReportState.show(ImportCompatibility.failure(ImportKind.REGEX, it.message))
             }
         }
     }

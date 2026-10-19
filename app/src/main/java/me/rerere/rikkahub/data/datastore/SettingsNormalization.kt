@@ -10,11 +10,15 @@ import me.rerere.search.SearchServiceOptions
 internal fun Settings.normalized(): Settings =
     withBuiltInDefaults().withoutRemovedCapabilities().withoutInvalidReferences().withValuesInRange()
 
+private val REMOVED_LOCAL_TOOLS = setOf(
+    LocalToolOption.Tts, LocalToolOption.Calendar, LocalToolOption.ScreenTime, LocalToolOption.Clipboard,
+)
+
 // Old backups may still enable generation or speech tools even though their settings pages are gone.
 internal fun Settings.withoutRemovedCapabilities(): Settings = copy(
     providers = providers.map { it.withoutImageGeneration() },
     assistants = assistants.map { assistant ->
-        assistant.copy(localTools = assistant.localTools.filterNot { it == LocalToolOption.Tts })
+        assistant.copy(localTools = assistant.localTools.filterNot { it in REMOVED_LOCAL_TOOLS })
     },
 )
 

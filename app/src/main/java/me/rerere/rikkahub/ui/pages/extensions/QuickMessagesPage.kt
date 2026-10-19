@@ -1,5 +1,8 @@
 package me.rerere.rikkahub.ui.pages.extensions
 
+import me.rerere.rikkahub.data.export.ImportCompatibility
+import me.rerere.rikkahub.data.export.ImportKind
+import me.rerere.rikkahub.ui.components.ui.ImportReportState
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -78,18 +81,22 @@ fun QuickMessagesPage(vm: QuickMessagesVM = koinViewModel()) {
                 runCatching {
                     val text = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
                         ?: error(failedMsg)
-                    vm.parseImport(text)
+                    val messages = vm.parseImport(text)
+                    messages to ImportCompatibility.inspect(ImportKind.QUICK_REPLY, text, messages.size)
                 }
             }
-            parsed.onSuccess { messages ->
+            parsed.onSuccess { (messages, report) ->
                 if (messages.isEmpty()) {
+                    ImportReportState.show(report)
                     toaster.show(failedMsg, type = ToastType.Error)
                 } else {
                     vm.addImported(messages)
                     toaster.show(importedMsg)
+                    ImportReportState.show(report)
                 }
             }.onFailure {
                 toaster.show(failedMsg, type = ToastType.Error)
+                ImportReportState.show(ImportCompatibility.failure(ImportKind.QUICK_REPLY, it.message))
             }
         }
     }

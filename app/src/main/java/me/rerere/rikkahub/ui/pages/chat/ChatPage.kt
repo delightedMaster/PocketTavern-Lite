@@ -670,7 +670,6 @@ private fun ChatFilesPickerSheet(
             onPickImage = attachmentPickerActions.onPickImage,
             onPickVideo = attachmentPickerActions.onPickVideo,
             onPickAudio = attachmentPickerActions.onPickAudio,
-            onPickFile = attachmentPickerActions.onPickFile,
             onSketch = attachmentPickerActions.onSketch,
         )
     }

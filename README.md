@@ -15,17 +15,20 @@ PocketTavern-Lite 是一个面向 Android 的轻量角色扮演聊天应用，�
 
 ## 构建
 
-需要 JDK 21、Android SDK（含 CMake 3.22.1 与 NDK）以及 Node.js 与 pnpm。
+需要 JDK 21、Android SDK（含 CMake 3.22.1 与 NDK）。
 
 ```bash
 git submodule update --init
-cd web-ui && pnpm install && cd ..
 ./gradlew :app:assembleDebug
 ```
 
 调试包的 applicationId 带 `.debug` 后缀。与上游同步的方法见 [docs/UPSTREAM.md](docs/UPSTREAM.md)。
 
 ## 功能
+
+- 导入兼容性报告：角色卡、世界书 / 预设、正则及快捷回复导入后显示实际导入数量、跳过项和未实现功能，可复制报告。解析成功不表示第三方脚本完全兼容。
+- 原生 Android 使用：不包含浏览器远程聊天服务和通用文档解析。普通复制粘贴、图片附件及酒馆数据导入保留，联网搜索保留。
+- Skills / Agent / MCP 的用途与保留范围见 [调研记录](docs/AGENT_SKILLS_MCP_RESEARCH.md)。
 
 - SillyTavern 角色卡 V1/V2/V3（PNG 与 JSON，含多开场白）、世界书、预设（`prompts` + `prompt_order`）、正则（仅显示 / 仅提示词 / 深度范围）和作者备注。
 - 缓存友好的提示词顺序：系统/预设、角色卡、本会话的记忆世界书、可见历史，然后是动态尾部（关键词触发的世界书、变量、作者备注、时间、当前发言者）。触发的条目不会放到角色卡前面。
@@ -101,7 +104,7 @@ cd web-ui && pnpm install && cd ..
 
 ## English
 
-PocketTavern-Lite is a lightweight, Android-first roleplay chat app. It tracks RikkaHub 3.0.0 and adds SillyTavern character cards (V2/V3 PNG and JSON, including alternate greetings), lorebooks, presets (`prompts` + `prompt_order`), regex scripts, author's notes, sandboxed HTML front-end cards, quick replies, and basic group chats. Heavy unrelated forks features are intentionally absent. The app id is `io.github.delightedmaster.pockettavern`, version 0.1.1, Firebase is optional, and the license is AGPL-3.0. Build with `git submodule update --init`, `pnpm install` inside `web-ui`, then `./gradlew :app:assembleDebug`.
+PocketTavern-Lite is a lightweight, Android-first roleplay chat app. It tracks RikkaHub 3.0.0 and adds SillyTavern character cards (V2/V3 PNG and JSON, including alternate greetings), lorebooks, presets (`prompts` + `prompt_order`), regex scripts, author's notes, sandboxed HTML front-end cards, quick replies, and basic group chats. Heavy unrelated forks features are intentionally absent. The app id is `io.github.delightedmaster.pockettavern`, version 0.1.1, Firebase is optional, and the license is AGPL-3.0. Build with `git submodule update --init`, `./gradlew :app:assembleDebug`.
 
 Prompt order is the system prompt, the character card, this chat's memory lorebook, the visible history, then a dynamic tail (keyword-triggered lore, variables, author's note, time, and the current speaker). Triggered entries are not placed before the character card. Every 40 floors the older messages are summarized and only the latest 10 stay visible. Both numbers are on the prompt page under author's note: "Summarize at floors" and "Floors to keep". The summary is appended to this chat's memory lorebook with a `---` floor-range separator and is never rewritten. When that entry grows past the token threshold (default 2000), the same turn folds the older blocks into a versioned recap. The default summary model is the chat model, so the summary request reuses the chat prefix. A separate connection profile runs without the main preset. There is a manual "summarize now" action and an optional review before the summary is saved. Summarized messages are archived by default (hidden, omitted from the prompt, restored in one tap) or deleted when that setting is on.
 

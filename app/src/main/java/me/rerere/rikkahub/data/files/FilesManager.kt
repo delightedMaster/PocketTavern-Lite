@@ -234,27 +234,6 @@ class FilesManager(
         Pair(count, size)
     }
 
-    fun createChatTextFile(text: String): UIMessagePart.Document {
-        val dir = context.filesDir.resolve(FileFolders.UPLOAD)
-        if (!dir.exists()) {
-            dir.mkdirs()
-        }
-        val fileName = buildUuidFileName(displayName = "pasted_text.txt", mimeType = "text/plain")
-        val file = dir.resolve(fileName)
-        file.writeText(text)
-        trackManagedFile(
-            folder = FileFolders.UPLOAD,
-            file = file,
-            displayName = "pasted_text.txt",
-            mimeType = "text/plain"
-        )
-        return UIMessagePart.Document(
-            url = file.toUri().toString(),
-            fileName = "pasted_text.txt",
-            mime = "text/plain"
-        )
-    }
-
     fun getImagesDir(): File {
         val dir = context.filesDir.resolve("images")
         if (!dir.exists()) {

@@ -21,7 +21,6 @@ import me.rerere.rikkahub.data.ai.group.groupCardLines
 import me.rerere.rikkahub.data.ai.group.toGroupMember
 import me.rerere.rikkahub.data.ai.tools.ChatToolFactory
 import me.rerere.rikkahub.data.ai.transformers.Base64ImageToLocalFileTransformer
-import me.rerere.rikkahub.data.ai.transformers.DocumentAsPromptTransformer
 import me.rerere.rikkahub.data.ai.transformers.InputMessageTransformer
 import me.rerere.rikkahub.data.ai.transformers.OcrTransformer
 import me.rerere.rikkahub.data.ai.transformers.OutputMessageTransformer
@@ -86,7 +85,6 @@ class ChatRequestFactory(
 ) {
     private val inputTransformers: List<InputMessageTransformer> = listOf(
         PlaceholderTransformer,
-        DocumentAsPromptTransformer,
         OcrTransformer,
         templateTransformer,
         WorkspaceReminderTransformer(workspaceRepository),

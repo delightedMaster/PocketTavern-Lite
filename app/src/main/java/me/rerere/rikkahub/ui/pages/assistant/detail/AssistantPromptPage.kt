@@ -1,5 +1,8 @@
 package me.rerere.rikkahub.ui.pages.assistant.detail
 
+import me.rerere.rikkahub.data.export.ImportCompatibility
+import me.rerere.rikkahub.data.export.ImportKind
+import me.rerere.rikkahub.ui.components.ui.ImportReportState
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.ArrowDown01
 import me.rerere.hugeicons.stroke.FileImport
@@ -174,15 +177,21 @@ private fun AssistantPromptContent(
                     val text = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
                         ?: error(regexImportFailedMsg)
                     val parsed = SillyTavernRegexImporter.parse(text)
-                    if (parsed.isEmpty()) error(regexImportFailedMsg)
-                    parsed
+                    parsed to ImportCompatibility.inspect(ImportKind.REGEX, text, parsed.size)
                 }
             }
-            result.onSuccess { parsed ->
+            result.onSuccess { (parsed, report) ->
+                if (parsed.isEmpty()) {
+                    ImportReportState.show(report)
+                    toaster.show(regexImportFailedMsg)
+                    return@onSuccess
+                }
                 onUpdate(currentAssistant.copy(regexes = currentAssistant.regexes + parsed))
                 toaster.show(regexImportedMsg.format(parsed.size))
+                ImportReportState.show(report)
             }.onFailure {
                 toaster.show(regexImportFailedMsg.format(it.message))
+                ImportReportState.show(ImportCompatibility.failure(ImportKind.REGEX, it.message))
             }
         }
     }

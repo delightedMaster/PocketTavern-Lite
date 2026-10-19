@@ -31,14 +31,10 @@ Material 3 look (cards with dividers, plain forms).
 - **app**: Main application module with UI, ViewModels, and core logic
 - **ai**: AI SDK abstraction layer for different providers (OpenAI, Google, Anthropic)
 - **common**: Common utilities and extensions
-- **document**: Document parsing module for handling PDF, DOCX, PPTX, and EPUB files
 - **highlight**: Code syntax highlighting implementation
 - **material3**: Material color utility extensions used by the app UI
 - **ui**: Reusable Compose UI components that do not depend on app logic
 - **search**: Search functionality SDK for multiple providers (Exa, Tavily, Zhipu, Bing, Brave, SearXNG, and others)
-- **speech**: Speech module for TTS and ASR implementations
-- **web**: Embedded web server module that provides Ktor server startup function and hosts static frontend build files (
-  built from web-ui/ React project)
 - **workspace**: Sandboxed per-workspace file system and shell execution environment exposed to the AI as tools.
 
 ## Concepts
@@ -79,7 +75,6 @@ Material 3 look (cards with dividers, plain forms).
   - TemplateTransformer: Apply Pebble templates to user messages with variables like time/date
   - ThinkTagTransformer: Extract `<think>` tags and convert to reasoning parts
   - RegexOutputTransformer: Apply regex replacements to assistant responses
-  - DocumentAsPromptTransformer: Convert document attachments to text prompts
   - Base64ImageToLocalFileTransformer: Convert base64 images to local file references
   - OcrTransformer: Perform OCR on images to extract text
 

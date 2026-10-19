@@ -469,9 +469,7 @@ private fun TextInputRow(
         var isFocused by remember { mutableStateOf(false) }
         var isFullScreen by remember { mutableStateOf(false) }
         var completionList by remember { mutableStateOf<ChatCompletionList?>(null) }
-        val receiveContentListener = remember(
-            settings.displaySetting.pasteLongTextAsFile, settings.displaySetting.pasteLongTextThreshold
-        ) {
+        val receiveContentListener = remember(state, filesManager) {
             ReceiveContentListener { transferableContent ->
                 when {
                     transferableContent.hasMediaType(MediaType.Image) -> {
@@ -485,19 +483,6 @@ private fun TextInputRow(
                                 )
                             }
                             uri != null
-                        }
-                    }
-
-                    settings.displaySetting.pasteLongTextAsFile && transferableContent.hasMediaType(MediaType.Text) -> {
-                        transferableContent.consume { item ->
-                            val text = item.text?.toString()
-                            if (text != null && text.length > settings.displaySetting.pasteLongTextThreshold) {
-                                val document = filesManager.createChatTextFile(text)
-                                state.addFiles(listOf(document))
-                                true
-                            } else {
-                                false
-                            }
                         }
                     }
 

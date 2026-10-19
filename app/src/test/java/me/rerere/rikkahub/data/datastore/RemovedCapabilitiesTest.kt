@@ -11,6 +11,14 @@ import org.junit.Test
 
 class RemovedCapabilitiesTest {
     @Test
+    fun `legacy settings and device tool names still decode after their features are removed`() {
+        val legacy = me.rerere.rikkahub.utils.JsonInstant.decodeFromString<Settings>(
+            """{"webServerEnabled":true,"webServerPort":8080,"displaySetting":{"pasteLongTextAsFile":true},"assistants":[{"localTools":[{"type":"calendar"},{"type":"screen_time"},{"type":"clipboard"},{"type":"time_info"}]}]}"""
+        ).withoutRemovedCapabilities()
+        assertEquals(listOf(LocalToolOption.TimeInfo), legacy.assistants.single().localTools)
+    }
+
+    @Test
     fun `old backups cannot enable image generation but retain vision and search`() {
         val visionModel = Model(
             inputModalities = listOf(Modality.TEXT, Modality.IMAGE),
@@ -31,8 +39,16 @@ class RemovedCapabilitiesTest {
     }
 
     @Test
+    fun `removed device tools cannot be created from legacy conversation options`() {
+        val tools = me.rerere.rikkahub.data.ai.tools.local.LocalTools().getTools(
+            listOf(LocalToolOption.Calendar, LocalToolOption.ScreenTime, LocalToolOption.Clipboard, LocalToolOption.Tts)
+        )
+        assertEquals(emptyList<me.rerere.ai.core.Tool>(), tools)
+    }
+
+    @Test
     fun `old assistant speech tool is removed while other tools remain enabled`() {
-        val assistant = Assistant(localTools = listOf(LocalToolOption.TimeInfo, LocalToolOption.Tts))
+        val assistant = Assistant(localTools = listOf(LocalToolOption.TimeInfo, LocalToolOption.Tts, LocalToolOption.Calendar, LocalToolOption.ScreenTime, LocalToolOption.Clipboard))
         val settings = Settings(assistants = listOf(assistant)).withoutRemovedCapabilities()
 
         assertEquals(assistant.id, settings.assistants.single().id)

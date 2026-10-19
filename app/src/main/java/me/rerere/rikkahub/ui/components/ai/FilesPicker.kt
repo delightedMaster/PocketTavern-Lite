@@ -108,7 +108,6 @@ internal fun FilesPicker(
     onPickImage: () -> Unit,
     onPickVideo: () -> Unit,
     onPickAudio: () -> Unit,
-    onPickFile: () -> Unit,
     onSketch: () -> Unit,
 ) {
     val settings = LocalSettings.current
@@ -174,7 +173,6 @@ internal fun FilesPicker(
                             add(AttachmentAction(HugeIcons.Video01, R.string.video, onPickVideo))
                             add(AttachmentAction(HugeIcons.MusicNote03, R.string.audio, onPickAudio))
                         }
-                        add(AttachmentAction(HugeIcons.Files02, R.string.upload_file, onPickFile))
                     }
                 )
 
