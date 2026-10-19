@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.1
+
+Update checks read this repository's GitHub releases and compare the tag with `versionName`. Notification settings can turn the check off, or pause it. The About page, share text, and update download links point at PocketTavern-Lite. RikkaHub stays credited there and in the README. The GitHub Release body for a `v*` tag is the matching section of this file.
+
+Removed from the app:
+
+- AI translation (the translator page, in-chat translate, and translation settings).
+- Image and video generation, including the media-service settings page and the `:mediagen` module. Chat image attachments, for sending pictures to vision models, stay.
+- The Favorites page and the per-message favorite action. Pinning a model in the model list stays.
+- Speech services: text-to-speech, speech recognition, the voice-mode input, and the `:speech` module.
+
+Room keeps the old translation, favorites, generated-media, and media-creation tables so an existing database still opens. The app no longer reads or writes them.
+
 ## 0.1.0
 
 First PocketTavern-Lite release. The app id is `io.github.delightedmaster.pockettavern`. It starts from RikkaHub 3.0.0 and keeps the chat path.

@@ -92,12 +92,30 @@ fun SettingPreferencesNotificationPage(vm: SettingVM = koinViewModel()) {
         ) {
             item {
                 CardGroup {
-                    item(
+                    switchItem(
+                        checked = displaySetting.updateCheckEnabled,
+                        onCheckedChange = {
+                            updateDisplaySetting(displaySetting.copy(updateCheckEnabled = it))
+                        },
+                        headlineContent = { Text(stringResource(R.string.setting_display_page_show_updates_title)) },
+                        supportingContent = {
+                            Text(
+                                stringResource(
+                                    if (displaySetting.updateCheckEnabled) {
+                                        R.string.setting_update_reminder_enabled
+                                    } else {
+                                        R.string.setting_update_reminder_disabled
+                                    }
+                                )
+                            )
+                        },
+                    )
+                    if (displaySetting.updateCheckEnabled) item(
                         onClick = {
                             selectedUpdatePauseDays = UPDATE_PAUSE_DAY_OPTIONS.first()
                             showUpdatePauseDialog = true
                         },
-                        headlineContent = { Text(stringResource(R.string.setting_display_page_show_updates_title)) },
+                        headlineContent = { Text(stringResource(R.string.setting_update_reminder_pause_title)) },
                         supportingContent = {
                             Text(
                                 if (updateChecksEnabled) {

@@ -6,7 +6,7 @@ PocketTavern-Lite 是一个面向 Android 的轻量角色扮演聊天应用，�
 
 ## 目标
 
-- **轻量**：不带情侣空间、生活中心、QQ/微信机器人、主动消息、插件沙箱、语音/视频通话、设备工具或 Python 运行时。
+- **轻量**：不带情侣空间、生活中心、QQ/微信机器人、主动消息、插件沙箱、语音/视频通话、语音合成与识别、AI 翻译、图片/视频生成、收藏页、设备工具或 Python 运行时。
 - **Android 优先**：Kotlin + Jetpack Compose，安装包与 RikkaHub 可以并存。
 - **高缓存命中**：同一轮对话里，世界书注入和宏的取值按用户轮冻结，避免工具循环每一步都改写前缀。
 - **SillyTavern 兼容**：角色卡 V1/V2/V3（PNG 与 JSON，含多开场白）、世界书（粘性、冷却、分组、递归、预算、扫描深度、插入位置）、作者备注、预设（`prompts` + `prompt_order`）和正则脚本（仅显示 / 仅提示词 / 深度范围）。
@@ -32,6 +32,8 @@ cd web-ui && pnpm install && cd ..
 - 记忆与总结。默认每 40 层总结更早的楼层，只把最近 10 层继续发给模型。两个数字都在「提示词 → 作者备注」里，标签是「达到多少楼层时总结」和「保留楼层」。摘要追加到这个会话自己的记忆世界书，分隔是 `---` 加楼层范围，旧摘要不会被改写。记忆超过 token 阈值（默认 2000）时，同一次总结把更早的块收成一条带版本号的回顾。默认用当前聊天模型，这样摘要请求能复用聊天前缀；换一个连接时不带主预设。可以先审阅再保存。已总结的消息默认归档（不进提示词，界面隐藏，一键恢复），也可以改成直接删除。聊天菜单里有「立即总结」。
 - HTML 前端卡、快捷回复和群聊，见下面三节。
 - Claude 在记忆世界书末尾和历史末尾打缓存断点。OpenAI 使用 `prompt_cache_key`，DeepSeek 使用会话 `user`。Gemini 的 `cachedContents` 接口没有接。
+- 更新检查读取 [本仓库的 GitHub Releases](https://github.com/delightedMaster/PocketTavern-Lite/releases)，用标签和 `versionName` 做语义化版本比较。通知设置里可以关闭。
+- 聊天可以附带图片，发给支持视觉输入的模型。不包含 AI 翻译、收藏页、语音合成/识别，以及图片和视频生成。
 
 ## HTML 前端卡与酒馆助手
 
@@ -95,10 +97,11 @@ cd web-ui && pnpm install && cd ..
 1. **已完成**：以 RikkaHub 3.0.0 为基线，接上 SillyTavern 角色卡、世界书、预设、正则和作者备注。
 2. **已完成**：缓存友好的提示词组装和追加式记忆总结。
 3. **已完成**：沙箱 WebView 里的 HTML 前端卡、群聊、快捷回复，以及 tag 发布时的签名流程。
+4. **已完成**（0.1.1）：更新检查改到本仓库的 GitHub Releases。去掉 AI 翻译、图片/视频生成、收藏页和语音服务。聊天附件里的图片保留。
 
 ## English
 
-PocketTavern-Lite is a lightweight, Android-first roleplay chat app. It tracks RikkaHub 3.0.0 and adds SillyTavern character cards (V2/V3 PNG and JSON, including alternate greetings), lorebooks, presets (`prompts` + `prompt_order`), regex scripts, author's notes, sandboxed HTML front-end cards, quick replies, and basic group chats. Heavy unrelated forks features are intentionally absent. The app id is `io.github.delightedmaster.pockettavern`, version 0.1.0, Firebase is optional, and the license is AGPL-3.0. Build with `git submodule update --init`, `pnpm install` inside `web-ui`, then `./gradlew :app:assembleDebug`.
+PocketTavern-Lite is a lightweight, Android-first roleplay chat app. It tracks RikkaHub 3.0.0 and adds SillyTavern character cards (V2/V3 PNG and JSON, including alternate greetings), lorebooks, presets (`prompts` + `prompt_order`), regex scripts, author's notes, sandboxed HTML front-end cards, quick replies, and basic group chats. Heavy unrelated forks features are intentionally absent. The app id is `io.github.delightedmaster.pockettavern`, version 0.1.1, Firebase is optional, and the license is AGPL-3.0. Build with `git submodule update --init`, `pnpm install` inside `web-ui`, then `./gradlew :app:assembleDebug`.
 
 Prompt order is the system prompt, the character card, this chat's memory lorebook, the visible history, then a dynamic tail (keyword-triggered lore, variables, author's note, time, and the current speaker). Triggered entries are not placed before the character card. Every 40 floors the older messages are summarized and only the latest 10 stay visible. Both numbers are on the prompt page under author's note: "Summarize at floors" and "Floors to keep". The summary is appended to this chat's memory lorebook with a `---` floor-range separator and is never rewritten. When that entry grows past the token threshold (default 2000), the same turn folds the older blocks into a versioned recap. The default summary model is the chat model, so the summary request reuses the chat prefix. A separate connection profile runs without the main preset. There is a manual "summarize now" action and an optional review before the summary is saved. Summarized messages are archived by default (hidden, omitted from the prompt, restored in one tap) or deleted when that setting is on.
 
@@ -108,7 +111,9 @@ Quick replies import SillyTavern JSON, bind to a character or to the chat, and s
 
 Group chats use natural, list, pooled, or manual speaker order. Member cards stay in member order in the stable prefix, including muted members. The speaker name is a tail line. One model serves the whole group, and the memory lorebook is the conversation's. Natural order matches a uniquely mentioned name; it does not call the model.
 
-Release signing reads `storeFile`, `storePassword`, `keyAlias`, and `keyPassword` from `local.properties` (paths relative to the app module) or `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. A tag push of `v*` builds the release APK. GitHub secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` sign it when all four are present; otherwise the attached APK is unsigned.
+Release signing reads `storeFile`, `storePassword`, `keyAlias`, and `keyPassword` from `local.properties` (paths relative to the app module) or `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. A tag push of `v*` builds the release APK and uses the matching `CHANGELOG.md` section as the GitHub Release body. GitHub secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` sign it when all four are present; otherwise the attached APK is unsigned.
+
+Update checks use this repository's GitHub releases and compare the tag with `versionName`. Notification settings can turn that check off. AI translation, the favorites page, speech recognition and synthesis, and image/video generation are not included. Sending a picture in chat, for a vision model, remains.
 
 ## 致谢 / Acknowledgements
 

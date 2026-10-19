@@ -152,7 +152,6 @@ sealed class SearchServiceOptions {
 
         val TYPES = mapOf(
             BingLocalOptions::class to "Bing",
-            RikkaHubOptions::class to "RikkaHub",
             ZhipuOptions::class to "智谱",
             DoubaoOptions::class to "豆包",
             TavilyOptions::class to "Tavily",
@@ -289,7 +288,9 @@ sealed class SearchServiceOptions {
         override val id: Uuid = Uuid.random(),
         val apiKey: String = "",
         val depth: String = "standard",
-    ) : SearchServiceOptions()
+    ) : SearchServiceOptions() {
+        override val displayName: String get() = "RikkaHub"
+    }
 
     @Serializable
     @SerialName("grok")

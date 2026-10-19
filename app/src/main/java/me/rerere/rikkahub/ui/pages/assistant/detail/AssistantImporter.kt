@@ -402,7 +402,7 @@ private suspend fun importFromUrl(
         val request = Request.Builder()
             .url(url)
             .get()
-            .addHeader("User-Agent", "RikkaHub/${BuildConfig.VERSION_NAME}")
+            .addHeader("User-Agent", "PocketTavern-Lite/${BuildConfig.VERSION_NAME}")
             .build()
         client.newCall(request).await().use { response ->
             if (!response.isSuccessful) {

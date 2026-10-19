@@ -81,14 +81,9 @@ internal val SETTINGS_FIELDS: List<SettingsField<*, *>> = with(SettingsStore) {
             // 认不出的值按 AUTO 处理
             decode = { name -> ReasoningLevel.entries.find { it.name == name } ?: ReasoningLevel.AUTO },
         ),
-        uuid(TRANSLATE_MODEL, Settings::translateModeId) { copy(translateModeId = it) },
         plain(ENABLE_SUGGESTION, Settings::enableSuggestion) { copy(enableSuggestion = it) },
-        uuid(IMAGE_GENERATION_MODEL, Settings::imageGenerationModelId) { copy(imageGenerationModelId = it) },
         plain(ENABLE_AUTO_TITLE, Settings::enableAutoTitle) { copy(enableAutoTitle = it) },
         plain(TITLE_PROMPT, Settings::titlePrompt) { copy(titlePrompt = it) },
-        plain(TRANSLATION_PROMPT, Settings::translatePrompt) { copy(translatePrompt = it) },
-        plain(TRANSLATE_THINKING_BUDGET, Settings::translateThinkingBudget) { copy(translateThinkingBudget = it) },
-        plain(TRANSLATE_TARGET_LANGUAGE, Settings::translateTargetLanguage) { copy(translateTargetLanguage = it) },
         plain(SUGGESTION_PROMPT, Settings::suggestionPrompt) { copy(suggestionPrompt = it) },
         uuid(OCR_MODEL, Settings::ocrModelId) { copy(ocrModelId = it) },
         plain(OCR_PROMPT, Settings::ocrPrompt) { copy(ocrPrompt = it) },
@@ -114,24 +109,6 @@ internal val SETTINGS_FIELDS: List<SettingsField<*, *>> = with(SettingsStore) {
 
         // S3
         json(S3_CONFIG, Settings::s3Config) { copy(s3Config = it) },
-        json(UPLOAD_S3_CONFIG, Settings::uploadS3Config) { copy(uploadS3Config = it) },
-
-        // 媒体生成
-        json(MEDIA_GENERATION_PROVIDERS, Settings::mediaGenerationProviders) { copy(mediaGenerationProviders = it) },
-
-        // TTS
-        json(TTS_PROVIDERS, Settings::ttsProviders) { copy(ttsProviders = it) },
-        uuid(SELECTED_TTS_PROVIDER, Settings::selectedTTSProviderId) { copy(selectedTTSProviderId = it) },
-        plain(DEFAULT_TTS_PLAYBACK_SPEED, Settings::defaultTTSPlaybackSpeed) { copy(defaultTTSPlaybackSpeed = it) },
-
-        // ASR
-        json(ASR_PROVIDERS, Settings::asrProviders) { copy(asrProviders = it) },
-        SettingsField(
-            SELECTED_ASR_PROVIDER, Settings::selectedASRProviderId, { copy(selectedASRProviderId = it) },
-            // 没选时不存这个 key
-            encode = { it?.toString() },
-            decode = { Uuid.parse(it) },
-        ),
 
         // Web Server
         plain(WEB_SERVER_ENABLED, Settings::webServerEnabled) { copy(webServerEnabled = it) },
@@ -212,9 +189,6 @@ internal val SETTINGS_FIELDS: List<SettingsField<*, *>> = with(SettingsStore) {
 
         // 备份提醒
         json(BACKUP_REMINDER_CONFIG, Settings::backupReminderConfig) { copy(backupReminderConfig = it) },
-
-        // 赞助提醒
-        plain(SPONSOR_ALERT_DISMISSED_AT, Settings::sponsorAlertDismissedAt) { copy(sponsorAlertDismissedAt = it) },
     )
 }
 
@@ -226,7 +200,6 @@ internal val SETTINGS_FIELDS: List<SettingsField<*, *>> = with(SettingsStore) {
 private val MISSING_KEY_DEFAULTS = Settings(
     chatModelId = DEFAULT_AUTO_MODEL_ID,
     fastModelId = DEFAULT_AUTO_MODEL_ID,
-    translateModeId = DEFAULT_AUTO_MODEL_ID,
 )
 
 /** 解码出的是盘上的原始值，还没有经过 [normalized]。 */

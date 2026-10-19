@@ -1413,10 +1413,6 @@ private fun BuiltInToolsSettings(
                 stringResource(R.string.setting_page_built_in_tools_url_context),
                 stringResource(R.string.setting_page_built_in_tools_url_context_desc)
             ),
-            BuiltInTools.ImageGeneration to Pair(
-                stringResource(R.string.setting_page_built_in_tools_image_generation),
-                stringResource(R.string.setting_page_built_in_tools_image_generation_desc)
-            )
         )
 
         // 弹窗底色和 CardGroup 默认的底色太接近，换一个深一档的

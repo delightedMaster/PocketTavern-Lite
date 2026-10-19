@@ -293,14 +293,9 @@ class ResponseAPI(
                                 })
                             }
 
-                            BuiltInTools.UrlContext -> {} // not supported
-
-                            BuiltInTools.ImageGeneration -> {
-                                add(buildJsonObject {
-                                    put("type", "image_generation")
-                                    put("model", "gpt-image-2.5-sunburst")
-                                })
-                            }
+                            BuiltInTools.UrlContext,
+                            BuiltInTools.ImageGeneration,
+                                -> {}
                         }
                     }
                 }

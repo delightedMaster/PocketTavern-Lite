@@ -7,7 +7,6 @@ import androidx.core.net.toUri
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -59,7 +58,6 @@ import me.rerere.rikkahub.data.ai.prompts.SUMMARY_SYSTEM_PROMPT_ZH
 import me.rerere.rikkahub.data.ai.ChatTurnContext
 import me.rerere.rikkahub.data.ai.ConversationMetaGenerator
 import me.rerere.rikkahub.data.ai.MemoryConsolidationScheduler
-import me.rerere.rikkahub.data.ai.TranslationHandler
 import me.rerere.rikkahub.data.ai.mcp.McpManager
 import me.rerere.rikkahub.data.ai.group.SpeakerChoice
 import me.rerere.rikkahub.data.ai.group.nextGroupSpeaker
@@ -97,9 +95,7 @@ import me.rerere.rikkahub.data.model.localFileUrls
 import me.rerere.rikkahub.data.model.selectBranch
 import me.rerere.rikkahub.data.model.toMessageNode
 import me.rerere.rikkahub.data.model.withAssistantUpdate
-import me.rerere.rikkahub.data.model.withNodeFavorite
 import me.rerere.rikkahub.data.model.withToolApproval
-import me.rerere.rikkahub.data.model.withTranslation
 import me.rerere.rikkahub.data.model.withoutConversationFields
 import me.rerere.rikkahub.data.model.withoutUnresumableToolCalls
 import me.rerere.rikkahub.data.repository.ConversationRepository
@@ -136,7 +132,6 @@ class ChatService(
     private val conversationRepo: ConversationRepository,
     private val requestFactory: ChatRequestFactory,
     private val memoryConsolidationScheduler: MemoryConsolidationScheduler,
-    private val translationHandler: TranslationHandler,
     private val metaGenerator: ConversationMetaGenerator,
     val mcpManager: McpManager,
     private val filesManager: FilesManager,
@@ -411,25 +406,6 @@ class ChatService(
             session.messageQueue.enqueue(content, answer)
             dispatchNextQueuedMessage(conversationId)
         }
-    }
-
-    /** Enqueue immediately; the result belongs to this item even after edits or later turns. */
-    fun enqueueVoiceMessage(conversationId: Uuid, text: String): Deferred<String?> {
-        val session = sessionManager.getOrCreate(conversationId)
-        val reply = CompletableDeferred<String?>()
-        synchronized(session) {
-            check(text.isNotBlank()) { context.getString(R.string.chat_page_voice_empty) }
-            check(!session.messageQueue.state.value.paused || session.messageQueue.state.value.messages.isEmpty()) {
-                context.getString(R.string.chat_page_voice_resume_queue)
-            }
-            check(!session.state.value.isAwaitingToolApproval) {
-                context.getString(R.string.chat_page_voice_tools_before_resume)
-            }
-            if (session.messageQueue.state.value.messages.isEmpty()) session.messageQueue.resume()
-            session.messageQueue.enqueue(listOf(UIMessagePart.Text(text)), reply = reply)
-            dispatchNextQueuedMessage(conversationId)
-        }
-        return reply
     }
 
     private fun dispatchNextQueuedMessage(conversationId: Uuid): Job? {
@@ -1408,53 +1384,6 @@ class ChatService(
         }
     }
 
-    // ---- 翻译消息 ----
-
-    fun translateMessage(
-        conversationId: Uuid,
-        message: UIMessage,
-        targetLanguage: Locale
-    ) {
-        appScope.launch(Dispatchers.IO) {
-            sessionManager.withSession<Unit>(conversationId) { session ->
-                try {
-                    ensureInitialized(session)
-                    val settings = settingsStore.awaitLoaded()
-
-                    val messageText = message.parts.filterIsInstance<UIMessagePart.Text>()
-                        .joinToString("\n\n") { it.text }
-                        .trim()
-
-                    if (messageText.isBlank()) return@withSession
-
-                    // Set loading state for translation
-                    val loadingText = context.getString(R.string.translating)
-                    session.update { it.withTranslation(message.id, loadingText) }
-
-                    translationHandler.translateText(
-                        settings = settings,
-                        sourceText = messageText,
-                        targetLanguage = targetLanguage
-                    ) { translatedText ->
-                        // Update translation field in real-time
-                        session.update { it.withTranslation(message.id, translatedText) }
-                    }.collect { /* Final translation already handled in onStreamUpdate */ }
-
-                    session.flush()
-                } catch (e: Exception) {
-                    if (e is CancellationException) throw e
-                    // Clear translation field on error
-                    if (session.isInitialized) session.update { it.withTranslation(message.id, null) }
-                    addError(e, conversationId, title = context.getString(R.string.error_title_translate_message))
-                }
-            }
-        }
-    }
-
-    suspend fun clearTranslationField(conversationId: Uuid, messageId: Uuid) {
-        mutate(conversationId) { it.withTranslation(messageId, null) }
-    }
-
     // ---- 消息操作 ----
 
     suspend fun editMessage(
@@ -1510,12 +1439,6 @@ class ChatService(
             if (targetNode.selectIndex == selectIndex) return@mutate conversation
             conversation.selectBranch(nodeId, selectIndex)
         }
-    }
-
-    // 收藏记录在单独的表里，节点上的标记只用于显示，不需要落库
-    suspend fun setNodeFavorite(conversationId: Uuid, nodeId: Uuid, favorite: Boolean) {
-        val session = sessionManager.get(conversationId)?.takeIf { it.isInitialized } ?: return
-        session.updateMetadata(transform = { it.withNodeFavorite(nodeId, favorite) }, persist = {})
     }
 
     suspend fun deleteMessage(

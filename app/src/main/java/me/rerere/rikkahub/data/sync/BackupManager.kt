@@ -22,7 +22,6 @@ import me.rerere.rikkahub.data.db.AppDatabaseFactory
 import me.rerere.rikkahub.data.db.AppDatabase
 import me.rerere.rikkahub.data.db.SQLiteConfiguration
 import me.rerere.rikkahub.data.files.FileFolders
-import me.rerere.rikkahub.data.files.MediaCreationFiles
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -65,9 +64,7 @@ class BackupManager(
                         for (file in files.filter { it.isFile }) {
                             currentCoroutineContext().ensureActive()
                             // A media result still being downloaded is incomplete and gets renamed when it finishes.
-                            if (folder == FileFolders.MEDIA_CREATION &&
-                                file.name.endsWith(MediaCreationFiles.PARTIAL_SUFFIX)
-                            ) continue
+                            if (folder == FileFolders.MEDIA_CREATION && file.name.endsWith(".partial")) continue
                             val relative = file.relativeTo(directory).invariantSeparatorsPath
                             PendingRestore.resolveInside(directory, relative)
                             addFile(zip, file, "$folder/$relative")

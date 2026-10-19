@@ -37,8 +37,8 @@ android {
         applicationId = "io.github.delightedmaster.pockettavern"
         minSdk = 26
         targetSdk = 37
-        versionCode = 193
-        versionName = "0.1.0"
+        versionCode = 194
+        versionName = "0.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -282,10 +282,6 @@ dependencies {
     implementation(libs.androidx.paging.runtime)
     implementation(libs.androidx.paging.compose)
 
-    // media3 (video playback)
-    implementation(libs.androidx.media3.exoplayer)
-    implementation(libs.androidx.media3.ui)
-
     // Apache Commons Text
     implementation(libs.commons.text)
 
@@ -323,8 +319,6 @@ dependencies {
     implementation(project(":document"))
     implementation(project(":highlight"))
     implementation(project(":search"))
-    implementation(project(":speech"))
-    implementation(project(":mediagen"))
     implementation(project(":common"))
     implementation(project(":material3"))
     implementation(project(":ui"))

@@ -82,11 +82,32 @@ jobs:
           chmod +x gradlew
           ./gradlew :app:assembleRelease
 
+      - name: Release notes from CHANGELOG
+        env:
+          SIGNED: ${{ steps.signing.outputs.signed }}
+        run: |
+          python3 - << 'PY'
+          import os
+          from pathlib import Path
+          tag = os.environ.get("GITHUB_REF_NAME", "")
+          version = tag[1:] if tag.startswith("v") else tag
+          lines = Path("CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+          start = next((i for i, line in enumerate(lines) if line.startswith("## ") and version in line), None)
+          if start is None:
+              body = "\n".join(lines).strip()
+          else:
+              end = next((j for j in range(start + 1, len(lines)) if lines[j].startswith("## ")), len(lines))
+              body = "\n".join(lines[start:end]).strip()
+          signing = (
+              "Signing: signed with ANDROID_KEYSTORE_BASE64."
+              if os.environ.get("SIGNED") == "true"
+              else "Signing: unsigned. Add ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD to sign future tags."
+          )
+          Path("release-notes.md").write_text(body + "\n\n" + signing + "\n", encoding="utf-8")
+          PY
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/*.apk
-          body: |
-            PocketTavern-Lite ${{ github.ref_name }}
-
-            Signing: ${{ steps.signing.outputs.signed == 'true' && 'signed with ANDROID_KEYSTORE_BASE64' || 'unsigned. Add ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD to sign future tags.' }}
+          body_path: release-notes.md
