@@ -8,8 +8,8 @@ import java.io.FileNotFoundException
 /**
  * 内置技能：以 `assets/builtin_skills/<name>/` 随 APK 发布，目录结构与用户技能相同（SKILL.md + 附属文件）。
  *
- * App 安装/更新后解压到 `filesDir/builtin_skills/`，并挂载到 workspace 的 `/builtin_skills`，
- * 这样附属脚本可以在 workspace 中执行。内置技能只读，与用户技能同名时以用户技能为准。
+ * App 安装/更新后解压到 `filesDir/builtin_skills/`，由 use_skill 只读加载。
+ * 内置技能只读，与用户技能同名时以用户技能为准；本应用不提供脚本执行环境。
  *
  * 注意：aapt 默认会忽略以 `.` 开头的文件和以 `_` 开头的目录，不要用这类名称。
  */
@@ -64,14 +64,6 @@ internal object BuiltinSkills {
             target.mkdirs()
             return
         }
-        // assets 不保留可执行位，带 shebang 的脚本需要手动恢复，才能在 workspace 中直接 ./script 执行
-        if (target.startsWithShebang()) {
-            target.setExecutable(true, false)
-        }
-    }
-
-    private fun File.startsWithShebang(): Boolean = inputStream().use { input ->
-        input.read() == '#'.code && input.read() == '!'.code
     }
 }
 

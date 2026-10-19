@@ -1,6 +1,6 @@
 # 模型提供商与连接测试
 
-PocketTavern-Lite 的 Android 客户端预置 24 个提供商配置，并允许添加任意自定义地址、API Key、请求头和模型。提供商名称与协议类型分开：兼容 OpenAI 的第三方服务不需要再写一套适配器。预设地址并不保证所有模型都支持所有可选功能，以实际发送测试结果为准。
+PocketTavern-Lite 的 Android 客户端预置 22 个提供商配置，并允许添加任意自定义地址、API Key、请求头和模型。提供商名称与协议类型分开：兼容 OpenAI 的第三方服务不需要再写一套适配器。预设地址并不保证所有模型都支持所有可选功能，以实际发送测试结果为准。
 
 | 协议 | 设置入口 | 普通 / 流式消息 |
 | --- | --- | --- |
@@ -33,3 +33,14 @@ Vertex AI 开启时使用 generateContent；Interactions 仅用于 Gemini Develo
 - Cerebras：<https://inference-docs.cerebras.ai/introduction>
 
 本次使用模拟提供商验证诊断行为，并运行已有协议流回放测试；没有用户 API Key，未对各家的真实账号进行联网生成验证。
+
+
+## 独立 Vertex 与新增订阅接口
+
+- 默认列表中的 `Gemini` 使用 Gemini Developer API；`Google Vertex AI` 使用 Google Cloud Vertex AI。它与 Vercel AI Gateway 是不同服务。
+- Vertex 明确提供 `Express`（API Key）与 `JSON 登录`（服务账号 JSON）两种方式，沿用原有 Location 与请求逻辑。导入 JSON 会验证类型及必需字段，避免把无效文件与旧凭据混在一起。
+- `OpenCode Go`：`https://opencode.ai/zen/go/v1`。按官方文档为不同模型使用 Chat Completions、Responses 或 Messages；发送真实客户端 `User-Agent: PocketTavern-Lite` 和每段会话稳定的 `x-opencode-session`。连接测试窗口也有自己的会话 ID。官方定位为编程代理服务，适用范围和额度由服务方决定。来源：<https://opencode.ai/docs/go/>。
+- `Command Code GOAT`：`https://api.commandcode.ai/provider/v1`。Claude 使用 Messages，其余模型使用 Chat Completions 或手动开启的 Responses；Messages 请求按其文档发送 Bearer 鉴权。来源：<https://commandcode.ai/docs/plans/goat>、<https://commandcode.ai/docs/provider>。
+- 五个被移除的默认预设不会再补回；未配置的旧预设会清理，已有密钥、模型或自定义地址的连接转为普通自定义配置。推荐入口及其广告数据已删除。
+
+新增预设与路由按官方文档及公开模型列表核对；没有用户 API Key，尚未验证真实订阅的生成权限。

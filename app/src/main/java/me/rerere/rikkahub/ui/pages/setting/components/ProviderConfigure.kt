@@ -28,6 +28,7 @@ import me.rerere.ai.provider.ClaudePromptCacheTtl
 import me.rerere.ai.provider.ProviderSetting
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.DEFAULT_PROVIDERS
+import me.rerere.rikkahub.data.ai.VertexServiceAccountCredentials
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.FileImport
 import me.rerere.hugeicons.stroke.Refresh03
@@ -41,10 +42,6 @@ import me.rerere.rikkahub.ui.components.ui.switchItem
 import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.ui.theme.JetbrainsMono
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlin.reflect.KClass
 
 @Composable
@@ -377,6 +374,11 @@ private fun ProviderConfigureClaude(
     }
 }
 
+private enum class VertexAuthMode(val titleRes: Int) {
+    EXPRESS(R.string.setting_provider_page_vertex_express),
+    JSON(R.string.setting_provider_page_vertex_json),
+}
+
 @Composable
 private fun ProviderConfigureGoogle(
     provider: ProviderSetting.Google,
@@ -393,17 +395,18 @@ private fun ProviderConfigureGoogle(
                 ?.bufferedReader()
                 ?.readText()
                 ?: return@rememberLauncherForActivityResult
-            val json = Json.parseToJsonElement(content).jsonObject
+            val credentials = VertexServiceAccountCredentials.fromJson(content)
             onEdit(
                 provider.copy(
-                    projectId = json["project_id"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null } ?: provider.projectId,
-                    serviceAccountEmail = json["client_email"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null } ?: provider.serviceAccountEmail,
-                    privateKey = json["private_key"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null } ?: provider.privateKey,
+                    projectId = credentials.projectId,
+                    serviceAccountEmail = credentials.email,
+                    privateKey = credentials.privateKey,
+                    useServiceAccount = true,
                 )
             )
-            toaster.show("Service account imported", type = ToastType.Success)
+            toaster.show(context.getString(R.string.setting_provider_page_service_account_imported), type = ToastType.Success)
         } catch (e: Exception) {
-            toaster.show("Failed to import: ${e.message}", type = ToastType.Error)
+            toaster.show(context.getString(R.string.setting_provider_page_service_account_import_failed, e.message.orEmpty()), type = ToastType.Error)
         }
     }
     val useServiceAccount = provider.vertexAI && provider.useServiceAccount
@@ -422,7 +425,7 @@ private fun ProviderConfigureGoogle(
                     !provider.baseUrl.isValidBaseUrl() || !provider.baseUrl.endsWith("/v1beta")
                     ),
                 supportingText = if (!provider.baseUrl.endsWith("/v1beta")) {
-                    { Text("The base URL usually ends with `/v1beta`") }
+                    { Text(stringResource(R.string.setting_provider_page_gemini_base_url_hint)) }
                 } else null,
                 trailingIcon = resetBaseUrlButton(provider) {
                     onEdit(provider.copy(baseUrl = provider.defaultBaseUrlForReset()))
@@ -438,16 +441,24 @@ private fun ProviderConfigureGoogle(
             headlineContent = { Text(stringResource(R.string.setting_provider_page_vertex_ai)) },
         )
         if (provider.vertexAI) {
-            switchItem(
-                checked = provider.useServiceAccount,
-                onCheckedChange = { onEdit(provider.copy(useServiceAccount = it)) },
-                headlineContent = { Text(stringResource(R.string.setting_provider_page_use_service_account)) },
-            )
+            formItem(headlineContent = { Text(stringResource(R.string.setting_provider_page_vertex_auth_mode)) }) {
+                ConnectedChoiceButtons(
+                    options = VertexAuthMode.entries,
+                    selected = if (provider.useServiceAccount) VertexAuthMode.JSON else VertexAuthMode.EXPRESS,
+                    onSelect = { onEdit(provider.copy(useServiceAccount = it == VertexAuthMode.JSON)) },
+                ) { mode, selected ->
+                    ConnectedChoiceLabel(text = stringResource(mode.titleRes), selected = selected)
+                }
+                Text(
+                    stringResource(if (provider.useServiceAccount) R.string.setting_provider_page_vertex_json_desc else R.string.setting_provider_page_vertex_express_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         } else {
             switchItem(
                 checked = provider.useInteractionsApi,
                 onCheckedChange = { onEdit(provider.copy(useInteractionsApi = it)) },
-                headlineContent = { Text("Interactions API (Beta)") },
+                headlineContent = { Text(stringResource(R.string.setting_provider_page_interactions_api)) },
                 supportingContent = { Text(if (provider.useInteractionsApi) "当前：Interactions" else "当前：generateContent") },
             )
         }
@@ -457,7 +468,7 @@ private fun ProviderConfigureGoogle(
         CardGroup {
             item(
                 onClick = { serviceAccountJsonLauncher.launch(arrayOf("application/json", "*/*")) },
-                headlineContent = { Text(stringResource(R.string.setting_provider_page_import_service_account_json)) },
+                headlineContent = { Text("导入服务账号 JSON") },
                 trailingContent = { Icon(HugeIcons.FileImport, contentDescription = null) },
             )
             textFieldItem(

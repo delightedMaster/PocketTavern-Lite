@@ -64,6 +64,9 @@ jobs:
             --tests 'me.rerere.rikkahub.data.datastore.SettingsFieldsTest' \
             --tests 'me.rerere.rikkahub.data.datastore.SettingsStoreTest' \
             --tests 'me.rerere.rikkahub.data.datastore.DefaultProvidersTest' \
+            --tests 'me.rerere.rikkahub.data.datastore.RetiredProvidersTest' \
+            --tests 'me.rerere.rikkahub.data.datastore.AssistantDefaultsTest' \
+            --tests 'me.rerere.rikkahub.data.ai.VertexServiceAccountCredentialsTest' \
             --tests 'me.rerere.rikkahub.data.ai.tools.ExternalWebSearchTest' \
             --tests 'me.rerere.rikkahub.data.ai.tools.SkillsToolsTest' \
             --tests 'me.rerere.rikkahub.data.model.ConversationMessagesTest'
@@ -72,6 +75,8 @@ jobs:
         run: |
           bash ./gradlew :ai:testDebugUnitTest \
             --tests 'me.rerere.ai.provider.ProviderDiagnosticsTest' \
+            --tests 'me.rerere.ai.provider.providers.openai.HostedModelApiTest' \
+            --tests 'me.rerere.ai.util.RequestHeadersTest' \
             --tests 'me.rerere.ai.provider.stream.StreamTraceReplayTest' \
             --tests 'me.rerere.ai.provider.providers.google.InteractionsApiTest'
 

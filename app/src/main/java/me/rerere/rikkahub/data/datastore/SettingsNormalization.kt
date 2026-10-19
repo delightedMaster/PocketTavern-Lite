@@ -34,7 +34,7 @@ private fun ProviderSetting.withoutImageGeneration(): ProviderSetting = copyProv
 
 // 补齐缺失的内置提供商/助手，内置提供商的描述信息始终以代码里的为准
 internal fun Settings.withBuiltInDefaults(): Settings {
-    var providers = this.providers.ifEmpty { DEFAULT_PROVIDERS }.toMutableList()
+    var providers = this.providers.withoutRetiredPresets().ifEmpty { DEFAULT_PROVIDERS }.toMutableList()
     DEFAULT_PROVIDERS.forEach { defaultProvider ->
         if (providers.none { it.id == defaultProvider.id }) {
             providers.add(defaultProvider.copyProvider())
@@ -50,12 +50,8 @@ internal fun Settings.withBuiltInDefaults(): Settings {
             )
         } else provider
     }.toMutableList()
-    val assistants = this.assistants.ifEmpty { DEFAULT_ASSISTANTS }.toMutableList()
-    DEFAULT_ASSISTANTS.forEach { defaultAssistant ->
-        if (assistants.none { it.id == defaultAssistant.id }) {
-            assistants.add(defaultAssistant.copy())
-        }
-    }
+    // Seed an empty installation safely, but never resurrect a template the user deleted.
+    val assistants = this.assistants.ifEmpty { DEFAULT_ASSISTANTS.take(1) }
     return copy(
         providers = providers,
         assistants = assistants,

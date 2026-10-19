@@ -18,7 +18,6 @@ class TransformerContext(
     val conversationModeInjectionIds: Set<Uuid> = emptySet(),
     val conversationLorebookIds: Set<Uuid> = emptySet(),
     val processingStatus: MutableStateFlow<String?> = MutableStateFlow(null),
-    val workspaceCwd: String? = null,
     val generationType: GenerationType = GenerationType.NORMAL,
     /** 完整对话里的用户消息数（截断前），导演备注间隔用 */
     val chatUserMessageCount: Int? = null,
@@ -78,7 +77,6 @@ suspend fun List<UIMessage>.transforms(
     conversationModeInjectionIds: Set<Uuid> = emptySet(),
     conversationLorebookIds: Set<Uuid> = emptySet(),
     processingStatus: MutableStateFlow<String?> = MutableStateFlow(null),
-    workspaceCwd: String? = null,
     generationType: GenerationType = GenerationType.NORMAL,
     chatUserMessageCount: Int? = null,
     chatMessageCount: Int? = null,
@@ -92,7 +90,6 @@ suspend fun List<UIMessage>.transforms(
         conversationModeInjectionIds = conversationModeInjectionIds,
         conversationLorebookIds = conversationLorebookIds,
         processingStatus = processingStatus,
-        workspaceCwd = workspaceCwd,
         generationType = generationType,
         chatUserMessageCount = chatUserMessageCount,
         chatMessageCount = chatMessageCount,

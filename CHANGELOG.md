@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- 移除工作区入口、文件操作与终端工具、PRoot 原生执行模块及 Termux 依赖，保留旧数据库结构兼容升级。
+- 补齐提示词、作者备注、正则规则、开场白等简体中文，并增加用途说明；清理设置中的英文提示。
+
+- 默认助手允许删除，删除后不再自动补回；保留至少一个角色，并自动切换被删除的当前角色。
+
+- 修复测试连接弹窗在编辑模型 ID / 测试消息、键盘弹出后被工具栏一起移除的问题。
+- 删除未使用的三张横幅；相机扫码改用 ZXing，移除 Quickie、ML Kit 离线扫码模型及其 CameraX 依赖，保留相册二维码识别与中文搜索词典。
+- 新增独立的 Google Vertex AI 预设，明确提供 Express 与服务账号 JSON 两种认证方式，沿用现有地区设置和请求逻辑。
+- 移除 APIMart、302.AI、随想 AI 网关、MaruCode、AiHubMix 默认预设及推荐入口，新增 OpenCode Go 与 Command Code GOAT。
+
 ## 0.1.2
 
 - 补充官方 Anthropic（Claude）、Mistral AI、Groq 和 Cerebras 预设；明确显示 OpenAI / Gemini 当前接口格式。

@@ -35,7 +35,6 @@ Material 3 look (cards with dividers, plain forms).
 - **material3**: Material color utility extensions used by the app UI
 - **ui**: Reusable Compose UI components that do not depend on app logic
 - **search**: Search functionality SDK for multiple providers (Exa, Tavily, Zhipu, Bing, Brave, SearXNG, and others)
-- **workspace**: Sandboxed per-workspace file system and shell execution environment exposed to the AI as tools.
 
 ## Concepts
 
@@ -48,7 +47,7 @@ Material 3 look (cards with dividers, plain forms).
   list of MessageNodes in a tree structure to support message branching, along with metadata like title, creation time,
   update time, pin status, chat suggestions, optional conversation-level system prompt, and prompt injection bindings.
   Once a conversation is persisted it also holds a `ConversationConfig` snapshot (chat model, reasoning level, search,
-  MCP servers, workspace, skills) taken from the assistant; from then on chat-page changes to those settings stay on
+  MCP servers, skills) taken from the assistant; from then on chat-page changes to those settings stay on
   the conversation, and code should read them through `Settings.getAssistantOf(conversation)` /
   `Settings.getChatModelOf(conversation)` instead of the assistant directly. Once loaded, the in-memory
   `ConversationSession` is the single source of truth: change a conversation through `ChatService` (which applies

@@ -364,14 +364,14 @@ private fun EditFileDialog(
         },
         confirmButton = {
             if (readOnly) {
-                TextButton(onClick = onDismiss) { Text("Close") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.skills_page_close)) }
             } else {
                 TextButton(onClick = { onConfirm(content) }) { Text(stringResource(R.string.skill_detail_page_save)) }
             }
         },
         dismissButton = {
             if (!readOnly) {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.skills_page_close)) }
             }
         },
     )
@@ -428,7 +428,7 @@ private fun AddFileDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.skills_page_close)) }
         },
     )
 }

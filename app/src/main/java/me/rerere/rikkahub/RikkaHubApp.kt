@@ -35,8 +35,6 @@ import me.rerere.rikkahub.data.sync.RestoreFailedException
 import me.rerere.rikkahub.utils.JsonInstant
 import me.rerere.rikkahub.utils.CrashHandler
 import me.rerere.rikkahub.utils.DatabaseUtil
-import me.rerere.rikkahub.data.repository.WorkspaceRepository
-import me.rerere.workspace.WorkspaceManager
 import org.koin.android.ext.android.get
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -84,12 +82,6 @@ class RikkaHubApp : Application() {
         // cleanup stale tool output files
         cleanupToolOutputs()
 
-        // cleanup workspace temp dirs (proot + rootfs /tmp)
-        cleanupWorkspaceTempDirs()
-
-        // check workspace integrity (mark workspaces with missing files as broken after backup restore)
-        checkWorkspaceIntegrity()
-
         // sync upload files to DB
         syncManagedFiles()
 
@@ -127,26 +119,6 @@ class RikkaHubApp : Application() {
                 Log.i(TAG, "incrementLaunchCount: $count")
             }.onFailure {
                 Log.e(TAG, "incrementLaunchCount failed", it)
-            }
-        }
-    }
-
-    private fun cleanupWorkspaceTempDirs() {
-        get<AppScope>().launch(Dispatchers.IO) {
-            runCatching {
-                get<WorkspaceManager>().cleanupAllTempDirs()
-            }.onFailure {
-                Log.e(TAG, "cleanupWorkspaceTempDirs failed", it)
-            }
-        }
-    }
-
-    private fun checkWorkspaceIntegrity() {
-        get<AppScope>().launch(Dispatchers.IO) {
-            runCatching {
-                get<WorkspaceRepository>().checkIntegrity()
-            }.onFailure {
-                Log.e(TAG, "checkWorkspaceIntegrity failed", it)
             }
         }
     }

@@ -25,7 +25,8 @@ fun createSkillTools(
         Tool(
             name = "use_skill",
             description = """
-                Load and apply a skill to get specialized instructions or capabilities.
+                Load and apply a skill to get specialized instructions.
+                This app can read skill instructions and reference files but cannot run scripts or shell commands.
                 Call this tool when the user's request matches one of the available skills.
             """.trimIndent(),
             systemPrompt = { _, _ ->

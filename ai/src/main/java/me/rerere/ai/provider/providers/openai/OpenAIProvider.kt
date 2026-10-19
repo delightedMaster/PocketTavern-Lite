@@ -29,6 +29,7 @@ import me.rerere.ai.ui.ImageGenerationItem
 import me.rerere.ai.ui.StreamChunk
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.util.KeyRoulette
+import me.rerere.ai.provider.providers.claude.ClaudeProvider
 import me.rerere.ai.util.configureReferHeaders
 import me.rerere.ai.util.json
 import me.rerere.ai.util.mergeCustomBody
@@ -56,15 +57,17 @@ class OpenAIProvider(
 
     private val chatCompletionsAPI = ChatCompletionsAPI(client = client, keyRoulette = keyRoulette)
     private val responseAPI = ResponseAPI(client = client, keyRoulette = keyRoulette)
+    private val messagesAPI by lazy { ClaudeProvider(client, context) }
 
 
     override suspend fun listModels(providerSetting: ProviderSetting.OpenAI): List<Model> =
         withContext(Dispatchers.IO) {
             val key = keyRoulette.next(providerSetting.apiKey, providerSetting.id.toString())
             val request = Request.Builder()
-                .url("${providerSetting.baseUrl}/models")
+                .url(providerSetting.hostedModelsUrl())
                 .headers(providerSetting.mergeCustomHeaders())
                 .addHeader("Authorization", "Bearer $key")
+                .configureReferHeaders(providerSetting.baseUrl)
                 .get()
                 .build()
 
@@ -121,36 +124,20 @@ class OpenAIProvider(
         providerSetting: ProviderSetting.OpenAI,
         messages: List<UIMessage>,
         params: TextGenerationParams
-    ): Flow<StreamChunk> = if (providerSetting.useResponseApi) {
-        responseAPI.streamText(
-            providerSetting = providerSetting,
-            messages = messages,
-            params = params
-        )
-    } else {
-        chatCompletionsAPI.streamText(
-            providerSetting = providerSetting,
-            messages = messages,
-            params = params
-        )
+    ): Flow<StreamChunk> = when (providerSetting.hostedModelApi(params.model.modelId)) {
+        HostedModelApi.CHAT_COMPLETIONS -> chatCompletionsAPI.streamText(providerSetting, messages, params)
+        HostedModelApi.RESPONSES -> responseAPI.streamText(providerSetting, messages, params)
+        HostedModelApi.MESSAGES -> messagesAPI.streamText(providerSetting.asMessagesProvider(), messages, params)
     }
 
     override suspend fun generateText(
         providerSetting: ProviderSetting.OpenAI,
         messages: List<UIMessage>,
         params: TextGenerationParams
-    ): TextGenerationResult = if (providerSetting.useResponseApi) {
-        responseAPI.generateText(
-            providerSetting = providerSetting,
-            messages = messages,
-            params = params
-        )
-    } else {
-        chatCompletionsAPI.generateText(
-            providerSetting = providerSetting,
-            messages = messages,
-            params = params
-        )
+    ): TextGenerationResult = when (providerSetting.hostedModelApi(params.model.modelId)) {
+        HostedModelApi.CHAT_COMPLETIONS -> chatCompletionsAPI.generateText(providerSetting, messages, params)
+        HostedModelApi.RESPONSES -> responseAPI.generateText(providerSetting, messages, params)
+        HostedModelApi.MESSAGES -> messagesAPI.generateText(providerSetting.asMessagesProvider(), messages, params)
     }
 
     override suspend fun generateEmbedding(

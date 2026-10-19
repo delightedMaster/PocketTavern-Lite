@@ -310,7 +310,7 @@ private fun SkillCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                     if (skill.builtin) {
-                        Tag { Text("Built-in") }
+                        Tag { Text(stringResource(R.string.skills_page_builtin)) }
                     }
                 }
                 Text(

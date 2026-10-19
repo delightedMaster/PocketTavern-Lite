@@ -28,7 +28,6 @@ import me.rerere.rikkahub.data.ai.transformers.PlaceholderTransformer
 import me.rerere.rikkahub.data.ai.transformers.RegexOutputTransformer
 import me.rerere.rikkahub.data.ai.transformers.TemplateTransformer
 import me.rerere.rikkahub.data.ai.transformers.ThinkTagTransformer
-import me.rerere.rikkahub.data.ai.transformers.WorkspaceReminderTransformer
 import me.rerere.rikkahub.data.ai.transformers.onGenerationFinish
 import me.rerere.rikkahub.data.ai.transformers.transformThinkTags
 import me.rerere.rikkahub.data.ai.transformers.transforms
@@ -42,7 +41,6 @@ import me.rerere.rikkahub.data.model.MemoryFile
 import me.rerere.rikkahub.data.model.getAssistantOf
 import me.rerere.rikkahub.data.model.getChatModelOf
 import me.rerere.rikkahub.data.repository.MemoryRepository
-import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.data.repository.memoryId
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -64,7 +62,6 @@ class ChatTurnContext(
     val conversationSystemPrompt: String?,
     val conversationModeInjectionIds: Set<Uuid>,
     val conversationLorebookIds: Set<Uuid>,
-    val workspaceCwd: String?,
     val memories: List<MemoryFile>,
     val tools: List<Tool>,
     var promptState: me.rerere.rikkahub.data.ai.assembly.PromptCacheState,
@@ -81,13 +78,11 @@ class ChatRequestFactory(
     private val chatToolFactory: ChatToolFactory,
     private val memoryRepository: MemoryRepository,
     templateTransformer: TemplateTransformer,
-    workspaceRepository: WorkspaceRepository,
 ) {
     private val inputTransformers: List<InputMessageTransformer> = listOf(
         PlaceholderTransformer,
         OcrTransformer,
         templateTransformer,
-        WorkspaceReminderTransformer(workspaceRepository),
     )
 
     private val outputTransformers: List<OutputMessageTransformer> = listOf(
@@ -119,13 +114,11 @@ class ChatRequestFactory(
             conversationSystemPrompt = conversation.customSystemPrompt,
             conversationModeInjectionIds = conversation.modeInjectionIds,
             conversationLorebookIds = conversation.lorebookIds,
-            workspaceCwd = conversation.workspaceCwd,
             memories = if (assistant.enableMemory) memoryRepository.getFiles(assistant.memoryId) else emptyList(),
             tools = chatToolFactory.createTools(
                 settings = settings,
                 assistant = assistant,
                 model = model,
-                workspaceCwd = conversation.workspaceCwd,
             ),
             promptState = conversation.promptState,
             groupCards = if (members.isEmpty()) emptyList() else groupCardLines(members),
@@ -289,7 +282,6 @@ class ChatRequestFactory(
             conversationModeInjectionIds = turn.conversationModeInjectionIds,
             conversationLorebookIds = turn.conversationLorebookIds,
             processingStatus = processingStatus,
-            workspaceCwd = turn.workspaceCwd,
             chatUserMessageCount = chatUserMessageCount,
             chatMessageCount = chatMessageCount,
         )

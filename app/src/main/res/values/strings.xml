@@ -1838,4 +1838,29 @@
   <string name="group_strategy_list">List</string>
   <string name="group_strategy_pooled">Pooled</string>
   <string name="group_strategy_manual">Manual</string>
+  <string name="setting_provider_page_vertex_auth_mode">Authentication method</string>
+  <string name="setting_provider_page_vertex_express">Express (API key)</string>
+  <string name="setting_provider_page_vertex_json">JSON sign-in</string>
+  <string name="setting_provider_page_vertex_express_desc">Enter an Express API key to use the global Google endpoint.</string>
+  <string name="setting_provider_page_vertex_json_desc">Import a service account JSON file. Access tokens are obtained and refreshed automatically.</string>
+  <string name="setting_provider_page_service_account_imported">Service account imported</string>
+  <string name="setting_provider_page_service_account_import_failed">Could not import service account: %1$s</string>
+  <string name="setting_provider_page_gemini_base_url_hint">The base URL usually ends with /v1beta</string>
+  <string name="setting_provider_page_interactions_api">Interactions API (Beta)</string>
+  <string name="setting_theme_page_unnamed">Unnamed theme</string>
+  <string name="setting_theme_page_hsl_hint" formatted="false">Use the format hsl(267 36% 48%)</string>
+  <string name="setting_search_detail_mode">Search mode</string>
+  <string name="assistant_page_regex_find_example">For example: \\b\\w+@\\w+\\.\\w+\\b</string>
+  <string name="assistant_page_regex_replace_example">For example: [EMAIL]</string>
+  <string name="assistant_page_last_role_hint">Create or import another character first</string>
+  <string name="skills_page_builtin">Built-in</string>
+  <string name="mcp_status_idle">Idle</string>
+  <string name="mcp_status_connecting">Connecting</string>
+  <string name="mcp_status_connected">Connected</string>
+  <string name="mcp_status_reconnecting">Reconnecting (%1$d/%2$d)</string>
+  <string name="mcp_status_error">Error: %1$s</string>
+  <string name="mcp_status_needs_authorization">Needs authorization</string>
+  <string name="mcp_status_authorizing">Authorizing</string>
+  <string name="mcp_status_tool_count">%1$d/%2$d tools</string>
+  <string name="skills_page_close">Close</string>
 </resources>

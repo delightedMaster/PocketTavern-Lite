@@ -8,6 +8,20 @@ import org.junit.Test
 
 class DefaultProvidersTest {
     @Test
+    fun `retired sponsors are absent and independent Vertex and coding plans are present`() {
+        val names = DEFAULT_PROVIDERS.map { it.name }.toSet()
+        assertTrue(names.intersect(setOf("APIMart", "302.AI", "随想AI网关", "MaruCode", "AiHubMix")).isEmpty())
+        assertEquals(22, DEFAULT_PROVIDERS.size)
+        val vertex = DEFAULT_PROVIDERS.single { it.name == "Google Vertex AI" } as ProviderSetting.Google
+        assertTrue(vertex.vertexAI)
+        assertFalse((DEFAULT_PROVIDERS.single { it.name == "Gemini" } as ProviderSetting.Google).vertexAI)
+        val go = DEFAULT_PROVIDERS.single { it.name == "OpenCode Go" } as ProviderSetting.OpenAI
+        assertEquals("https://opencode.ai/zen/go/v1", go.baseUrl)
+        assertEquals("PocketTavern-Lite", go.customHeaders.single { it.name == "User-Agent" }.value)
+        assertEquals("https://api.commandcode.ai/provider/v1", (DEFAULT_PROVIDERS.single { it.name == "Command Code GOAT" } as ProviderSetting.OpenAI).baseUrl)
+    }
+
+    @Test
     fun `additional official providers use OpenAI compatible endpoints`() {
         val expected = mapOf(
             "Mistral AI" to "https://api.mistral.ai/v1",

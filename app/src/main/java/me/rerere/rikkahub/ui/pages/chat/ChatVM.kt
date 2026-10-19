@@ -366,11 +366,6 @@ class ChatVM(
         }
     }
 
-    fun updateWorkspaceCwd(workspaceCwd: String?) {
-        viewModelScope.launch {
-            chatService.updateWorkspaceCwd(_conversationId, workspaceCwd)
-        }
-    }
 
     /**
      * Called from the card WebView. The JSON result is returned immediately.
