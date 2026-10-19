@@ -82,10 +82,6 @@ val dataSourceModule = module {
     }
 
     single {
-        get<AppDatabase>().genMediaDao()
-    }
-
-    single {
         get<AppDatabase>().messageNodeDao()
     }
 
@@ -94,23 +90,11 @@ val dataSourceModule = module {
     }
 
     single {
-        get<AppDatabase>().favoriteDao()
-    }
-
-    single {
         get<AppDatabase>().workspaceDao()
     }
 
     single {
         get<AppDatabase>().folderDao()
-    }
-
-    single {
-        get<AppDatabase>().mediaCreationDao()
-    }
-
-    single {
-        get<AppDatabase>().translationHistoryDao()
     }
 
     single {

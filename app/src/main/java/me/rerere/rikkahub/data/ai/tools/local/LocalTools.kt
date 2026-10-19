@@ -1,26 +1,13 @@
 package me.rerere.rikkahub.data.ai.tools.local
 
-import android.content.Context
 import me.rerere.ai.core.Tool
-import me.rerere.rikkahub.data.event.AppEventBus
 
-class LocalTools(
-    private val context: Context,
-    private val eventBus: AppEventBus,
-) {
+class LocalTools {
     val javascriptTool by lazy { buildJavascriptTool() }
 
     val timeTool by lazy { buildTimeInfoTool() }
 
-    val clipboardTool by lazy { buildClipboardTool(context) }
-
     val askUserTool by lazy { buildAskUserTool() }
-
-    val screenTimeTool by lazy { buildScreenTimeTool(context, eventBus) }
-
-    val calendarQueryTool by lazy { buildCalendarQueryTool(context) }
-
-    val calendarCreateTool by lazy { buildCalendarCreateTool(context) }
 
     val chartDisplayTool by lazy { buildChartDisplayTool() }
 
@@ -32,19 +19,9 @@ class LocalTools(
         if (options.contains(LocalToolOption.TimeInfo)) {
             tools.add(timeTool)
         }
-        if (options.contains(LocalToolOption.Clipboard)) {
-            tools.add(clipboardTool)
-        }
         // LocalToolOption.Tts stays serializable so old assistants still decode. Do not build a TTS tool.
         if (options.contains(LocalToolOption.AskUser)) {
             tools.add(askUserTool)
-        }
-        if (options.contains(LocalToolOption.ScreenTime)) {
-            tools.add(screenTimeTool)
-        }
-        if (options.contains(LocalToolOption.Calendar)) {
-            tools.add(calendarQueryTool)
-            tools.add(calendarCreateTool)
         }
         if (options.contains(LocalToolOption.ChartDisplay)) {
             tools.add(chartDisplayTool)

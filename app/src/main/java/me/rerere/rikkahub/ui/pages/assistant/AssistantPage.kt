@@ -1,5 +1,6 @@
 package me.rerere.rikkahub.ui.pages.assistant
 
+import me.rerere.rikkahub.ui.components.ui.ImportReportState
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Copy01
 import me.rerere.hugeicons.stroke.Add01
@@ -387,6 +388,7 @@ private fun AssistantCreationSheet(
                     onImport = { result ->
                         vm.addAssistantWithLorebooks(result.assistant, result.newLorebooks)
                         state.dismiss()
+                        result.report?.let(ImportReportState::show)
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )

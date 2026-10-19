@@ -635,10 +635,6 @@ private fun ModelSettingsForm(
                             onUpdateInputModalities = {
                                 onModelChange(model.copy(inputModalities = it))
                             },
-                            outputModalities = model.outputModalities,
-                            onUpdateOutputModalities = {
-                                onModelChange(model.copy(outputModalities = it))
-                            }
                         )
 
                         if (model.type == ModelType.CHAT) {
@@ -1055,7 +1051,7 @@ private fun ModelTypeSelector(
         style = MaterialTheme.typography.titleSmall
     )
     ConnectedChoiceButtons(
-        options = ModelType.entries,
+        options = ModelType.entries.filterNot { it == ModelType.IMAGE },
         selected = selectedType,
         onSelect = onTypeSelected,
     ) { type, selected ->
@@ -1077,8 +1073,6 @@ private fun ModelModalitySelector(
     model: Model,
     inputModalities: List<Modality>,
     onUpdateInputModalities: (List<Modality>) -> Unit,
-    outputModalities: List<Modality>,
-    onUpdateOutputModalities: (List<Modality>) -> Unit
 ) {
     if (model.type == ModelType.CHAT) {
         Text(
@@ -1090,29 +1084,6 @@ private fun ModelModalitySelector(
             selected = inputModalities,
             onToggle = { modality, checked ->
                 onUpdateInputModalities(if (checked) inputModalities + modality else inputModalities - modality)
-            },
-        ) { modality, selected ->
-            ConnectedChoiceLabel(
-                text = stringResource(
-                    when (modality) {
-                        Modality.TEXT -> R.string.setting_provider_page_text
-                        Modality.IMAGE -> R.string.setting_provider_page_image
-                    }
-                ),
-                selected = selected,
-                icon = HugeIcons.Tick01,
-            )
-        }
-
-        Text(
-            stringResource(R.string.setting_provider_page_output_modality),
-            style = MaterialTheme.typography.titleSmall
-        )
-        ConnectedMultiChoiceButtons(
-            options = Modality.entries,
-            selected = outputModalities,
-            onToggle = { modality, checked ->
-                onUpdateOutputModalities(if (checked) outputModalities + modality else outputModalities - modality)
             },
         ) { modality, selected ->
             ConnectedChoiceLabel(

@@ -17,7 +17,6 @@ import me.rerere.rikkahub.utils.EmojiUtils
 import me.rerere.rikkahub.utils.JsonInstant
 import me.rerere.rikkahub.utils.SoundEffectPlayer
 import me.rerere.rikkahub.utils.UpdateChecker
-import me.rerere.rikkahub.web.WebServerManager
 import org.koin.dsl.module
 
 val appModule = module {
@@ -28,7 +27,7 @@ val appModule = module {
     }
 
     single {
-        LocalTools(get(), get())
+        LocalTools()
     }
 
     single {
@@ -114,15 +113,5 @@ val appModule = module {
         )
     }
 
-    single {
-        WebServerManager(
-            context = get(),
-            appScope = get(),
-            chatService = get(),
-            conversationRepo = get(),
-            folderRepo = get(),
-            settingsStore = get(),
-            filesManager = get()
-        )
-    }
+
 }

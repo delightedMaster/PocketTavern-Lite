@@ -1,11 +1,36 @@
 package me.rerere.rikkahub.data.datastore
 
+import me.rerere.ai.provider.BuiltInTools
+import me.rerere.ai.provider.Modality
 import me.rerere.ai.provider.ProviderSetting
+import me.rerere.rikkahub.data.ai.tools.local.LocalToolOption
 import me.rerere.search.SearchServiceOptions
 
 /** 读盘后和每次修改后都要过一遍，保证内存里的设置始终是规整的。 */
 internal fun Settings.normalized(): Settings =
-    withBuiltInDefaults().withoutInvalidReferences().withValuesInRange()
+    withBuiltInDefaults().withoutRemovedCapabilities().withoutInvalidReferences().withValuesInRange()
+
+private val REMOVED_LOCAL_TOOLS = setOf(
+    LocalToolOption.Tts, LocalToolOption.Calendar, LocalToolOption.ScreenTime, LocalToolOption.Clipboard,
+)
+
+// Old backups may still enable generation or speech tools even though their settings pages are gone.
+internal fun Settings.withoutRemovedCapabilities(): Settings = copy(
+    providers = providers.map { it.withoutImageGeneration() },
+    assistants = assistants.map { assistant ->
+        assistant.copy(localTools = assistant.localTools.filterNot { it in REMOVED_LOCAL_TOOLS })
+    },
+)
+
+private fun ProviderSetting.withoutImageGeneration(): ProviderSetting = copyProvider(
+    models = models.map { model ->
+        model.copy(
+            tools = model.tools - BuiltInTools.ImageGeneration,
+            outputModalities = listOf(Modality.TEXT),
+            providerOverwrite = model.providerOverwrite?.withoutImageGeneration(),
+        )
+    }
+)
 
 // 补齐缺失的内置提供商/助手，内置提供商的描述信息始终以代码里的为准
 internal fun Settings.withBuiltInDefaults(): Settings {

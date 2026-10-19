@@ -103,11 +103,6 @@ data class Settings(
     val macroChatVariables: Map<String, Map<String, String>> = emptyMap(),
     // 群聊成员卡按 memberIds 的固定顺序放进前缀。记忆世界书是会话自己的那一份。
     val groupChats: List<GroupChat> = emptyList(),
-    val webServerEnabled: Boolean = false,
-    val webServerPort: Int = 8080,
-    val webServerJwtEnabled: Boolean = false,
-    val webServerAccessPassword: String = "",
-    val webServerLocalhostOnly: Boolean = false,
     val backupReminderConfig: BackupReminderConfig = BackupReminderConfig(),
 ) {
     val globalRegexes: List<AssistantRegex>
@@ -184,8 +179,6 @@ data class DisplaySetting(
     val codeBlockAutoWrap: Boolean = false,
     val codeBlockAutoCollapse: Boolean = false,
     val showLineNumbers: Boolean = false,
-    val pasteLongTextAsFile: Boolean = false,
-    val pasteLongTextThreshold: Int = 1000,
     val sendOnEnter: Boolean = false,
     val enableAutoScroll: Boolean = true,
     val enableLatexRendering: Boolean = true,

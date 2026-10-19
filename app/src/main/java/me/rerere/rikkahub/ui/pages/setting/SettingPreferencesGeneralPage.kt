@@ -159,27 +159,7 @@ fun SettingPreferencesGeneralPage(vm: SettingVM = koinViewModel()) {
                         supportingContent = { Text(stringResource(R.string.setting_display_page_skip_crop_image_desc)) },
                         headlineContent = { Text(stringResource(R.string.setting_display_page_skip_crop_image_title)) },
                     )
-                    switchItem(
-                        checked = displaySetting.pasteLongTextAsFile,
-                        onCheckedChange = { updateDisplaySetting(displaySetting.copy(pasteLongTextAsFile = it)) },
-                        supportingContent = { Text(stringResource(R.string.setting_display_page_paste_long_text_as_file_desc)) },
-                        headlineContent = { Text(stringResource(R.string.setting_display_page_paste_long_text_as_file_title)) },
-                    )
-                    if (displaySetting.pasteLongTextAsFile) {
-                        formItem(
-                            headlineContent = { Text(stringResource(R.string.setting_display_page_paste_long_text_threshold_title)) },
-                            trailingContent = { CardGroupValue("${displaySetting.pasteLongTextThreshold}") },
-                        ) {
-                            Slider(
-                                value = displaySetting.pasteLongTextThreshold.toFloat(),
-                                onValueChange = {
-                                    updateDisplaySetting(displaySetting.copy(pasteLongTextThreshold = it.toInt()))
-                                },
-                                valueRange = 100f..10000f,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    }
+
                 }
             }
 

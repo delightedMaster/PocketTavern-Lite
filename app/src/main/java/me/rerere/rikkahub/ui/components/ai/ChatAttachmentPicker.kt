@@ -31,7 +31,6 @@ import me.rerere.rikkahub.ui.components.ui.permission.rememberPermissionState
 import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.ui.hooks.ChatInputState
 import me.rerere.rikkahub.utils.ImageUtils
-import me.rerere.rikkahub.utils.isAllowedFileType
 import org.koin.compose.koinInject
 import java.io.File
 import kotlin.uuid.Uuid
@@ -41,7 +40,6 @@ internal data class ChatAttachmentPickerActions(
     val onPickImage: () -> Unit,
     val onPickVideo: () -> Unit,
     val onPickAudio: () -> Unit,
-    val onPickFile: () -> Unit,
     val onSketch: () -> Unit,
 )
 
@@ -161,37 +159,6 @@ internal fun rememberChatAttachmentPickerActions(
             }
         }
 
-    val filePickerLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-            if (uris.isNotEmpty()) {
-                val documents = uris.mapNotNull { uri ->
-                    val fileName = filesManager.getFileNameFromUri(uri) ?: "file"
-                    val mime = filesManager.getFileMimeType(uri) ?: "text/plain"
-                    if (isAllowedFileType(fileName, mime)) {
-                        val localUri = filesManager.createChatFilesByContents(listOf(uri)).firstOrNull()
-                            ?: run {
-                                toaster.show(
-                                    resources.getString(R.string.chat_input_file_read_failed, fileName),
-                                    type = ToastType.Error
-                                )
-                                return@mapNotNull null
-                            }
-                        UIMessagePart.Document(url = localUri.toString(), fileName = fileName, mime = mime)
-                    } else {
-                        toaster.show(
-                            resources.getString(R.string.chat_input_unsupported_file_type, fileName),
-                            type = ToastType.Error
-                        )
-                        null
-                    }
-                }
-                if (documents.isNotEmpty()) {
-                    inputState.addFiles(documents)
-                    onAttachmentAdded()
-                }
-            }
-        }
-
     val scope = rememberCoroutineScope()
     var showSketch by remember { mutableStateOf(false) }
     if (showSketch) {
@@ -212,7 +179,6 @@ internal fun rememberChatAttachmentPickerActions(
         onPickImage = { imagePickerLauncher.launch("image/*") },
         onPickVideo = { videoPickerLauncher.launch("video/*") },
         onPickAudio = { audioPickerLauncher.launch("audio/*") },
-        onPickFile = { filePickerLauncher.launch(arrayOf("*/*")) },
         onSketch = { showSketch = true },
     )
 }

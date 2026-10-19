@@ -1,5 +1,8 @@
 package me.rerere.rikkahub.ui.pages.extensions
 
+import me.rerere.rikkahub.data.export.ImportCompatibility
+import me.rerere.rikkahub.data.export.ImportKind
+import me.rerere.rikkahub.ui.components.ui.ImportReportState
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -668,10 +671,11 @@ private fun LorebookTab(
                     val fileName = LorebookSerializer.getUriFileName(context, uri)?.removeSuffix(".json")
                     val book = LorebookSerializer.importFromJson(json, fileName)
                     val regexes = SillyTavernRegexImporter.parseFromPreset(json)
-                    book to ((fileName?.takeIf { it.isNotBlank() } ?: book.name) to regexes)
+                    Triple(book, (fileName?.takeIf { it.isNotBlank() } ?: book.name) to regexes,
+                        ImportCompatibility.inspect(ImportKind.LOREBOOK, json, book.entries.size))
                 }
             }
-            result.onSuccess { (book, namedRegexes) ->
+            result.onSuccess { (book, namedRegexes, report) ->
                 onUpdate(currentLorebooks + book)
                 val (rawName, regexes) = namedRegexes
                 if (regexes.isNotEmpty()) {
@@ -691,8 +695,10 @@ private fun LorebookTab(
                     onRegexGroups(groups)
                 }
                 toaster.show(importSuccessMsg)
+                ImportReportState.show(report)
             }.onFailure { error ->
                 toaster.show(importFailedMsg.format(error.message))
+                ImportReportState.show(ImportCompatibility.failure(ImportKind.LOREBOOK, error.message))
             }
         }
     }

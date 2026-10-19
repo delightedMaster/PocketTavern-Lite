@@ -65,7 +65,7 @@ fun UpdateCard(vm: ChatVM) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = stringResource(R.string.update_card_check_failed),
+                    text = "${stringResource(R.string.app_name)} · ${stringResource(R.string.update_card_check_failed)}",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -100,7 +100,7 @@ fun UpdateCard(vm: ChatVM) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = stringResource(R.string.update_card_new_version_found, info.version),
+                            text = "${stringResource(R.string.app_name)} · ${stringResource(R.string.update_card_new_version_found, info.version)}",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.weight(1f)
@@ -125,7 +125,9 @@ fun UpdateCard(vm: ChatVM) {
             val downloadHandler = useThrottle<UpdateDownload>(500) { item ->
                 vm.updateChecker.downloadUpdate(context, item)
                 showDetail = false
-                toaster.show(context.getString(R.string.update_card_downloading), type = ToastType.Info)
+                if (item.isApk) {
+                    toaster.show(context.getString(R.string.update_card_downloading), type = ToastType.Info)
+                }
             }
             ModalBottomSheet(
                 onDismissRequest = { showDetail = false },
@@ -139,15 +141,20 @@ fun UpdateCard(vm: ChatVM) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        text = info.version,
+                        text = "${stringResource(R.string.app_name)} ${info.version}",
                         style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    Text(
-                        text = Instant.parse(info.publishedAt).toJavaInstant().toLocalDateTime(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    val publishedAt = remember(info.publishedAt) {
+                        runCatching { Instant.parse(info.publishedAt).toJavaInstant().toLocalDateTime() }.getOrNull()
+                    }
+                    if (publishedAt != null) {
+                        Text(
+                            text = publishedAt,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     MarkdownBlock(
                         content = info.changelog,
                         modifier = Modifier
@@ -168,11 +175,9 @@ fun UpdateCard(vm: ChatVM) {
                                         text = downloadItem.name,
                                     )
                                 },
-                                supportingContent = {
-                                    Text(
-                                        text = downloadItem.size
-                                    )
-                                },
+                                supportingContent = if (downloadItem.isApk) {
+                                    { Text(text = downloadItem.size) }
+                                } else null,
                                 leadingContent = {
                                     Icon(
                                         imageVector = HugeIcons.Download01,

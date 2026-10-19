@@ -77,16 +77,16 @@ class SettingsStoreTest {
     @Test
     fun `concurrent updates are all applied`() = runBlocking {
         val store = open().store
-        store.update { it.copy(webServerPort = 0) }
+        store.update { it.copy(summaryTriggerFloors = 0) }
 
         (1..8).map {
             launch(Dispatchers.Default) {
-                repeat(50) { store.update { it.copy(webServerPort = it.webServerPort + 1) } }
+                repeat(50) { store.update { it.copy(summaryTriggerFloors = it.summaryTriggerFloors + 1) } }
             }
         }.joinAll()
 
-        assertEquals(400, store.settingsFlow.value.webServerPort)
-        assertEquals(400, reopened().webServerPort)
+        assertEquals(400, store.settingsFlow.value.summaryTriggerFloors)
+        assertEquals(400, reopened().summaryTriggerFloors)
     }
 
     @Test
@@ -97,17 +97,17 @@ class SettingsStoreTest {
         val gate = CompletableDeferred<Unit>()
         opened.disk.writeGate = gate
 
-        val first = launch(start = CoroutineStart.UNDISPATCHED) { store.update { it.copy(webServerPort = 9001) } }
+        val first = launch(start = CoroutineStart.UNDISPATCHED) { store.update { it.copy(summaryTriggerFloors = 9001) } }
         while (opened.disk.writes.get() == 0) delay(1)
         val rest = (9002..9050).map { port ->
-            launch(start = CoroutineStart.UNDISPATCHED) { store.update { it.copy(webServerPort = port) } }
+            launch(start = CoroutineStart.UNDISPATCHED) { store.update { it.copy(summaryTriggerFloors = port) } }
         }
         gate.complete(Unit)
         (rest + first).joinAll()
 
         assertEquals(2, opened.disk.writes.get())
-        assertEquals(9050, store.settingsFlow.value.webServerPort)
-        assertEquals(9050, reopened().webServerPort)
+        assertEquals(9050, store.settingsFlow.value.summaryTriggerFloors)
+        assertEquals(9050, reopened().summaryTriggerFloors)
     }
 
     @Test

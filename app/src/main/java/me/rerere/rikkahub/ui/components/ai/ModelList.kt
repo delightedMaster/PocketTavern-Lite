@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -49,10 +48,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,7 +56,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastFilter
 import androidx.compose.ui.util.fastForEach
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -74,17 +69,13 @@ import me.rerere.hugeicons.stroke.ArrowDown01
 import me.rerere.hugeicons.stroke.ArrowRight01
 import me.rerere.hugeicons.stroke.Brain02
 import me.rerere.hugeicons.stroke.Cancel01
-import me.rerere.hugeicons.stroke.DragDropHorizontal
-import me.rerere.hugeicons.stroke.Favourite
 import me.rerere.hugeicons.stroke.Image03
 import me.rerere.hugeicons.stroke.Search01
 import me.rerere.hugeicons.stroke.Text
 import me.rerere.hugeicons.stroke.Tools
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
-import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.datastore.findModelById
-import me.rerere.rikkahub.data.datastore.findProvider
 import me.rerere.rikkahub.ui.components.ui.AutoAIIcon
 import me.rerere.rikkahub.ui.components.ui.Tag
 import me.rerere.rikkahub.ui.components.ui.TagType
@@ -92,10 +83,6 @@ import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.hooks.rememberSharedPreferenceString
 import me.rerere.rikkahub.ui.theme.extendColors
 import me.rerere.rikkahub.utils.toDp
-import me.rerere.ui.icons.HeartIcon
-import org.koin.compose.koinInject
-import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlin.uuid.Uuid
 
 class ModelListState internal constructor(
@@ -360,17 +347,6 @@ private fun ColumnScope.ModelList(
     onDismiss: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val settingsStore = koinInject<SettingsStore>()
-    val settings = settingsStore.settingsFlow
-        .collectAsStateWithLifecycle()
-
-    val favoriteModels = settings.value.favoriteModels.mapNotNull { modelId ->
-        val model = settings.value.providers.findModelById(modelId) ?: return@mapNotNull null
-        if (model.type != modelType) return@mapNotNull null
-        val provider = model.findProvider(providers = settings.value.providers, checkOverwrite = false) ?: return@mapNotNull null
-        model to provider
-    }
-
     var searchKeywords by remember { mutableStateOf("") }
 
     // 折叠的供应商（持久化），搜索时全部展开
@@ -408,7 +384,7 @@ private fun ColumnScope.ModelList(
     }
 
     // 计算当前选中模型的位置
-    val selectedModelPosition = remember(currentModel, favoriteModels, providers, typeFilteredModelsByProvider) {
+    val selectedModelPosition = remember(currentModel, providers, typeFilteredModelsByProvider) {
         // 仅用于初始定位，搜索关键词此时为空
         if (currentModel == null) return@remember 0
 
@@ -417,22 +393,6 @@ private fun ColumnScope.ModelList(
         // 跳过无providers提示
         if (providers.isEmpty()) {
             position += 1
-        }
-
-        // 检查是否在收藏列表中
-        val favoriteIndex = favoriteModels.indexOfFirst { it.first.id == currentModel }
-        if (favoriteIndex >= 0) {
-            if (favoriteModels.isNotEmpty()) {
-                position += 1 // favorite header
-            }
-            position += favoriteIndex
-            return@remember position
-        }
-
-        // 跳过收藏列表
-        if (favoriteModels.isNotEmpty()) {
-            position += 1 // favorite header
-            position += favoriteModels.size
         }
 
         // 在providers中查找
@@ -456,45 +416,11 @@ private fun ColumnScope.ModelList(
     val lazyListState = rememberLazyListState(
         initialFirstVisibleItemIndex = selectedModelPosition
     )
-    val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
-        // 计算favorite models在列表中的位置偏移
-        var favoriteStartIndex = 0
-        if (providers.isEmpty()) {
-            favoriteStartIndex = 1 // no providers item
-        }
-        if (favoriteModels.isNotEmpty()) {
-            favoriteStartIndex += 1 // favorite header
-        }
-
-        val fromIndex = from.index - favoriteStartIndex
-        val toIndex = to.index - favoriteStartIndex
-
-        // 只处理favorite models范围内的拖拽
-        if (fromIndex >= 0 && toIndex >= 0 &&
-            fromIndex < favoriteModels.size && toIndex < favoriteModels.size
-        ) {
-            val newFavoriteModels = settings.value.favoriteModels.toMutableList().apply {
-                add(toIndex, removeAt(fromIndex))
-            }
-            coroutineScope.launch {
-                settingsStore.update { oldSettings ->
-                    oldSettings.copy(favoriteModels = newFavoriteModels)
-                }
-            }
-        }
-    }
-    val haptic = LocalHapticFeedback.current
-
-    val providerPositions = remember(providers, favoriteModels, visibleModelsByProvider) {
+    val providerPositions = remember(providers, visibleModelsByProvider) {
         var currentIndex = 0
         if (providers.isEmpty()) {
             currentIndex = 1 // no providers item
         }
-        if (favoriteModels.isNotEmpty()) {
-            currentIndex += 1 // favorite header
-            currentIndex += favoriteModels.size // favorite models
-        }
-
         providers.map { provider ->
             val position = currentIndex
             currentIndex += 1 // provider header
@@ -551,75 +477,6 @@ private fun ColumnScope.ModelList(
             }
         }
 
-        if (favoriteModels.isNotEmpty()) {
-            stickyHeader {
-                Text(
-                    text = stringResource(R.string.model_list_favorite),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .padding(bottom = 4.dp, top = 8.dp)
-                )
-            }
-
-            items(
-                items = favoriteModels,
-                key = { "favorite:" + it.first.id.toString() }
-            ) { (model, provider) ->
-                ReorderableItem(
-                    state = reorderableState,
-                    key = "favorite:" + model.id.toString()
-                ) { isDragging ->
-                    ModelItem(
-                        model = model,
-                        onSelect = onSelect,
-                        modifier = Modifier
-                            .scale(if (isDragging) 0.95f else 1f)
-                            .animateItem(),
-                        providerSetting = provider,
-                        select = model.id == currentModel,
-                        onDismiss = {
-                            onDismiss()
-                        },
-                        tail = {
-                            IconButton(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        settingsStore.update { settings ->
-                                            settings.copy(
-                                                favoriteModels = settings.favoriteModels.filter { it != model.id }
-                                            )
-                                        }
-                                    }
-                                }
-                            ) {
-                                Icon(
-                                    HeartIcon,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        },
-                        dragHandle = {
-                            Icon(
-                                imageVector = HugeIcons.DragDropHorizontal,
-                                contentDescription = null,
-                                modifier = Modifier.longPressDraggableHandle(
-                                    onDragStarted = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
-                                    },
-                                    onDragStopped = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.GestureEnd)
-                                    }
-                                )
-                            )
-                        }
-                    )
-                }
-            }
-        }
-
         providers.fastForEach { providerSetting ->
             val collapsed = isCollapsed(providerSetting)
             stickyHeader(key = "header:${providerSetting.id}") {
@@ -660,7 +517,6 @@ private fun ColumnScope.ModelList(
                 items = visibleModelsByProvider[providerSetting.id].orEmpty(),
                 key = { it.id }
             ) { model ->
-                val favorite = settings.value.favoriteModels.contains(model.id)
                 ModelItem(
                     model = model,
                     onSelect = onSelect,
@@ -670,41 +526,6 @@ private fun ColumnScope.ModelList(
                     onDismiss = {
                         onDismiss()
                     },
-                    tail = {
-                        IconButton(
-                            onClick = {
-                                coroutineScope.launch {
-                                    settingsStore.update { settings ->
-                                        if (favorite) {
-                                            settings.copy(
-                                                favoriteModels = settings.favoriteModels.filter { it != model.id }
-                                            )
-
-                                        } else {
-                                            settings.copy(
-                                                favoriteModels = settings.favoriteModels + model.id
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        ) {
-                            if (favorite) {
-                                Icon(
-                                    HeartIcon,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = HugeIcons.Favourite,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
                 )
             }
         }
@@ -768,8 +589,6 @@ private fun ModelItem(
     onSelect: (Model) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    tail: @Composable RowScope.() -> Unit = {},
-    dragHandle: @Composable (RowScope.() -> Unit)? = null
 ) {
     val navController = LocalNavController.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -842,9 +661,7 @@ private fun ModelItem(
                         ModelAbilityTag(model = model)
                     }
                 }
-                tail()
             }
-            dragHandle?.let { it() }
         }
     }
 }

@@ -1,5 +1,8 @@
 package me.rerere.rikkahub.ui.pages.assistant.detail
 
+import me.rerere.rikkahub.data.export.ImportCompatibility
+import me.rerere.rikkahub.data.export.ImportKind
+import me.rerere.rikkahub.ui.components.ui.ImportReportState
 import android.content.Context
 import android.net.Uri
 import android.util.Base64
@@ -89,6 +92,7 @@ import kotlin.uuid.Uuid
  */
 data class TavernImportResult(
     val assistant: Assistant,
+    val report: me.rerere.rikkahub.data.export.ImportCompatibilityReport? = null,
     val newLorebooks: List<Lorebook> = emptyList(),  // 保留字段：当前导入不再产生外置书（内嵌书随卡存储）
 )
 
@@ -216,6 +220,7 @@ private fun SillyTavernImporter(
                 onDismiss = { showUrlDialog = false },
                 onConfirm = { url ->
                     runImport(scope, { isLoading = it }, { e ->
+                        ImportReportState.show(ImportCompatibility.failure(ImportKind.CHARACTER, e.message))
                         e.printStackTrace()
                         toaster.show(e.message ?: context.getString(R.string.assistant_importer_download_failed, ""))
                     }) {
@@ -326,6 +331,7 @@ private fun importFile(
     setLoading: (Boolean) -> Unit
 ) {
     runImport(scope, setLoading, { e ->
+        ImportReportState.show(ImportCompatibility.failure(ImportKind.CHARACTER, e.message))
         e.printStackTrace()
         toaster.show(e.message ?: context.getString(R.string.assistant_importer_import_failed))
     }) {
@@ -498,7 +504,7 @@ private suspend fun importFromString(
             mergeGreetings = mergeGreetings,
         )
         toaster.show(context.getString(R.string.assistant_importer_import_success))
-        onImport(TavernImportResult(assistant = assistant, newLorebooks = lorebooks))
+        onImport(TavernImportResult(assistant = assistant, newLorebooks = lorebooks, report = withContext(Dispatchers.Default) { ImportCompatibility.inspect(ImportKind.CHARACTER, jsonString, 1) }))
         return
     }
 
@@ -519,7 +525,7 @@ private suspend fun importFromString(
             mergeGreetings = mergeGreetings,
         )
         toaster.show(context.getString(R.string.assistant_importer_import_success))
-        onImport(TavernImportResult(assistant = assistant, newLorebooks = lorebooks))
+        onImport(TavernImportResult(assistant = assistant, newLorebooks = lorebooks, report = withContext(Dispatchers.Default) { ImportCompatibility.inspect(ImportKind.CHARACTER, jsonString, 1) }))
         return
     }
 
@@ -537,7 +543,7 @@ private suspend fun importFromString(
     }
 
     toaster.show(context.getString(R.string.assistant_importer_import_success))
-    onImport(TavernImportResult(assistant = assistant, newLorebooks = lorebooks))
+    onImport(TavernImportResult(assistant = assistant, newLorebooks = lorebooks, report = withContext(Dispatchers.Default) { ImportCompatibility.inspect(ImportKind.CHARACTER, jsonString, 1) }))
 }
 
 // ==================== 风月 AI 角色卡 =========

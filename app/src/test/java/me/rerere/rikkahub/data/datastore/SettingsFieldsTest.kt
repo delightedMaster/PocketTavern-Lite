@@ -60,7 +60,7 @@ class SettingsFieldsTest {
 
         assertEquals(STORED_KEYS, stored.keys)
         assertEquals(false, stored["dynamic_color"])
-        assertEquals(9090, stored["web_server_port"])
+        assertFalse(stored.keys.any { it.startsWith("web_server_") })
         assertEquals("title", stored["title_prompt"])
         assertEquals("00000000-0000-0000-0000-000000000001", stored["chat_model"])
         assertEquals("LOW", stored["fast_model_reasoning_level"])
@@ -77,7 +77,6 @@ class SettingsFieldsTest {
         assertEquals(DEFAULT_MODE_INJECTIONS, settings.modeInjections)
         assertEquals(DEFAULT_ASSISTANT_ID, settings.assistantId)
         assertEquals(true, settings.dynamicColor)
-        assertEquals(8080, settings.webServerPort)
     }
 
     @Test
@@ -186,11 +185,6 @@ private val SAMPLE = Settings(
     macroGlobalVariables = mapOf("hp" to "1"),
     macroChatVariables = mapOf("chat" to mapOf("mood" to "ok")),
     groupChats = listOf(GroupChat(id = id(35), name = "table")),
-    webServerEnabled = true,
-    webServerPort = 9090,
-    webServerJwtEnabled = true,
-    webServerAccessPassword = "secret",
-    webServerLocalhostOnly = true,
     backupReminderConfig = BackupReminderConfig(enabled = true),
 )
 
@@ -221,11 +215,6 @@ private val STORED_KEYS = setOf(
     "mcp_servers",
     "webdav_config",
     "s3_config",
-    "web_server_enabled",
-    "web_server_port",
-    "web_server_jwt_enabled",
-    "web_server_access_password",
-    "web_server_localhost_only",
     "mode_injections",
     "lorebooks",
     "regex_groups",
