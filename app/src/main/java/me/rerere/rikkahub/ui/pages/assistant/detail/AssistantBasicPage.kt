@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.ai.provider.ModelType
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.ui.components.ai.GenerationLengthFields
 import me.rerere.rikkahub.ui.components.ai.ModelField
 import me.rerere.rikkahub.ui.components.ai.ModelListSheet
 import me.rerere.rikkahub.ui.components.ai.ReasoningButton
@@ -385,35 +386,9 @@ internal fun AssistantBasicContent(
                 }
             }
             formItem(
-                headlineContent = { Text(stringResource(R.string.assistant_page_max_tokens)) },
-                supportingContent = { Text(stringResource(R.string.assistant_page_max_tokens_desc)) },
+                headlineContent = { Text(stringResource(R.string.generation_length_title)) },
             ) {
-                OutlinedTextField(
-                    value = assistant.maxTokens?.toString() ?: "",
-                    onValueChange = { text ->
-                        val tokens = if (text.isBlank()) {
-                            null
-                        } else {
-                            text.toIntOrNull()?.takeIf { it > 0 }
-                        }
-                        onUpdate(
-                            assistant.copy(
-                                maxTokens = tokens
-                            )
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text(stringResource(R.string.assistant_page_max_tokens_no_limit))
-                    },
-                    supportingText = {
-                        if (assistant.maxTokens != null) {
-                            Text(stringResource(R.string.assistant_page_max_tokens_limit, assistant.maxTokens))
-                        } else {
-                            Text(stringResource(R.string.assistant_page_max_tokens_no_token_limit))
-                        }
-                    }
-                )
+                GenerationLengthFields(assistant, onUpdate)
             }
         }
 

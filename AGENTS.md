@@ -75,7 +75,6 @@ Material 3 look (cards with dividers, plain forms).
   - ThinkTagTransformer: Extract `<think>` tags and convert to reasoning parts
   - RegexOutputTransformer: Apply regex replacements to assistant responses
   - Base64ImageToLocalFileTransformer: Convert base64 images to local file references
-  - OcrTransformer: Perform OCR on images to extract text
 
   Output transformers support `visualTransform()` for UI display during streaming and `onGenerationFinish()` for final
   processing after generation completes.

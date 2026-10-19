@@ -99,7 +99,6 @@ onSuccess
 | 2  | `PromptInjectionTransformer`   | 注入 ModeInjection 和 Lorebook 触发的提示词       |
 | 3  | `PlaceholderTransformer`       | 替换消息中的 `{{placeholder}}` 占位符             |
 | 4  | `DocumentAsPromptTransformer`  | 将文档附件转换为文本内容注入消息                         |
-| 5  | `OcrTransformer`               | 对图片 Part 执行 OCR，将识别结果附加为文本               |
 | 6  | `TemplateTransformer`          | 用 Pebble 模板引擎渲染消息（可访问 time/date/role 变量） |
 
 `PromptInjectionTransformer` 支持四种注入位置：
@@ -206,7 +205,6 @@ app/src/main/java/me/rerere/rikkahub/
     │   ├── ThinkTagTransformer.kt
     │   ├── RegexOutputTransformer.kt
     │   ├── DocumentAsPromptTransformer.kt
-    │   ├── OcrTransformer.kt
     │   ├── Base64ImageToLocalFileTransformer.kt
     │   ├── PlaceholderTransformer.kt
     └── tools/

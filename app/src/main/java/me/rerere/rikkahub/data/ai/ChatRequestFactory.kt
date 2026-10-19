@@ -22,7 +22,6 @@ import me.rerere.rikkahub.data.ai.group.toGroupMember
 import me.rerere.rikkahub.data.ai.tools.ChatToolFactory
 import me.rerere.rikkahub.data.ai.transformers.Base64ImageToLocalFileTransformer
 import me.rerere.rikkahub.data.ai.transformers.InputMessageTransformer
-import me.rerere.rikkahub.data.ai.transformers.OcrTransformer
 import me.rerere.rikkahub.data.ai.transformers.OutputMessageTransformer
 import me.rerere.rikkahub.data.ai.transformers.PlaceholderTransformer
 import me.rerere.rikkahub.data.ai.transformers.RegexOutputTransformer
@@ -81,7 +80,6 @@ class ChatRequestFactory(
 ) {
     private val inputTransformers: List<InputMessageTransformer> = listOf(
         PlaceholderTransformer,
-        OcrTransformer,
         templateTransformer,
     )
 
@@ -129,7 +127,7 @@ class ChatRequestFactory(
 
     /**
      * 本轮交给 runAgent 的请求和钩子。[messages] 的最后一条是助手消息时从它继续，否则新建一条助手消息。
-     * [processingStatus] 用来显示 OCR 这类输入转换的进度。
+     * [processingStatus] 用来显示输入转换的进度。
      */
     fun createAgent(
         turn: ChatTurnContext,
@@ -205,7 +203,7 @@ class ChatRequestFactory(
         messages: List<UIMessage>,
         compressPrompt: String,
     ): String {
-        val (requestMessages, params) = buildStep(turn, messages)
+        val (requestMessages, params) = buildStep(turn, messages, compressionPrompt = compressPrompt)
         // 压缩指令不经过输入转换器，模板转换器会把其中的花括号当成模板语法
         val result = withRetry(
             policy = turn.settings.retryPolicy(),
@@ -266,13 +264,14 @@ class ChatRequestFactory(
         turn: ChatTurnContext,
         messages: List<UIMessage>,
         processingStatus: MutableStateFlow<String?> = MutableStateFlow(null),
+        compressionPrompt: String? = null,
     ): StepRequest {
         val assistant = turn.assistant
         val chatUserMessageCount = messages.count { it.role == MessageRole.USER }
         val chatMessageCount = messages.size
         val previousRequest = turn.promptState.lastFullRequest
         val layered = turn.layeredPrompt(messages)
-        val requestMessages = layered.messages.transforms(
+        val expandedMessages = layered.messages.transforms(
             transformers = inputTransformers,
             context = context,
             model = turn.model,
@@ -284,6 +283,19 @@ class ChatRequestFactory(
             processingStatus = processingStatus,
             chatUserMessageCount = chatUserMessageCount,
             chatMessageCount = chatMessageCount,
+        )
+        val limit = assistant.contextTokenLimit ?: turn.model.contextLength.takeIf { it > 0 }
+        val toolTokens = if (limit == null) 0 else turn.tools.sumOf {
+            me.rerere.rikkahub.data.ai.transformers.estimateTokens(
+                it.name + it.description + it.parameters().toString()
+            ) + 12
+        }
+        val requestMessages = fitContextTokenBudget(
+            expandedMessages,
+            limit,
+            if (compressionPrompt == null) assistant.maxTokens else null,
+            toolTokens + (compressionPrompt?.let { me.rerere.rikkahub.data.ai.transformers.estimateTokens(it) + 8 } ?: 0),
+            allowHistoryTrim = compressionPrompt == null,
         )
         val texts = requestMessages.map { it.toText() }
         val diverge = me.rerere.rikkahub.data.ai.assembly.firstDivergence(previousRequest, texts)

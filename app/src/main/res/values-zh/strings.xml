@@ -1864,4 +1864,11 @@ mDNS 地址：使用 .local 主机名，同一网络中的其他设备可通过�
   <string name="skills_page_close">关闭</string>
   <string name="prompt_page_edit_preset">编辑预设</string>
   <string name="prompt_page_entry_enable">启用条目：%1$s</string>
+  <string name="generation_length_title">上下文与回复长度</string>
+  <string name="generation_context_tokens">上下文长度（tokens）</string>
+  <string name="generation_context_hint">留空跟随模型设置。按估算 token 数保留最近对话，不会删除历史记录。</string>
+  <string name="generation_reply_tokens">最大回复量（tokens）</string>
+  <string name="generation_reply_hint">留空使用提供商默认值。这是单次回复的上限，不保证模型写满。</string>
+  <string name="generation_unlocked_hint">可直接输入任意正整数，不受预设档位限制；实际容量仍由模型和提供商决定，token 数为估算值。</string>
+  <string name="generation_role_defaults_hint">修改当前角色和新聊天的默认值；已有聊天可在聊天菜单中单独调整。</string>
 </resources>

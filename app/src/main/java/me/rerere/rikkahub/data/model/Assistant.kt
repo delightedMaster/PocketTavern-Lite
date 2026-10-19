@@ -39,6 +39,7 @@ data class Assistant(
     val regexes: List<AssistantRegex> = emptyList(),
     val reasoningLevel: ReasoningLevel = ReasoningLevel.AUTO,
     val maxTokens: Int? = null,
+    val contextTokenLimit: Int? = null,
     val customHeaders: List<CustomHeader> = emptyList(),
     val customBodies: List<CustomBody> = emptyList(),
     val mcpServers: Set<Uuid> = emptySet(),

@@ -33,6 +33,8 @@ import me.rerere.hugeicons.stroke.ScanText
 import me.rerere.hugeicons.stroke.Zap
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.Settings
+import me.rerere.rikkahub.data.datastore.getCurrentAssistant
+import me.rerere.rikkahub.ui.components.ai.GenerationLengthFields
 import me.rerere.rikkahub.ui.components.ai.ModelField
 import me.rerere.rikkahub.ui.components.ai.ModelListSheet
 import me.rerere.rikkahub.ui.components.ai.ModelListState
@@ -133,11 +135,7 @@ private fun ModelSettingsPage(settings: Settings, vm: SettingVM, contentPadding:
         providers = settings.providers,
         type = ModelType.CHAT,
     )
-    val ocrModel = rememberModelListState(
-        modelId = settings.ocrModelId,
-        providers = settings.providers,
-        type = ModelType.CHAT,
-    )
+
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -156,6 +154,26 @@ private fun ModelSettingsPage(settings: Settings, vm: SettingVM, contentPadding:
                     iconContainerColor = containerColor,
                     iconContentColor = contentColor,
                 )
+            }
+        }
+        item {
+            val assistant = settings.getCurrentAssistant()
+            CardGroup {
+                formItem(
+                    headlineContent = { Text(stringResource(R.string.generation_length_title)) },
+                    supportingContent = { Text(stringResource(R.string.generation_role_defaults_hint)) },
+                ) {
+                    GenerationLengthFields(assistant) { updated ->
+                        vm.updateSettings { latest ->
+                            latest.copy(assistants = latest.assistants.map {
+                                if (it.id == updated.id) it.copy(
+                                    contextTokenLimit = updated.contextTokenLimit,
+                                    maxTokens = updated.maxTokens,
+                                ) else it
+                            })
+                        }
+                    }
+                }
             }
         }
         item {
@@ -198,20 +216,6 @@ private fun ModelSettingsPage(settings: Settings, vm: SettingVM, contentPadding:
                 )
             }
         }
-        item {
-            val containerColor = MaterialTheme.colorScheme.secondaryContainer
-            val contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-            CardGroup {
-                modelItem(
-                    icon = HugeIcons.ScanText,
-                    title = R.string.setting_model_page_ocr_model,
-                    description = R.string.setting_model_page_ocr_model_desc,
-                    state = ocrModel,
-                    iconContainerColor = containerColor,
-                    iconContentColor = contentColor,
-                )
-            }
-        }
     }
 
     ModelListSheet(state = chatModel) {
@@ -219,9 +223,6 @@ private fun ModelSettingsPage(settings: Settings, vm: SettingVM, contentPadding:
     }
     ModelListSheet(state = fastModel) {
         vm.updateSettings { latest -> latest.copy(fastModelId = it.id) }
-    }
-    ModelListSheet(state = ocrModel) {
-        vm.updateSettings { latest -> latest.copy(ocrModelId = it.id) }
     }
 }
 

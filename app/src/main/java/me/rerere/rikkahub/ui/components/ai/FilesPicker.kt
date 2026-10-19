@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -85,7 +87,6 @@ internal fun FilesPicker(
     // 会话视角下的助手和模型：会话开始后以会话上固定的配置为准
     assistant: Assistant,
     chatModel: Model?,
-    state: ChatInputState,
     mcpManager: McpManager,
     onCompressContext: (additionalPrompt: String) -> Job,
     onSummarizeNow: () -> Job,
@@ -93,15 +94,10 @@ internal fun FilesPicker(
     showCompressDialog: Boolean,
     onShowCompressDialogChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
-    onTakePic: () -> Unit,
-    onPickImage: () -> Unit,
-    onPickVideo: () -> Unit,
-    onPickAudio: () -> Unit,
-    onSketch: () -> Unit,
 ) {
     val settings = LocalSettings.current
-    val provider = chatModel?.findProvider(providers = settings.providers)
     val navController = LocalNavController.current
+    var showGenerationSettings by remember { mutableStateOf(false) }
     var page by remember { mutableStateOf(FilesPickerPage.MAIN) }
     // 在子页面时，返回键回到主页面而不是关闭 sheet
     BackHandler(enabled = page != FilesPickerPage.MAIN) {
@@ -144,23 +140,11 @@ internal fun FilesPicker(
                     .padding(bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                AttachmentGrid(
-                    actions = buildList {
-                        add(AttachmentAction(HugeIcons.Camera01, R.string.take_picture, onTakePic))
-                        add(AttachmentAction(HugeIcons.Image02, R.string.photo, onPickImage))
-                        add(AttachmentAction(HugeIcons.PaintBoard, R.string.sketch, onSketch))
-                        if (provider != null && provider is ProviderSetting.Google) {
-                            add(AttachmentAction(HugeIcons.Video01, R.string.video, onPickVideo))
-                            add(AttachmentAction(HugeIcons.MusicNote03, R.string.audio, onPickAudio))
-                        }
-                    }
-                )
-
                 // 分段列表：各项按显示条件依次占位，首尾项才有大圆角
                 val showMcp = settings.mcpServers.isNotEmpty()
                 // 限制了上下文消息数就是滚动上下文，旧消息会自动移出，不需要压缩
                 val showCompress = assistant.contextMessageLimit <= 0
-                val itemCount = 2 + listOf(showMcp, showCompress).count { it }
+                val itemCount = 3 + listOf(showMcp, showCompress).count { it }
                 var itemIndex = 0
                 Column(
                     verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
@@ -173,6 +157,13 @@ internal fun FilesPicker(
                             shapes = ListItemDefaults.segmentedShapes(index = itemIndex++, count = itemCount),
                             onClick = { page = FilesPickerPage.MCP },
                         )
+                    }
+
+                    SegmentedListItem(
+                        onClick = { showGenerationSettings = true },
+                        shapes = ListItemDefaults.segmentedShapes(index = itemIndex++, count = itemCount),
+                    ) {
+                        Text(stringResource(R.string.generation_length_title))
                     }
 
                     // Extensions (Quick Messages + Prompt Injections + Skills)
@@ -214,7 +205,7 @@ internal fun FilesPicker(
                                 val contextTokens = remember(conversation.messageNodes) {
                                     conversation.lastContextTokens()
                                 }
-                                val contextLength = chatModel?.contextLength?.takeIf { it > 0 }
+                                val contextLength = assistant.contextTokenLimit ?: chatModel?.contextLength?.takeIf { it > 0 }
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -256,6 +247,19 @@ internal fun FilesPicker(
                 }
             }
         }
+    }
+
+    if (showGenerationSettings) {
+        AlertDialog(
+            onDismissRequest = { showGenerationSettings = false },
+            title = { Text(stringResource(R.string.generation_length_title)) },
+            text = { GenerationLengthFields(assistant, onUpdateAssistant) },
+            confirmButton = {
+                TextButton(onClick = { showGenerationSettings = false }) {
+                    Text(stringResource(R.string.prompt_page_confirm))
+                }
+            },
+        )
     }
 
     // Compress Context Dialog
@@ -313,75 +317,6 @@ private fun ExtensionPickerPage(
     }
 }
 
-private class AttachmentAction(
-    val icon: ImageVector,
-    @param:StringRes val label: Int,
-    val onClick: () -> Unit,
-)
-
-// 附件入口：一行最多四个，再多就均分成两行
-@Composable
-private fun AttachmentGrid(
-    actions: List<AttachmentAction>,
-    modifier: Modifier = Modifier,
-) {
-    val perRow = if (actions.size <= 4) actions.size else (actions.size + 1) / 2
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        actions.chunked(perRow).fastForEach { row ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                row.fastForEach { action ->
-                    AttachmentTile(
-                        action = action,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AttachmentTile(
-    action: AttachmentAction,
-    modifier: Modifier = Modifier,
-) {
-    FilledTonalButton(
-        onClick = action.onClick,
-        // 按下时圆角收紧
-        shapes = ButtonDefaults.shapes(
-            shape = MaterialTheme.shapes.extraLarge,
-            pressedShape = MaterialTheme.shapes.medium,
-        ),
-        modifier = modifier.heightIn(min = 88.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 16.dp),
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(
-                imageVector = action.icon,
-                contentDescription = null,
-                modifier = Modifier.size(28.dp),
-            )
-            Text(
-                text = stringResource(action.label),
-                // 四个并排时较长的译文放不下，自动缩小字号
-                autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 14.sp),
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
 // 列表项尾部的已启用数量
 @Composable
 internal fun CountBadge(count: Int) {
@@ -407,20 +342,5 @@ private fun ContextUsageRing(fraction: Float) {
         color = color,
         strokeWidth = 3.dp,
         trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun AttachmentGridPreview() {
-    AttachmentGrid(
-        actions = listOf(
-            AttachmentAction(HugeIcons.Camera01, R.string.take_picture) {},
-            AttachmentAction(HugeIcons.Image02, R.string.photo) {},
-            AttachmentAction(HugeIcons.Video01, R.string.video) {},
-            AttachmentAction(HugeIcons.MusicNote03, R.string.audio) {},
-            AttachmentAction(HugeIcons.Files02, R.string.upload_file) {},
-        ),
-        modifier = Modifier.padding(16.dp),
     )
 }

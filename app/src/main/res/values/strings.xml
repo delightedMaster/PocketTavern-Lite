@@ -1865,4 +1865,11 @@
   <string name="skills_page_close">Close</string>
   <string name="prompt_page_edit_preset">Edit preset</string>
   <string name="prompt_page_entry_enable">Enable entry: %1$s</string>
+  <string name="generation_length_title">Context and reply length</string>
+  <string name="generation_context_tokens">Context window (tokens)</string>
+  <string name="generation_context_hint">Blank follows the model setting. Old turns are omitted from requests when the estimated budget is exceeded.</string>
+  <string name="generation_reply_tokens">Maximum reply (tokens)</string>
+  <string name="generation_reply_hint">Blank uses the provider default. This is a maximum, not a required response length.</string>
+  <string name="generation_unlocked_hint">Custom positive numbers are not capped by UI presets. The model and provider still enforce their actual limits; token counts are estimates.</string>
+  <string name="generation_role_defaults_hint">Defaults for the current character and new chats. Existing chats have their own control in the chat menu.</string>
 </resources>

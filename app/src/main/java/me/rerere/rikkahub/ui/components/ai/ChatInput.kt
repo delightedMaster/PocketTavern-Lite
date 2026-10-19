@@ -431,7 +431,6 @@ private fun TextInputRow(
     onRunQuickReply: (String) -> Unit,
 ) {
     val settings = LocalSettings.current
-    val filesManager: FilesManager = koinInject()
 
     var isEditingReasoning by remember { mutableStateOf(false) }
 
@@ -469,28 +468,6 @@ private fun TextInputRow(
         var isFocused by remember { mutableStateOf(false) }
         var isFullScreen by remember { mutableStateOf(false) }
         var completionList by remember { mutableStateOf<ChatCompletionList?>(null) }
-        val receiveContentListener = remember(state, filesManager) {
-            ReceiveContentListener { transferableContent ->
-                when {
-                    transferableContent.hasMediaType(MediaType.Image) -> {
-                        transferableContent.consume { item ->
-                            val uri = item.uri
-                            if (uri != null) {
-                                state.addImages(
-                                    filesManager.createChatFilesByContents(
-                                        listOf(uri)
-                                    )
-                                )
-                            }
-                            uri != null
-                        }
-                    }
-
-                    else -> transferableContent
-                }
-            }
-        }
-
         LaunchedEffect(completionProviders, isFocused) {
             if (!isFocused || completionProviders.isEmpty()) {
                 completionList = null
@@ -545,7 +522,6 @@ private fun TextInputRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("chat_input")
-                .contentReceiver(receiveContentListener)
                 .onFocusChanged {
                     isFocused = it.isFocused
                 },
