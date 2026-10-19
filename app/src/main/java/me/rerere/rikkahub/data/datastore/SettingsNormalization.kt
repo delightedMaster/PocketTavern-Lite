@@ -4,6 +4,7 @@ import me.rerere.ai.provider.BuiltInTools
 import me.rerere.ai.provider.Modality
 import me.rerere.ai.provider.ProviderSetting
 import me.rerere.rikkahub.data.ai.tools.local.LocalToolOption
+import me.rerere.rikkahub.data.model.LorebookKind
 import me.rerere.search.SearchServiceOptions
 
 /** 读盘后和每次修改后都要过一遍，保证内存里的设置始终是规整的。 */
@@ -108,7 +109,11 @@ internal fun Settings.withoutInvalidReferences(): Settings {
             .ifEmpty { listOf(SearchServiceOptions.DEFAULT) }
             .distinctBy { it.id },
         modeInjections = settings.modeInjections.distinctBy { it.id },
-        lorebooks = settings.lorebooks.distinctBy { it.id },
+        lorebooks = settings.lorebooks.distinctBy { it.id }.map { book ->
+            if (book.kind == LorebookKind.WORLD_BOOK && book.description == "SillyTavern 预设导入") {
+                book.copy(kind = LorebookKind.PRESET)
+            } else book
+        },
         quickMessages = settings.quickMessages.distinctBy { it.id },
     )
 }

@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import me.rerere.rikkahub.data.datastore.Settings
+import me.rerere.rikkahub.data.export.LorebookImport
 import me.rerere.rikkahub.data.datastore.SettingsStore
 
 class PromptVM(
@@ -13,6 +14,10 @@ class PromptVM(
 ) : ViewModel() {
     val settings = settingsStore.settingsFlow
         .stateIn(viewModelScope, SharingStarted.Lazily, Settings.dummy())
+
+    suspend fun importLorebook(imported: LorebookImport) {
+        settingsStore.update { imported.applyTo(it) }
+    }
 
     fun updateSettings(fn: (Settings) -> Settings) {
         viewModelScope.launch {

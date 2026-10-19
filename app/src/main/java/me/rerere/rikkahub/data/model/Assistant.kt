@@ -648,12 +648,16 @@ object DelayUntilRecursionSerializer : kotlinx.serialization.KSerializer<Int> {
  * Lorebook - 组织管理多个 RegexInjection
  */
 @Serializable
+enum class LorebookKind { WORLD_BOOK, PRESET }
+
+@Serializable
 data class Lorebook(
     val id: Uuid = Uuid.random(),
     val name: String = "",
     val description: String = "",
     val enabled: Boolean = true,
     val entries: List<PromptInjection.RegexInjection> = emptyList(),
+    val kind: LorebookKind = LorebookKind.WORLD_BOOK,
     // 是否来自角色卡内嵌世界书（官方 world_info_character_str
     val isCharacterBook: Boolean = false,
 )
