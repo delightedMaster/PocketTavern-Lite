@@ -1,5 +1,8 @@
 package me.rerere.rikkahub.ui.pages.extensions
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
@@ -65,16 +68,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEachIndexed
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import me.rerere.ai.core.MessageRole
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Add01
+import me.rerere.hugeicons.stroke.Code
+import me.rerere.hugeicons.stroke.Idea01
 import me.rerere.hugeicons.stroke.ArrowDown01
 import me.rerere.hugeicons.stroke.Book01
 import me.rerere.hugeicons.stroke.Cancel01
@@ -86,6 +94,9 @@ import me.rerere.hugeicons.stroke.MagicWand01
 import me.rerere.hugeicons.stroke.Share03
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.export.LorebookSerializer
+import me.rerere.rikkahub.data.export.SillyTavernRegexImporter
+import me.rerere.rikkahub.data.model.RegexGroup
+import me.rerere.rikkahub.data.model.RegexGroupSource
 import me.rerere.rikkahub.data.export.ModeInjectionSerializer
 import me.rerere.rikkahub.ui.hooks.rememberExporter
 import me.rerere.rikkahub.ui.hooks.rememberImporter
@@ -122,7 +133,9 @@ private enum class PromptTab(
     @param:StringRes private val labelRes: Int,
 ) : PagerTab {
     MODE_INJECTIONS(HugeIcons.MagicWand01, R.string.prompt_page_mode_injection_tab),
-    LOREBOOKS(HugeIcons.Book01, R.string.prompt_page_lorebook_tab);
+    LOREBOOKS(HugeIcons.Book01, R.string.prompt_page_lorebook_tab),
+    AUTHOR_NOTE(HugeIcons.Idea01, R.string.prompt_page_author_note_tab),
+    REGEX(HugeIcons.Code, R.string.prompt_page_regex_tab);
 
     override val label: String
         @Composable get() = stringResource(labelRes)
@@ -172,7 +185,23 @@ fun PromptPage(vm: PromptVM = koinViewModel()) {
 
                     PromptTab.LOREBOOKS -> LorebookTab(
                         lorebooks = settings.lorebooks,
-                        onUpdate = { vm.updateSettings { latest -> latest.copy(lorebooks = it) } }
+                        regexGroups = settings.regexGroups,
+                        onUpdate = { vm.updateSettings { latest -> latest.copy(lorebooks = it) } },
+                        onRegexGroups = { groups ->
+                            vm.updateSettings { latest -> latest.copy(regexGroups = groups) }
+                        },
+                    )
+
+                    PromptTab.AUTHOR_NOTE -> AuthorNoteTab(
+                        settings = settings,
+                        onUpdate = { vm.updateSettings(it) },
+                    )
+
+                    PromptTab.REGEX -> RegexScriptsTab(
+                        groups = settings.regexGroups,
+                        onUpdate = { groups ->
+                            vm.updateSettings { latest -> latest.copy(regexGroups = groups) }
+                        },
                     )
                 }
             }
@@ -546,18 +575,32 @@ private fun InjectionPosition.usesStandaloneMessage(): Boolean = when (this) {
     InjectionPosition.BEFORE_SYSTEM_PROMPT,
     InjectionPosition.AFTER_SYSTEM_PROMPT -> false
 
+    InjectionPosition.BEFORE_CHARACTER,
+    InjectionPosition.AFTER_CHARACTER,
+    InjectionPosition.ANTAGONIZE,
     InjectionPosition.TOP_OF_CHAT,
     InjectionPosition.BOTTOM_OF_CHAT,
-    InjectionPosition.AT_DEPTH -> true
+    InjectionPosition.AFTER_DIALOG,
+    InjectionPosition.AT_DEPTH,
+    InjectionPosition.AUTHOR_NOTE,
+    InjectionPosition.EM_TOP,
+    InjectionPosition.EM_BOTTOM -> true
 }
 
 @Composable
 private fun getPositionLabel(position: InjectionPosition): String = when (position) {
     InjectionPosition.BEFORE_SYSTEM_PROMPT -> stringResource(R.string.prompt_page_position_before_system)
     InjectionPosition.AFTER_SYSTEM_PROMPT -> stringResource(R.string.prompt_page_position_after_system)
+    InjectionPosition.BEFORE_CHARACTER -> stringResource(R.string.prompt_page_position_before_character)
+    InjectionPosition.AFTER_CHARACTER -> stringResource(R.string.prompt_page_position_after_character)
+    InjectionPosition.ANTAGONIZE -> stringResource(R.string.prompt_page_position_antagonize)
     InjectionPosition.TOP_OF_CHAT -> stringResource(R.string.prompt_page_position_top_of_chat)
     InjectionPosition.BOTTOM_OF_CHAT -> stringResource(R.string.prompt_page_position_bottom_of_chat)
+    InjectionPosition.AFTER_DIALOG -> stringResource(R.string.prompt_page_position_after_dialog)
     InjectionPosition.AT_DEPTH -> stringResource(R.string.prompt_page_position_at_depth)
+    InjectionPosition.AUTHOR_NOTE -> stringResource(R.string.prompt_page_position_author_note)
+    InjectionPosition.EM_TOP -> stringResource(R.string.prompt_page_position_em_top)
+    InjectionPosition.EM_BOTTOM -> stringResource(R.string.prompt_page_position_em_bottom)
 }
 
 @Composable
@@ -588,7 +631,9 @@ private fun getRoleLabel(role: MessageRole): String = when (role) {
 @Composable
 private fun LorebookTab(
     lorebooks: List<Lorebook>,
-    onUpdate: (List<Lorebook>) -> Unit
+    regexGroups: List<RegexGroup>,
+    onUpdate: (List<Lorebook>) -> Unit,
+    onRegexGroups: (List<RegexGroup>) -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(true) }
     val lazyListState = rememberLazyListState()
@@ -610,12 +655,45 @@ private fun LorebookTab(
     }
     val importSuccessMsg = stringResource(R.string.export_import_success)
     val importFailedMsg = stringResource(R.string.export_import_failed)
-    val importer = rememberImporter(LorebookSerializer) { result ->
-        result.onSuccess { imported ->
-            onUpdate(currentLorebooks + imported)
-            toaster.show(importSuccessMsg)
-        }.onFailure { error ->
-            toaster.show(importFailedMsg.format(error.message))
+    val presetFolderName = stringResource(R.string.tavern_regex_preset_folder)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val currentGroups by rememberUpdatedState(regexGroups)
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val json = LorebookSerializer.readUri(context, uri)
+                    val fileName = LorebookSerializer.getUriFileName(context, uri)?.removeSuffix(".json")
+                    val book = LorebookSerializer.importFromJson(json, fileName)
+                    val regexes = SillyTavernRegexImporter.parseFromPreset(json)
+                    book to ((fileName?.takeIf { it.isNotBlank() } ?: book.name) to regexes)
+                }
+            }
+            result.onSuccess { (book, namedRegexes) ->
+                onUpdate(currentLorebooks + book)
+                val (rawName, regexes) = namedRegexes
+                if (regexes.isNotEmpty()) {
+                    val name = rawName.ifBlank { presetFolderName }
+                    val existing = currentGroups.firstOrNull {
+                        it.source == RegexGroupSource.PRESET && it.name == name
+                    }
+                    val groups = if (existing != null) {
+                        currentGroups.map { if (it.id == existing.id) it.copy(regexes = regexes) else it }
+                    } else {
+                        currentGroups + RegexGroup(
+                            name = name,
+                            source = RegexGroupSource.PRESET,
+                            regexes = regexes,
+                        )
+                    }
+                    onRegexGroups(groups)
+                }
+                toaster.show(importSuccessMsg)
+            }.onFailure { error ->
+                toaster.show(importFailedMsg.format(error.message))
+            }
         }
     }
 
@@ -662,7 +740,7 @@ private fun LorebookTab(
                 .align(Alignment.BottomCenter)
                 .offset(y = -ScreenOffset),
             leadingContent = {
-                IconButton(onClick = { importer.importFromFile() }) {
+                IconButton(onClick = { importer.launch(arrayOf("application/json", "text/plain", "*/*")) }) {
                     Icon(HugeIcons.FileImport, null)
                 }
             },
@@ -1154,11 +1232,10 @@ private fun RegexInjectionEditDialog(
                 )
 
                 OutlinedTextField(
-                    value = entry.scanDepth.toString(),
-                    onValueChange = {
-                        it.toIntOrNull()?.let { d -> onEdit(entry.copy(scanDepth = d)) }
-                    },
+                    value = entry.scanDepth?.toString().orEmpty(),
+                    onValueChange = { onEdit(entry.copy(scanDepth = it.toIntOrNull())) },
                     label = { Text(stringResource(R.string.prompt_page_scan_depth)) },
+                    supportingText = { Text(stringResource(R.string.prompt_page_scan_depth_hint)) },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )

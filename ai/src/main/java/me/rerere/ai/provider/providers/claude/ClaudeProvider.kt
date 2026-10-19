@@ -49,6 +49,7 @@ import me.rerere.ai.provider.stream.SseEvent
 import me.rerere.ai.ui.ImageGenerationItem
 import me.rerere.ai.ui.StreamChunk
 import me.rerere.ai.ui.UIMessage
+import me.rerere.ai.ui.UIMessageAnnotation
 import me.rerere.ai.ui.ClaudeReasoningMetadata
 import me.rerere.ai.ui.ServerToolMetadata
 import me.rerere.ai.ui.ServerToolProtocol
@@ -65,6 +66,7 @@ import me.rerere.ai.util.encodeBase64
 import me.rerere.ai.util.json
 import me.rerere.ai.util.mergeCustomBody
 import me.rerere.ai.util.mergeCustomHeaders
+import me.rerere.ai.util.withSortedKeys
 import me.rerere.ai.util.parseErrorDetail
 import me.rerere.ai.util.stringSafe
 import me.rerere.common.http.await
@@ -83,6 +85,8 @@ private const val TAG = "ClaudeProvider"
 private const val ANTHROPIC_VERSION = "2023-06-01"
 private const val CLAUDE_PAUSE_TURN = "pause_turn"
 private const val MAX_PAUSE_TURN_CONTINUATIONS = 5
+
+private data class ClaudeSystemBlock(val text: String, val breakpoint: Boolean)
 
 internal suspend fun generateClaudeWithPauseTurn(
     messages: List<UIMessage>,
@@ -425,11 +429,22 @@ class ClaudeProvider(private val client: OkHttpClient, context: Context? = null)
         params: TextGenerationParams,
         stream: Boolean = false
     ): JsonObject {
+        val systemBlocks = leadingSystemBlocks(messages)
+        val extraSystemIndex = systemBlocks.indices.firstOrNull { index ->
+            systemBlocks[index].breakpoint && index != systemBlocks.lastIndex
+        }
+        val caching = providerSetting.promptCaching
+        val reservesTools = (params.model.abilities.contains(ModelAbility.TOOL) && params.tools.isNotEmpty()) ||
+            params.model.tools.any { it == BuiltInTools.Search }
+        val reserved = (if (caching && systemBlocks.isNotEmpty()) 1 else 0) +
+            (if (caching && reservesTools) 1 else 0) +
+            (if (caching && extraSystemIndex != null) 1 else 0)
+        val messageBudget = if (caching) (4 - reserved).coerceIn(0, 2) else 0
         return buildJsonObject {
             put("model", params.model.modelId)
             put(
                 "messages",
-                buildMessages(messages, providerSetting.promptCaching, providerSetting.promptCacheTtl)
+                buildMessages(messages, caching, providerSetting.promptCacheTtl, messageBudget)
             )
             put("max_tokens", params.maxTokens ?: 64_000)
 
@@ -446,16 +461,16 @@ class ClaudeProvider(private val client: OkHttpClient, context: Context? = null)
 
             put("stream", stream)
 
-            // system prompt
-            val systemMessage = messages.firstOrNull { it.role == MessageRole.SYSTEM }
-            val systemTextParts = systemMessage?.parts?.filterIsInstance<UIMessagePart.Text>().orEmpty()
-            if (systemTextParts.isNotEmpty()) {
+            // Leading system messages stay in the system array. Later ones are sent as user
+            // messages so a summary or anchored lore entry is not dropped.
+            if (systemBlocks.isNotEmpty()) {
                 put("system", buildJsonArray {
-                    systemTextParts.forEachIndexed { index, part ->
+                    systemBlocks.forEachIndexed { index, block ->
                         add(buildJsonObject {
                             put("type", "text")
-                            put("text", part.text)
-                            if (providerSetting.promptCaching && index == systemTextParts.lastIndex) {
+                            put("text", block.text)
+                            val mark = caching && (index == systemBlocks.lastIndex || index == extraSystemIndex)
+                            if (mark) {
                                 put("cache_control", cacheControlEphemeral(providerSetting.promptCacheTtl))
                             }
                         })
@@ -531,7 +546,7 @@ class ClaudeProvider(private val client: OkHttpClient, context: Context? = null)
                     }
                 }
             }
-        }.mergeCustomBody(params.customBody)
+        }.mergeCustomBody(params.customBody).withSortedKeys()
     }
 
     private fun cacheControlEphemeral(promptCacheTtl: ClaudePromptCacheTtl) = buildJsonObject {
@@ -539,52 +554,68 @@ class ClaudeProvider(private val client: OkHttpClient, context: Context? = null)
         promptCacheTtl.apiValue?.let { put("ttl", it) }
     }
 
+    /** Old three-argument shape. Callers without an explicit budget get one rolling breakpoint. */
     private fun buildMessages(
         messages: List<UIMessage>,
         promptCaching: Boolean,
-        promptCacheTtl: ClaudePromptCacheTtl
-    ) = buildJsonArray {
-        messages
-            .filter { it.isValidToUpload() && it.role != MessageRole.SYSTEM }
-            .forEach { message ->
-                if (message.role == MessageRole.ASSISTANT) {
-                    addAssistantMessage(message)
-                } else {
-                    addUserMessage(message)
-                }
+        promptCacheTtl: ClaudePromptCacheTtl,
+    ): JsonArray = buildMessages(
+        messages,
+        promptCaching,
+        promptCacheTtl,
+        maxMessageBreakpoints = if (promptCaching) 1 else 0,
+    )
+
+    private fun buildMessages(
+        messages: List<UIMessage>,
+        promptCaching: Boolean,
+        promptCacheTtl: ClaudePromptCacheTtl,
+        maxMessageBreakpoints: Int,
+    ): JsonArray {
+        val body = messages.filter { it.isValidToUpload() }.dropWhile { it.role == MessageRole.SYSTEM }
+        val jsonMessages = mutableListOf<JsonElement>()
+        val explicit = mutableListOf<Int>()
+        body.forEach { message ->
+            val send = if (message.role == MessageRole.SYSTEM) message.copy(role = MessageRole.USER) else message
+            val chunk = buildJsonArray {
+                if (send.role == MessageRole.ASSISTANT) addAssistantMessage(send) else addUserMessage(send)
             }
-    }.let { messagesArray ->
-        if (!promptCaching) return@let messagesArray
-        insertMessagesCacheControl(messagesArray, promptCacheTtl)
+            val start = jsonMessages.size
+            jsonMessages.addAll(chunk)
+            if (chunk.isNotEmpty() && message.annotations.any { it is UIMessageAnnotation.CacheBreakpoint }) {
+                explicit += start + chunk.size - 1
+            }
+        }
+        val array = JsonArray(jsonMessages)
+        if (!promptCaching || maxMessageBreakpoints <= 0) return array
+        return insertMessagesCacheControl(array, promptCacheTtl, explicit, maxMessageBreakpoints)
     }
 
     /**
-     * 在倒数第二条非 tool_result 的 user message 的最后一个 content block 上插入 cache_control
+     * Explicit [UIMessageAnnotation.CacheBreakpoint] marks win. With more than the remaining
+     * budget, keep the earliest and latest. With no marks, cache the second-to-last real user
+     * message so an unmarked chat still has a rolling breakpoint.
      */
     private fun insertMessagesCacheControl(
         messages: JsonArray,
-        promptCacheTtl: ClaudePromptCacheTtl
+        promptCacheTtl: ClaudePromptCacheTtl,
+        explicitBreakpoints: List<Int>,
+        maxBreakpoints: Int,
     ): JsonArray {
-        // 找出所有非 tool_result 的 user message 的索引
-        val realUserIndices = messages.mapIndexedNotNull { index, msg ->
-            val obj = msg.jsonObject
-            if (obj["role"]?.jsonPrimitive?.contentOrNull == "user") {
-                val content = obj["content"]?.jsonArray
-                val isToolResult = content?.any {
-                    it.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "tool_result"
-                } == true
-                if (!isToolResult) index else null
-            } else null
+        val targets = if (explicitBreakpoints.isNotEmpty()) {
+            val distinct = explicitBreakpoints.distinct().sorted()
+            when {
+                maxBreakpoints <= 0 -> emptyList()
+                distinct.size == 1 || maxBreakpoints == 1 -> listOf(distinct.last())
+                else -> listOf(distinct.first(), distinct.last())
+            }
+        } else {
+            listOfNotNull(secondToLastRealUser(messages)).take(maxBreakpoints)
         }
-
-        // 取倒数第二条
-        val targetIndex = if (realUserIndices.size >= 2) {
-            realUserIndices[realUserIndices.size - 2]
-        } else return messages
-
-        // 在目标 message 的最后一个 content block 上添加 cache_control
+        if (targets.isEmpty()) return messages
+        val targetSet = targets.toSet()
         return JsonArray(messages.mapIndexed { index, msg ->
-            if (index == targetIndex) {
+            if (index in targetSet) {
                 val obj = msg.jsonObject
                 val content = obj["content"]?.jsonArray ?: return@mapIndexed msg
                 val newContent = JsonArray(content.mapIndexed { contentIndex, block ->
@@ -597,6 +628,32 @@ class ClaudeProvider(private val client: OkHttpClient, context: Context? = null)
                 JsonObject(obj + mapOf("content" to newContent))
             } else msg
         })
+    }
+
+    private fun secondToLastRealUser(messages: JsonArray): Int? {
+        val realUserIndices = messages.mapIndexedNotNull { index, msg ->
+            val obj = msg.jsonObject
+            if (obj["role"]?.jsonPrimitive?.contentOrNull == "user") {
+                val content = obj["content"]?.jsonArray
+                val isToolResult = content?.any {
+                    it.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "tool_result"
+                } == true
+                if (!isToolResult) index else null
+            } else null
+        }
+        return if (realUserIndices.size >= 2) realUserIndices[realUserIndices.size - 2] else null
+    }
+
+    private fun leadingSystemBlocks(messages: List<UIMessage>): List<ClaudeSystemBlock> {
+        return messages
+            .filter { it.isValidToUpload() }
+            .takeWhile { it.role == MessageRole.SYSTEM }
+            .flatMap { message ->
+                val marked = message.annotations.any { it is UIMessageAnnotation.CacheBreakpoint }
+                message.parts.filterIsInstance<UIMessagePart.Text>()
+                    .filter { it.text.isNotBlank() }
+                    .map { ClaudeSystemBlock(it.text, marked) }
+            }
     }
 
     private fun JsonArrayBuilder.addAssistantMessage(message: UIMessage) {

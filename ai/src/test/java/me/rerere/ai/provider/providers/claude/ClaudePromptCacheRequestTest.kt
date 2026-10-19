@@ -11,7 +11,11 @@ import me.rerere.ai.provider.Model
 import me.rerere.ai.provider.ModelAbility
 import me.rerere.ai.provider.ProviderSetting
 import me.rerere.ai.provider.TextGenerationParams
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.contentOrNull
 import me.rerere.ai.ui.UIMessage
+import me.rerere.ai.ui.UIMessageAnnotation
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -249,5 +253,84 @@ class ClaudePromptCacheRequestTest {
                 assertNull(block.jsonObject["cache_control"])
             }
         }
+    }
+
+    @Test
+    fun `leading system messages stay in system and a later system message is sent as user`() {
+        val providerSetting = ProviderSetting.Claude(promptCaching = false)
+        val messages = listOf(
+            UIMessage.system("system prompt"),
+            UIMessage.system("summary"),
+            UIMessage.user("hello"),
+            UIMessage.system("anchored lore"),
+            UIMessage.user("next"),
+        )
+        val request = buildRequest(
+            providerSetting,
+            messages,
+            TextGenerationParams(model = Model(modelId = "claude-test")),
+        )
+        val system = request["system"]!!.jsonArray.map { it.jsonObject["text"]!!.jsonPrimitive.content }
+        assertEquals(listOf("system prompt", "summary"), system)
+        val texts = request["messages"]!!.jsonArray.map { message ->
+            message.jsonObject["role"]!!.jsonPrimitive.content to
+                message.jsonObject["content"]!!.jsonArray.joinToString { it.jsonObject["text"]?.jsonPrimitive?.contentOrNull.orEmpty() }
+        }
+        assertEquals(
+            listOf("user" to "hello", "user" to "anchored lore", "user" to "next"),
+            texts,
+        )
+    }
+
+    @Test
+    fun `explicit breakpoints stay within four content cache controls`() {
+        val providerSetting = ProviderSetting.Claude(promptCaching = true)
+        val messages = listOf(
+            UIMessage.system("system prompt").copy(
+                annotations = listOf(UIMessageAnnotation.CacheBreakpoint("static")),
+            ),
+            UIMessage.system("summary").copy(
+                annotations = listOf(UIMessageAnnotation.CacheBreakpoint("summary")),
+            ),
+            UIMessage.user("first"),
+            UIMessage.assistant("answer"),
+            UIMessage.user("second").copy(
+                annotations = listOf(UIMessageAnnotation.CacheBreakpoint("history")),
+            ),
+        )
+        val request = buildRequest(
+            providerSetting,
+            messages,
+            TextGenerationParams(
+                model = Model(modelId = "claude-test", abilities = listOf(ModelAbility.TOOL)),
+                tools = listOf(dummyTool()),
+            ),
+        )
+        val systemMarks = request["system"]!!.jsonArray.map { it.jsonObject["cache_control"] != null }
+        assertEquals(listOf(true, true), systemMarks)
+        assertNotNull(request["tools"]!!.jsonArray.last().jsonObject["cache_control"])
+        val messageMarks = request["messages"]!!.jsonArray.map { message ->
+            message.jsonObject["content"]!!.jsonArray.any { it.jsonObject["cache_control"] != null }
+        }
+        assertEquals(listOf(false, false, true), messageMarks)
+        assertTrue(contentCacheControls(request) <= 4)
+    }
+
+    private fun contentCacheControls(request: JsonObject): Int {
+        var count = 0
+        fun walk(element: JsonElement, inContent: Boolean) {
+            when (element) {
+                is JsonObject -> {
+                    if (inContent && element.containsKey("cache_control")) count++
+                    element.forEach { (key, value) ->
+                        walk(value, inContent || key == "system" || key == "tools" || key == "messages")
+                    }
+                }
+                is JsonArray -> element.forEach { walk(it, inContent) }
+                else -> Unit
+            }
+        }
+        walk(request, false)
+        return count
     }
 }

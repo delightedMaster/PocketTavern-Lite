@@ -63,6 +63,17 @@ fun ResponseBody.stringSafe(): String? {
     }
 }
 
+/** Stable key order so two identical requests share the same bytes. */
+fun JsonObject.withSortedKeys(): JsonObject = JsonObject(
+    entries.sortedBy { it.key }.associate { (key, value) -> key to value.withSortedKeys() },
+)
+
+fun JsonElement.withSortedKeys(): JsonElement = when (this) {
+    is JsonObject -> withSortedKeys()
+    is JsonArray -> JsonArray(map { it.withSortedKeys() })
+    else -> this
+}
+
 fun JsonObject.mergeCustomBody(bodies: List<CustomBody>): JsonObject {
     if (bodies.isEmpty()) return this
 

@@ -9,6 +9,7 @@ import android.graphics.Matrix
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
 import java.io.File
+import java.nio.charset.StandardCharsets
 import com.drew.imaging.ImageMetadataReader
 import com.drew.imaging.png.PngChunkType
 import com.drew.metadata.png.PngDirectory
@@ -299,20 +300,47 @@ object ImageUtils {
      * @return Result<String> 包含角色元数据的Result对象
      */
     fun getTavernCharacterMeta(context: Context, uri: Uri): Result<String> = runCatching {
-        val metadata = context.contentResolver.openInputStream(uri)?.use { ImageMetadataReader.readMetadata(it) }
-        if (metadata == null) error("Metadata is null, please check if the image is a character card")
-        if (!metadata.containsDirectoryOfType(PngDirectory::class.java)) error("No PNG directory found, please check if the image is a character card")
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: error("unable to read image")
+        getTavernCharacterMetaFromBytes(bytes).getOrThrow()
+    }
 
-        val pngDirectory = metadata.getDirectoriesOfType(PngDirectory::class.java)
-            .firstOrNull { directory ->
-                directory.pngChunkType == PngChunkType.tEXt
-                    && directory.getString(PngDirectory.TAG_TEXTUAL_DATA).startsWith("[chara:")
-            } ?: error("No tEXt chunk found, please check if the image is a character card")
+    /**
+     * Read a SillyTavern PNG card. `ccv3` wins over `chara` when both chunks exist.
+     * The returned string is the base64 payload, matching the URI importer.
+     */
+    fun getTavernCharacterMetaFromBytes(bytes: ByteArray): Result<String> = runCatching {
+        var offset = 8
+        var charaResult: String? = null
+        while (offset + 8 <= bytes.size) {
+            val length = readPngInt(bytes, offset)
+            if (length < 0 || offset + 12 + length > bytes.size) break
+            val type = String(bytes, offset + 4, 4, StandardCharsets.US_ASCII)
+            val dataStart = offset + 8
+            val dataEnd = dataStart + length
+            if (type == "tEXt") {
+                val chunk = bytes.copyOfRange(dataStart, dataEnd)
+                val nullPos = chunk.indexOf(0)
+                if (nullPos > 0) {
+                    val keyword = String(chunk, 0, nullPos, StandardCharsets.ISO_8859_1)
+                    val rawText = String(chunk, nullPos + 1, chunk.size - nullPos - 1, StandardCharsets.ISO_8859_1).trim()
+                    if (keyword.equals("ccv3", ignoreCase = true) || keyword.equals("chara", ignoreCase = true)) {
+                        val payload = rawText.removePrefix("[chara:").removeSuffix("]").trim()
+                        if (keyword.equals("ccv3", ignoreCase = true)) return Result.success(payload)
+                        charaResult = payload
+                    }
+                }
+            }
+            offset += 12 + length
+        }
+        charaResult ?: error("no character card data in png")
+    }
 
-        val value = pngDirectory.getString(PngDirectory.TAG_TEXTUAL_DATA)
-
-        val regex = Regex("""\[chara:\s*(.+?)]""")
-        return Result.success(regex.find(value)?.groupValues?.get(1) ?: error("No character data found"))
+    private fun readPngInt(bytes: ByteArray, offset: Int): Int {
+        return ((bytes[offset].toInt() and 0xFF) shl 24) or
+            ((bytes[offset + 1].toInt() and 0xFF) shl 16) or
+            ((bytes[offset + 2].toInt() and 0xFF) shl 8) or
+            (bytes[offset + 3].toInt() and 0xFF)
     }
 
     data class ImageInfo(

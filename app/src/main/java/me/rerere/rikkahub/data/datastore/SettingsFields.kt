@@ -2,7 +2,10 @@ package me.rerere.rikkahub.data.datastore
 
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
+import me.rerere.ai.core.MessageRole
 import me.rerere.ai.core.ReasoningLevel
+import me.rerere.rikkahub.data.model.AuthorNoteEntry
+import me.rerere.rikkahub.data.model.parseAuthorNotePosition
 import me.rerere.rikkahub.utils.JsonInstant
 import kotlin.reflect.KProperty1
 import kotlin.uuid.Uuid
@@ -140,7 +143,72 @@ internal val SETTINGS_FIELDS: List<SettingsField<*, *>> = with(SettingsStore) {
         // 提示词注入
         json(MODE_INJECTIONS, Settings::modeInjections) { copy(modeInjections = it) },
         json(LOREBOOKS, Settings::lorebooks) { copy(lorebooks = it) },
+        json(REGEX_GROUPS, Settings::regexGroups) { copy(regexGroups = it) },
         json(QUICK_MESSAGES, Settings::quickMessages) { copy(quickMessages = it) },
+        plain(WORLD_INFO_BUDGET, Settings::worldInfoBudget) { copy(worldInfoBudget = it) },
+        plain(WORLD_INFO_BUDGET_CAP, Settings::worldInfoBudgetCap) { copy(worldInfoBudgetCap = it) },
+        plain(WORLD_INFO_MIN_ACTIVATIONS, Settings::worldInfoMinActivations) { copy(worldInfoMinActivations = it) },
+        plain(WORLD_INFO_MIN_ACTIVATIONS_DEPTH_MAX, Settings::worldInfoMinActivationsDepthMax) {
+            copy(worldInfoMinActivationsDepthMax = it)
+        },
+        plain(WORLD_INFO_RECURSIVE, Settings::worldInfoRecursive) { copy(worldInfoRecursive = it) },
+        plain(WORLD_INFO_MAX_RECURSION_STEPS, Settings::worldInfoMaxRecursionSteps) {
+            copy(worldInfoMaxRecursionSteps = it)
+        },
+        plain(WORLD_INFO_DEPTH, Settings::worldInfoDepth) { copy(worldInfoDepth = it) },
+        plain(WORLD_INFO_CHARACTER_STRATEGY, Settings::worldInfoCharacterStrategy) {
+            copy(worldInfoCharacterStrategy = it)
+        },
+        plain(WORLD_INFO_OVERFLOW_ALERT, Settings::worldInfoOverflowAlert) { copy(worldInfoOverflowAlert = it) },
+        plain(WORLD_INFO_USE_GROUP_SCORING, Settings::worldInfoUseGroupScoring) {
+            copy(worldInfoUseGroupScoring = it)
+        },
+        json(PERSONAS, Settings::personas) { copy(personas = it) },
+        SettingsField(
+            ACTIVE_PERSONA_ID, Settings::activePersonaId, { copy(activePersonaId = it) },
+            encode = { it?.toString() },
+            decode = { Uuid.parse(it) },
+        ),
+        plain(AUTHOR_NOTE, Settings::authorNote) { copy(authorNote = it) },
+        plain(AUTHOR_NOTE_ENABLED, Settings::authorNoteEnabled) { copy(authorNoteEnabled = it) },
+        SettingsField(
+            AUTHOR_NOTE_POSITION, Settings::authorNotePosition, { copy(authorNotePosition = it) },
+            encode = { it.name },
+            decode = { parseAuthorNotePosition(it) },
+        ),
+        plain(AUTHOR_NOTE_DEPTH, Settings::authorNoteDepth) { copy(authorNoteDepth = it) },
+        SettingsField(
+            AUTHOR_NOTE_ROLE, Settings::authorNoteRole, { copy(authorNoteRole = it) },
+            encode = { it.name },
+            decode = { name -> runCatching { MessageRole.valueOf(name) }.getOrDefault(MessageRole.SYSTEM) },
+        ),
+        plain(AUTHOR_NOTE_INTERVAL, Settings::authorNoteInterval) { copy(authorNoteInterval = it) },
+        plain(SUMMARY_ENABLED, Settings::summaryEnabled) { copy(summaryEnabled = it) },
+        plain(SUMMARY_TRIGGER_FLOORS, Settings::summaryTriggerFloors) { copy(summaryTriggerFloors = it) },
+        plain(SUMMARY_KEEP_FLOORS, Settings::summaryKeepFloors) { copy(summaryKeepFloors = it) },
+        plain(SUMMARY_CONSOLIDATION_TOKENS, Settings::summaryConsolidationTokens) {
+            copy(summaryConsolidationTokens = it)
+        },
+        plain(SUMMARY_DELETE_ARCHIVED, Settings::summaryDeleteArchived) { copy(summaryDeleteArchived = it) },
+        plain(SUMMARY_REVIEW_BEFORE_COMMIT, Settings::summaryReviewBeforeCommit) {
+            copy(summaryReviewBeforeCommit = it)
+        },
+        plain(SUMMARY_USE_CHAT_MODEL, Settings::summaryUseChatModel) { copy(summaryUseChatModel = it) },
+        SettingsField(
+            SUMMARY_MODEL_ID, Settings::summaryModelId, { copy(summaryModelId = it) },
+            encode = { it?.toString() },
+            decode = { Uuid.parse(it) },
+        ),
+        plain(SUMMARY_PROMPT, Settings::summaryPrompt) { copy(summaryPrompt = it) },
+        json(HTML_CARD_ALLOWLIST, Settings::htmlCardAllowlist) { copy(htmlCardAllowlist = it) },
+        SettingsField(
+            AUTHOR_NOTE_ENTRIES, Settings::authorNoteEntries, { copy(authorNoteEntries = it) },
+            encode = { entries -> entries?.let { JsonInstant.encodeToString(it) } },
+            decode = { JsonInstant.decodeFromString<List<AuthorNoteEntry>>(it) },
+        ),
+        json(MACRO_GLOBAL_VARIABLES, Settings::macroGlobalVariables) { copy(macroGlobalVariables = it) },
+        json(MACRO_CHAT_VARIABLES, Settings::macroChatVariables) { copy(macroChatVariables = it) },
+        json(GROUP_CHATS, Settings::groupChats) { copy(groupChats = it) },
 
         // 备份提醒
         json(BACKUP_REMINDER_CONFIG, Settings::backupReminderConfig) { copy(backupReminderConfig = it) },

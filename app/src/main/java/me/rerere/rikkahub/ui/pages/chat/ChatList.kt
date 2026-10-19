@@ -53,6 +53,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -116,6 +117,54 @@ private const val TAG = "ChatList"
 private const val LoadingIndicatorKey = "LoadingIndicator"
 private const val ScrollBottomKey = "ScrollBottomKey"
 
+private sealed interface ChatRow {
+    data class Speech(val index: Int, val node: MessageNode) : ChatRow
+    data class Archived(val startFloor: Int, val endFloor: Int, val messageIds: List<Uuid>) : ChatRow
+}
+
+private fun chatRows(nodes: List<MessageNode>): List<ChatRow> {
+    val rows = mutableListOf<ChatRow>()
+    var index = 0
+    while (index < nodes.size) {
+        if (!nodes[index].currentMessage.archived) {
+            rows += ChatRow.Speech(index, nodes[index])
+            index++
+        } else {
+            val start = index
+            while (index < nodes.size && nodes[index].currentMessage.archived) index++
+            rows += ChatRow.Archived(
+                startFloor = start + 1,
+                endFloor = index,
+                messageIds = nodes.subList(start, index).map { it.currentMessage.id },
+            )
+        }
+    }
+    return rows
+}
+
+@Composable
+private fun ArchivedFloorsRow(startFloor: Int, endFloor: Int, onRestore: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.chat_page_archived_floors, startFloor, endFloor),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onRestore) {
+                Text(stringResource(R.string.chat_page_restore_archived))
+            }
+        }
+    }
+}
+
 @Composable
 fun ChatList(
     innerPadding: PaddingValues,
@@ -132,6 +181,7 @@ fun ChatList(
     onRegenerate: (UIMessage) -> Unit = {},
     onEdit: (UIMessage) -> Unit = {},
     onForkMessage: (UIMessage) -> Unit = {},
+    onRestoreArchived: (List<Uuid>) -> Unit = {},
     onDelete: (UIMessage) -> Unit = {},
     onUpdateMessage: (MessageNode) -> Unit = {},
     onClickSuggestion: (String) -> Unit = {},
@@ -174,6 +224,7 @@ fun ChatList(
                 onRegenerate = onRegenerate,
                 onEdit = onEdit,
                 onForkMessage = onForkMessage,
+                onRestoreArchived = onRestoreArchived,
                 onDelete = onDelete,
                 onUpdateMessage = onUpdateMessage,
                 onClickSuggestion = onClickSuggestion,
@@ -223,6 +274,7 @@ private fun ChatListNormal(
     onRegenerate: (UIMessage) -> Unit,
     onEdit: (UIMessage) -> Unit,
     onForkMessage: (UIMessage) -> Unit,
+    onRestoreArchived: (List<Uuid>) -> Unit,
     onDelete: (UIMessage) -> Unit,
     onUpdateMessage: (MessageNode) -> Unit,
     onClickSuggestion: (String) -> Unit,
@@ -293,6 +345,7 @@ private fun ChatListNormal(
             .associateBy { it.id }
     }
     val lastMessageIndex = conversation.messageNodes.lastIndex
+    val rows = remember(conversation.messageNodes) { chatRows(conversation.messageNodes) }
 
     Box(
         modifier = Modifier
@@ -340,10 +393,24 @@ private fun ChatListNormal(
                     .topFadingEdge(innerPadding.calculateTopPadding() + 24.dp)
                     .hazeSource(state = hazeState),
             ) {
-            itemsIndexed(
-                items = conversation.messageNodes,
-                key = { index, item -> item.id },
-            ) { index, node ->
+            items(
+                items = rows,
+                key = { row ->
+                    when (row) {
+                        is ChatRow.Speech -> row.node.id
+                        is ChatRow.Archived -> "archived-${row.startFloor}-${row.endFloor}"
+                    }
+                },
+            ) { row ->
+                when (row) {
+                    is ChatRow.Archived -> ArchivedFloorsRow(
+                        startFloor = row.startFloor,
+                        endFloor = row.endFloor,
+                        onRestore = { onRestoreArchived(row.messageIds) },
+                    )
+                    is ChatRow.Speech -> {
+                        val index = row.index
+                        val node = row.node
                 Column {
                     ListSelectableItem(
                         key = node.id,
@@ -359,6 +426,7 @@ private fun ChatListNormal(
                     ) {
                         ChatMessage(
                             node = node,
+                            depth = conversation.messageNodes.size - index,
                             model = node.currentMessage.modelId?.let(modelById::get)
                                 ?: node.currentMessage.snapshotModel(),
                             assistant = assistant,
@@ -394,6 +462,8 @@ private fun ChatListNormal(
                             onToolAnswer = onToolAnswer,
                             lastMessage = index == lastMessageIndex,
                         )
+                    }
+                }
                     }
                 }
             }

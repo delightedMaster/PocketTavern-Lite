@@ -20,6 +20,7 @@ import me.rerere.hugeicons.stroke.Book03
 import me.rerere.hugeicons.stroke.File02
 import me.rerere.hugeicons.stroke.Folder01
 import me.rerere.hugeicons.stroke.Puzzle
+import me.rerere.hugeicons.stroke.MessageAdd01
 import me.rerere.hugeicons.stroke.Zap
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.ui.components.nav.BackButton
@@ -62,6 +63,12 @@ fun ExtensionsPage() {
                         leadingContent = { CardGroupIcon(HugeIcons.Zap, containerColor = containerColor, contentColor = contentColor) },
                         headlineContent = { Text(stringResource(R.string.assistant_page_quick_messages)) },
                         supportingContent = { Text(stringResource(R.string.extensions_page_quick_messages_desc)) },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.GroupChats) },
+                        leadingContent = { CardGroupIcon(HugeIcons.MessageAdd01, containerColor = containerColor, contentColor = contentColor) },
+                        headlineContent = { Text(stringResource(R.string.extensions_page_group_chats)) },
+                        supportingContent = { Text(stringResource(R.string.extensions_page_group_chats_desc)) },
                     )
                     item(
                         onClick = { navController.navigate(Screen.Prompts) },

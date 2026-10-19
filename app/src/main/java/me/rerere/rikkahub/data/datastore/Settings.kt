@@ -3,6 +3,7 @@ package me.rerere.rikkahub.data.datastore
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import me.rerere.ai.core.MessageRole
 import me.rerere.ai.core.ReasoningLevel
 import me.rerere.ai.provider.ProviderSetting
 import me.rerere.asr.ASRProviderSetting
@@ -13,10 +14,16 @@ import me.rerere.rikkahub.data.ai.prompts.DEFAULT_SUGGESTION_PROMPT
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_TITLE_PROMPT
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_TRANSLATION_PROMPT
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.AssistantRegex
+import me.rerere.rikkahub.data.model.AuthorNoteEntry
+import me.rerere.rikkahub.data.model.AuthorNotePosition
 import me.rerere.rikkahub.data.model.Avatar
+import me.rerere.rikkahub.data.model.GroupChat
 import me.rerere.rikkahub.data.model.Lorebook
+import me.rerere.rikkahub.data.model.Persona
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.QuickMessage
+import me.rerere.rikkahub.data.model.RegexGroup
 import me.rerere.rikkahub.data.model.Tag
 import me.rerere.rikkahub.data.sync.s3.S3Config
 import me.rerere.rikkahub.ui.theme.CustomTheme
@@ -72,7 +79,48 @@ data class Settings(
     val selectedASRProviderId: Uuid? = null,
     val modeInjections: List<PromptInjection.ModeInjection> = DEFAULT_MODE_INJECTIONS,
     val lorebooks: List<Lorebook> = emptyList(),
+    val regexGroups: List<RegexGroup> = emptyList(),
     val quickMessages: List<QuickMessage> = emptyList(),
+    // 世界书预算：100 = 不按百分比裁剪。低于 100 或设置绝对上限时才丢条目。
+    val worldInfoBudget: Int = 100,
+    val worldInfoBudgetCap: Int = 0,
+    val worldInfoMinActivations: Int = 0,
+    val worldInfoMinActivationsDepthMax: Int = 0,
+    val worldInfoRecursive: Boolean = false,
+    val worldInfoMaxRecursionSteps: Int = 0,
+    val worldInfoDepth: Int = 2,
+    val worldInfoCharacterStrategy: Int = 1,
+    val worldInfoOverflowAlert: Boolean = false,
+    val worldInfoUseGroupScoring: Boolean = false,
+    val personas: List<Persona> = emptyList(),
+    val activePersonaId: Uuid? = null,
+    val authorNote: String = "",
+    val authorNoteEnabled: Boolean = false,
+    val authorNotePosition: AuthorNotePosition = AuthorNotePosition.IN_CHAT,
+    val authorNoteDepth: Int = 4,
+    val authorNoteRole: MessageRole = MessageRole.SYSTEM,
+    val authorNoteInterval: Int = 1,
+    /** Summarize once the live floor count reaches this. 0 disables the automatic pass. */
+    val summaryEnabled: Boolean = true,
+    val summaryTriggerFloors: Int = 40,
+    val summaryKeepFloors: Int = 10,
+    /** When the memory lorebook is larger than this, fold older blocks into a recap. */
+    val summaryConsolidationTokens: Int = 2000,
+    /** False archives the summarized floors. True deletes them. */
+    val summaryDeleteArchived: Boolean = false,
+    val summaryReviewBeforeCommit: Boolean = false,
+    val summaryUseChatModel: Boolean = true,
+    val summaryModelId: Uuid? = null,
+    /** Empty uses the built-in prompt for the current language. */
+    val summaryPrompt: String = "",
+    /** Hosts an HTML card may fetch. Empty blocks every network request. */
+    val htmlCardAllowlist: List<String> = emptyList(),
+    // null = 尚未物化的新格式，继续兼容旧 authorNote
+    val authorNoteEntries: List<AuthorNoteEntry>? = null,
+    val macroGlobalVariables: Map<String, String> = emptyMap(),
+    val macroChatVariables: Map<String, Map<String, String>> = emptyMap(),
+    // 群聊成员卡按 memberIds 的固定顺序放进前缀。记忆世界书是会话自己的那一份。
+    val groupChats: List<GroupChat> = emptyList(),
     val webServerEnabled: Boolean = false,
     val webServerPort: Int = 8080,
     val webServerJwtEnabled: Boolean = false,
@@ -81,6 +129,9 @@ data class Settings(
     val backupReminderConfig: BackupReminderConfig = BackupReminderConfig(),
     val sponsorAlertDismissedAt: Int = 0,
 ) {
+    val globalRegexes: List<AssistantRegex>
+        get() = regexGroups.flatMap { it.regexes }
+
     companion object {
         // 构造一个用于初始化的settings, 但它不能用于保存，防止使用初始值存储
         fun dummy() = Settings(init = true)

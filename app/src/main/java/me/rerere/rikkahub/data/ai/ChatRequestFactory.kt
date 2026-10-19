@@ -14,10 +14,11 @@ import me.rerere.ai.provider.Model
 import me.rerere.ai.provider.ProviderManager
 import me.rerere.ai.provider.ProviderSetting
 import me.rerere.ai.provider.TextGenerationParams
+import me.rerere.ai.core.MessageRole
 import me.rerere.ai.ui.UIMessage
-import me.rerere.ai.ui.limitContext
 import me.rerere.rikkahub.R
-import me.rerere.rikkahub.data.ai.prompts.buildMemoryPrompt
+import me.rerere.rikkahub.data.ai.group.groupCardLines
+import me.rerere.rikkahub.data.ai.group.toGroupMember
 import me.rerere.rikkahub.data.ai.tools.ChatToolFactory
 import me.rerere.rikkahub.data.ai.transformers.Base64ImageToLocalFileTransformer
 import me.rerere.rikkahub.data.ai.transformers.DocumentAsPromptTransformer
@@ -25,11 +26,9 @@ import me.rerere.rikkahub.data.ai.transformers.InputMessageTransformer
 import me.rerere.rikkahub.data.ai.transformers.OcrTransformer
 import me.rerere.rikkahub.data.ai.transformers.OutputMessageTransformer
 import me.rerere.rikkahub.data.ai.transformers.PlaceholderTransformer
-import me.rerere.rikkahub.data.ai.transformers.PromptInjectionTransformer
 import me.rerere.rikkahub.data.ai.transformers.RegexOutputTransformer
 import me.rerere.rikkahub.data.ai.transformers.TemplateTransformer
 import me.rerere.rikkahub.data.ai.transformers.ThinkTagTransformer
-import me.rerere.rikkahub.data.ai.transformers.TimeReminderTransformer
 import me.rerere.rikkahub.data.ai.transformers.WorkspaceReminderTransformer
 import me.rerere.rikkahub.data.ai.transformers.onGenerationFinish
 import me.rerere.rikkahub.data.ai.transformers.transformThinkTags
@@ -37,6 +36,7 @@ import me.rerere.rikkahub.data.ai.transformers.transforms
 import me.rerere.rikkahub.data.ai.transformers.visualTransforms
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.findProvider
+import me.rerere.rikkahub.data.datastore.getAssistantById
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.MemoryFile
@@ -63,9 +63,16 @@ class ChatTurnContext(
     val providerSetting: ProviderSetting,
     val conversationId: Uuid,
     val conversationSystemPrompt: String?,
+    val conversationModeInjectionIds: Set<Uuid>,
+    val conversationLorebookIds: Set<Uuid>,
     val workspaceCwd: String?,
     val memories: List<MemoryFile>,
     val tools: List<Tool>,
+    var promptState: me.rerere.rikkahub.data.ai.assembly.PromptCacheState,
+    /** Member cards in the group's fixed order. Empty for a single-character chat. */
+    val groupCards: List<String> = emptyList(),
+    val speakerName: String? = null,
+    val speakerId: String? = null,
 )
 
 /** 把会话变成发给模型的请求：系统提示词、上下文裁剪、输入输出转换都在这里 */
@@ -78,8 +85,6 @@ class ChatRequestFactory(
     workspaceRepository: WorkspaceRepository,
 ) {
     private val inputTransformers: List<InputMessageTransformer> = listOf(
-        TimeReminderTransformer,
-        PromptInjectionTransformer,
         PlaceholderTransformer,
         DocumentAsPromptTransformer,
         OcrTransformer,
@@ -100,6 +105,13 @@ class ChatRequestFactory(
         val model = settings.getChatModelOf(conversation)
             ?: throw IllegalStateException("No chat model selected")
         val provider = model.findProvider(settings.providers) ?: error("Provider not found")
+        val group = conversation.config?.groupId?.let { id ->
+            settings.groupChats.firstOrNull { it.id == id && it.enabled }
+        }
+        val members = group?.let { active ->
+            active.memberIds.mapNotNull { settings.getAssistantById(it)?.toGroupMember(active) }
+        }.orEmpty()
+        val speaker = members.firstOrNull { it.id == conversation.config?.groupSpeakerId?.toString() }
         return ChatTurnContext(
             settings = settings,
             assistant = assistant,
@@ -107,6 +119,8 @@ class ChatRequestFactory(
             providerSetting = provider,
             conversationId = conversation.id,
             conversationSystemPrompt = conversation.customSystemPrompt,
+            conversationModeInjectionIds = conversation.modeInjectionIds,
+            conversationLorebookIds = conversation.lorebookIds,
             workspaceCwd = conversation.workspaceCwd,
             memories = if (assistant.enableMemory) memoryRepository.getFiles(assistant.memoryId) else emptyList(),
             tools = chatToolFactory.createTools(
@@ -115,6 +129,10 @@ class ChatRequestFactory(
                 model = model,
                 workspaceCwd = conversation.workspaceCwd,
             ),
+            promptState = conversation.promptState,
+            groupCards = if (members.isEmpty()) emptyList() else groupCardLines(members),
+            speakerName = speaker?.name,
+            speakerId = speaker?.id,
         )
     }
 
@@ -131,7 +149,7 @@ class ChatRequestFactory(
             provider = providerManager.getProviderByType(turn.providerSetting),
             providerSetting = turn.providerSetting,
             messages = messages,
-            tools = turn.tools,
+            tools = turn.tools.stableOrder(),
             stream = turn.assistant.streamOutput,
             retry = turn.settings.retryPolicy(),
         )
@@ -143,14 +161,42 @@ class ChatRequestFactory(
 
             override suspend fun previewStep(message: UIMessage, newPartsFrom: Int) =
                 message.transformNewParts(newPartsFrom) {
-                    it.visualTransforms(outputTransformers, context, turn.model, turn.assistant, turn.settings)
+                    it.visualTransforms(
+                        outputTransformers,
+                        context,
+                        turn.model,
+                        turn.assistant,
+                        turn.settings,
+                        conversationId = turn.conversationId,
+                    )
                 }
 
             override suspend fun finishStep(message: UIMessage, newPartsFrom: Int) =
                 message.transformNewParts(newPartsFrom) {
-                    it.transforms(outputTransformers, context, turn.model, turn.assistant, turn.settings)
-                        .visualTransforms(outputTransformers, context, turn.model, turn.assistant, turn.settings)
-                        .onGenerationFinish(outputTransformers, context, turn.model, turn.assistant, turn.settings)
+                    it.transforms(
+                        outputTransformers,
+                        context,
+                        turn.model,
+                        turn.assistant,
+                        turn.settings,
+                        conversationId = turn.conversationId,
+                    )
+                        .visualTransforms(
+                            outputTransformers,
+                            context,
+                            turn.model,
+                            turn.assistant,
+                            turn.settings,
+                            conversationId = turn.conversationId,
+                        )
+                        .onGenerationFinish(
+                            outputTransformers,
+                            context,
+                            turn.model,
+                            turn.assistant,
+                            turn.settings,
+                            conversationId = turn.conversationId,
+                        )
                 }
         }
         return request to hooks
@@ -186,6 +232,44 @@ class ChatRequestFactory(
         return summary.ifBlank { error("Failed to generate compressed summary") }
     }
 
+    /**
+     * One summary or recap call.
+     * The chat-model path reuses [buildStep], so the prefix matches the chat request.
+     * A separate connection profile sends only the summary prompt, with no preset.
+     */
+    suspend fun generateMemorySummary(
+        turn: ChatTurnContext,
+        messages: List<UIMessage>,
+        systemPrompt: String,
+        instruction: String,
+        useChatPrefix: Boolean,
+        summaryModel: Model?,
+    ): String {
+        if (!useChatPrefix && summaryModel != null) {
+            val provider = summaryModel.findProvider(turn.settings.providers)
+                ?: error("Summary model provider not found")
+            val result = withRetry(
+                policy = turn.settings.retryPolicy(),
+                onRetry = { Log.w(TAG, "Summary request failed, retrying in ${it.delay}", it.cause) },
+            ) {
+                providerManager.getProviderByType(provider).generateText(
+                    providerSetting = provider,
+                    messages = listOf(UIMessage.system(systemPrompt), UIMessage.user(instruction)),
+                    params = TextGenerationParams(
+                        model = summaryModel,
+                        sessionId = turn.conversationId.toString(),
+                    ),
+                )
+            }
+            val summary = result.message.compressionSummaryOrNull()
+                ?: error(context.getString(R.string.chat_page_compress_tool_call_response))
+            return summary.ifBlank { error("Failed to generate summary") }
+        }
+        // The tracker line rides in the extra user message. A new system message would sit
+        // in front of the cached prefix.
+        return generateCompressionSummary(turn, messages, systemPrompt + "\n\n" + instruction)
+    }
+
     /** 一步请求实际发出的消息和参数；正常对话和压缩共用，二者的请求前缀必须一致才能命中提示词缓存 */
     private suspend fun buildStep(
         turn: ChatTurnContext,
@@ -193,48 +277,39 @@ class ChatRequestFactory(
         processingStatus: MutableStateFlow<String?> = MutableStateFlow(null),
     ): StepRequest {
         val assistant = turn.assistant
-        val requestMessages = buildList {
-            val system = buildString {
-                val effectiveSystemPrompt =
-                    if (assistant.allowConversationSystemPrompt && !turn.conversationSystemPrompt.isNullOrBlank()) {
-                        turn.conversationSystemPrompt
-                    } else {
-                        assistant.systemPrompt
-                    }
-                if (effectiveSystemPrompt.isNotBlank()) {
-                    append(effectiveSystemPrompt)
-                }
-
-                // 记忆
-                if (assistant.enableMemory) {
-                    appendLine()
-                    append(buildMemoryPrompt(turn.memories))
-                }
-                // 工具prompt
-                turn.tools.forEach { tool ->
-                    appendLine()
-                    append(tool.systemPrompt(turn.model, messages))
-                }
-            }
-            if (system.isNotBlank()) {
-                add(UIMessage.system(prompt = system).copy(isSynthetic = true))
-            }
-            addAll(messages.limitContext(assistant.contextMessageLimit))
-        }.transforms(
+        val chatUserMessageCount = messages.count { it.role == MessageRole.USER }
+        val chatMessageCount = messages.size
+        val previousRequest = turn.promptState.lastFullRequest
+        val layered = turn.layeredPrompt(messages)
+        val requestMessages = layered.messages.transforms(
             transformers = inputTransformers,
             context = context,
             model = turn.model,
             assistant = assistant,
             settings = turn.settings,
+            conversationId = turn.conversationId,
+            conversationModeInjectionIds = turn.conversationModeInjectionIds,
+            conversationLorebookIds = turn.conversationLorebookIds,
             processingStatus = processingStatus,
             workspaceCwd = turn.workspaceCwd,
+            chatUserMessageCount = chatUserMessageCount,
+            chatMessageCount = chatMessageCount,
+        )
+        val texts = requestMessages.map { it.toText() }
+        val diverge = me.rerere.rikkahub.data.ai.assembly.firstDivergence(previousRequest, texts)
+        turn.promptState = layered.state.copy(
+            frozenText = captureFrozenMacros(messages, requestMessages, layered.state),
+            lastFullRequest = texts,
+            prefixDivergeAt = diverge,
+            divergePrevious = if (diverge >= 0) previousRequest.getOrElse(diverge) { "" } else "",
+            divergeCurrent = if (diverge >= 0) texts.getOrElse(diverge) { "" } else "",
         )
         val params = TextGenerationParams(
             model = turn.model,
             temperature = assistant.temperature,
             topP = assistant.topP,
             maxTokens = assistant.maxTokens,
-            tools = turn.tools,
+            tools = turn.tools.stableOrder(),
             reasoningLevel = assistant.reasoningLevel,
             customHeaders = buildList {
                 addAll(assistant.customHeaders)

@@ -30,31 +30,59 @@ import me.rerere.ai.agent.RetryAttempt
 import me.rerere.ai.agent.runAgent
 import me.rerere.ai.core.MessageRole
 import me.rerere.ai.provider.BuiltInTools
+import me.rerere.ai.provider.Model
 import me.rerere.ai.provider.ModelAbility
 import me.rerere.ai.ui.ToolApprovalState
 import me.rerere.ai.ui.UIMessage
+import me.rerere.ai.ui.UIMessageAnnotation
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.ai.ui.isEmptyInputMessage
 import me.rerere.common.android.Logging
 import me.rerere.rikkahub.AppScope
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.ai.ChatRequestFactory
+import me.rerere.rikkahub.data.ai.assembly.FloorPolicy
+import me.rerere.rikkahub.data.ai.assembly.HistoryMessage
+import me.rerere.rikkahub.data.ai.assembly.commitFloorSummary
+import me.rerere.rikkahub.data.ai.assembly.consolidateMemory
+import me.rerere.rikkahub.data.ai.assembly.fillSummaryPrompt
+import me.rerere.rikkahub.data.ai.assembly.formatPassage
+import me.rerere.rikkahub.data.ai.assembly.memoryOverThreshold
+import me.rerere.rikkahub.data.ai.assembly.planFloorSummary
+import me.rerere.rikkahub.data.ai.assembly.renderMemoryLore
+import me.rerere.rikkahub.data.ai.prompts.SUMMARY_CONSOLIDATION_NOTE_EN
+import me.rerere.rikkahub.data.ai.prompts.SUMMARY_CONSOLIDATION_NOTE_ZH
+import me.rerere.rikkahub.data.ai.prompts.SUMMARY_PROMPT_EN
+import me.rerere.rikkahub.data.ai.prompts.SUMMARY_PROMPT_ZH
+import me.rerere.rikkahub.data.ai.prompts.SUMMARY_SYSTEM_PROMPT_EN
+import me.rerere.rikkahub.data.ai.prompts.SUMMARY_SYSTEM_PROMPT_ZH
 import me.rerere.rikkahub.data.ai.ChatTurnContext
 import me.rerere.rikkahub.data.ai.ConversationMetaGenerator
 import me.rerere.rikkahub.data.ai.MemoryConsolidationScheduler
 import me.rerere.rikkahub.data.ai.TranslationHandler
 import me.rerere.rikkahub.data.ai.mcp.McpManager
+import me.rerere.rikkahub.data.ai.group.SpeakerChoice
+import me.rerere.rikkahub.data.ai.group.nextGroupSpeaker
+import me.rerere.rikkahub.data.ai.group.toGroupMember
 import me.rerere.rikkahub.data.ai.prompts.buildCompressPrompt
 import me.rerere.rikkahub.data.ai.tools.InvalidMcpServerNamesException
 import me.rerere.rikkahub.data.ai.tools.shouldUseExternalWebSearch
+import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.data.datastore.findModelById
+import me.rerere.rikkahub.data.datastore.findProvider
+import me.rerere.rikkahub.data.datastore.getAssistantById
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.data.event.AppEvent
 import me.rerere.rikkahub.data.event.AppEventBus
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Conversation
+import me.rerere.rikkahub.data.model.ConversationConfig
+import me.rerere.rikkahub.data.model.archiveMessages
 import me.rerere.rikkahub.data.model.bindConfig
+import me.rerere.rikkahub.data.model.deleteMessages
+import me.rerere.rikkahub.data.model.restoreMessages
 import me.rerere.rikkahub.data.model.cancelInterruptedTools
 import me.rerere.rikkahub.data.model.deleteMessage
 import me.rerere.rikkahub.data.model.editMessage
@@ -66,7 +94,6 @@ import me.rerere.rikkahub.data.model.getStoredAssistantOf
 import me.rerere.rikkahub.data.model.insertContextCheckpoint
 import me.rerere.rikkahub.data.model.isAwaitingToolApproval
 import me.rerere.rikkahub.data.model.localFileUrls
-import me.rerere.rikkahub.data.model.replaceUserRegexes
 import me.rerere.rikkahub.data.model.selectBranch
 import me.rerere.rikkahub.data.model.toMessageNode
 import me.rerere.rikkahub.data.model.withAssistantUpdate
@@ -174,6 +201,14 @@ class ChatService(
 
     fun clearAllErrors() {
         _errors.value = emptyList()
+    }
+
+    private val _pendingSummary = MutableStateFlow<PendingSummaryReview?>(null)
+    val pendingSummaryReview: StateFlow<PendingSummaryReview?> = _pendingSummary.asStateFlow()
+    private var summaryReview: CompletableDeferred<String?>? = null
+
+    fun submitSummaryReview(text: String?) {
+        summaryReview?.complete(text)
     }
 
     // 生成完成流
@@ -418,8 +453,8 @@ class ChatService(
                 ensureInitialized(session)
                 finishInterruptedPendingTools(session)
 
-                val assistant = settingsStore.awaitLoaded().getStoredAssistantOf(session.state.value)
-                val processedContent = queued.parts.replaceUserRegexes(assistant)
+                // Prompt regex runs on the request copy. Display regex runs on this stored text.
+                val processedContent = queued.parts
 
                 // 添加消息到列表
                 val previousIds = session.state.value.currentMessages.mapTo(HashSet()) { it.id }
@@ -576,12 +611,37 @@ class ChatService(
             val settings = settingsStore.awaitLoaded()
             // 清掉上一轮的建议；没法继续执行的工具调用发给模型会被拒绝，先去掉。
             // 重新生成时只清理要发给模型的节点，被重新生成的节点保持原样，旧回复留作分支
-            val conversation = session.update { latest ->
+            session.update { latest ->
                 val untilNode = regenerateNodeId
                     ?.let { nodeId -> latest.messageNodes.indexOfFirst { it.id == nodeId } }
                     ?.takeIf { it != -1 }
                     ?: latest.messageNodes.size
                 latest.copy(chatSuggestions = emptyList()).withoutUnresumableToolCalls(untilNode)
+            }
+            // Tool continuations end on the assistant message that owns the tool call.
+            // Summarizing there would archive the turn the tools still belong to.
+            val lastRole = session.state.value.currentMessages.lastOrNull()?.role
+            if (regenerateNodeId == null && lastRole == MessageRole.USER) {
+                runCatching { summarizeConversation(session, force = false) }
+                    .onFailure { error ->
+                        if (error is CancellationException) throw error
+                        addError(
+                            error,
+                            conversationId,
+                            title = context.getString(R.string.chat_page_summary_failed),
+                        )
+                    }
+            }
+            var conversation = session.state.value
+            if (regenerateNodeId == null && conversation.currentMessages.lastOrNull()?.role == MessageRole.USER) {
+                val choice = chooseGroupSpeaker(settings, conversation)
+                if (choice != null && conversation.config?.groupSpeakerId?.toString() != choice.id) {
+                    session.update { latest ->
+                        val config = latest.config ?: return@update latest
+                        latest.copy(config = config.copy(groupSpeakerId = Uuid.parse(choice.id)))
+                    }
+                    conversation = session.state.value
+                }
             }
             val turn = requestFactory.createContext(settings, conversation)
             senderName = if (turn.assistant.useAssistantAvatar) {
@@ -613,7 +673,20 @@ class ChatService(
                         is AgentEvent.MessageUpdated -> {
                             // 生成过程中只有网络重试的提示会留着，收到新内容说明重试已经成功
                             session.processingStatus.value = null
-                            session.update { it.upsertMessage(replyNodeId, event.message) }
+                            val speakerId = turn.speakerId
+                            val speakerName = turn.speakerName
+                            val tagged = if (
+                                speakerId != null && speakerName != null &&
+                                event.message.annotations.none { it is UIMessageAnnotation.GroupSpeaker }
+                            ) {
+                                event.message.copy(
+                                    annotations = event.message.annotations +
+                                        UIMessageAnnotation.GroupSpeaker(speakerId, speakerName),
+                                )
+                            } else {
+                                event.message
+                            }
+                            session.update { it.upsertMessage(replyNodeId, tagged) }
                             // 通知等边缘副作用由 ChatNotificationManager 消费；
                             // tryEmit 不挂起，事件丢失只影响单次通知更新，不能反压生成链
                             appEventBus.tryEmit(
@@ -637,6 +710,10 @@ class ChatService(
                     session.processingStatus.value = null
                     // 可能被取消了，或者意外结束，兜底保存
                     val finished = session.finishGeneration()
+                    session.updateMetadata(
+                        transform = { it.copy(promptState = turn.promptState) },
+                        persist = { conversationRepo.updatePromptState(conversationId, it.promptState) },
+                    )
                     // 生成结束：取消 Live Update 通知，后台时发送完成通知
                     appEventBus.emit(
                         AppEvent.ChatGenerationEnded(
@@ -786,6 +863,254 @@ class ChatService(
     }
 
     // ---- 压缩对话历史 ----
+
+    suspend fun summarizeNow(conversationId: Uuid) {
+        withLoadedSession(conversationId) { session ->
+            check(!session.isGenerating) { context.getString(R.string.chat_page_summary_busy) }
+            summarizeConversation(session, force = true)
+        }
+    }
+
+    suspend fun setGroupSpeaker(conversationId: Uuid, speakerId: Uuid) {
+        val settings = settingsStore.awaitLoaded()
+        withLoadedSession(conversationId) { session ->
+            session.updateMetadata(
+                transform = { latest ->
+                    val bound = if (latest.config == null) latest.bindConfig(settings) else latest
+                    bound.copy(config = bound.config?.copy(groupSpeakerId = speakerId))
+                },
+                persist = conversationRepo::updateConversationConfig,
+            )
+        }
+    }
+
+    suspend fun updateQuickReplyIds(conversationId: Uuid, ids: Set<Uuid>) {
+        val settings = settingsStore.awaitLoaded()
+        withLoadedSession(conversationId) { session ->
+            session.updateMetadata(
+                transform = { latest ->
+                    val bound = if (latest.config == null) latest.bindConfig(settings) else latest
+                    bound.copy(config = bound.config?.copy(quickReplyIds = ids))
+                },
+                persist = conversationRepo::updateConversationConfig,
+            )
+        }
+    }
+
+    suspend fun updateMessageVariables(conversationId: Uuid, variables: Map<String, Map<String, String>>) {
+        mutate(conversationId) { it.copy(promptState = it.promptState.copy(messageVariables = variables)) }
+    }
+
+    /**
+     * `/gen` with no text. Starts a turn only when the user is already the last speaker.
+     */
+    fun generateReply(conversationId: Uuid) {
+        val session = sessionManager.getOrCreate(conversationId)
+        synchronized(session) {
+            if (session.getJob() != null) return
+            val job = launchGenerationJob(conversationId) {
+                try {
+                    ensureInitialized(session)
+                    val last = session.state.value.currentMessages.lastOrNull()
+                    check(last?.role == MessageRole.USER) {
+                        context.getString(R.string.chat_page_gen_needs_user)
+                    }
+                    runTurn(session)
+                    _generationDoneFlow.emit(conversationId)
+                } catch (e: Exception) {
+                    reportFailure(session, e, R.string.chat_page_summary_failed)
+                }
+            }
+            session.setJob(job)
+        }
+    }
+
+    suspend fun openGroupChat(groupId: Uuid): Uuid {
+        val settings = settingsStore.awaitLoaded()
+        val group = settings.groupChats.firstOrNull { it.id == groupId }
+            ?: error("Group not found")
+        group.conversationId?.let { existing ->
+            if (conversationRepo.getConversationById(existing) != null) return existing
+        }
+        val assistantId = group.memberIds.firstOrNull() ?: settings.getCurrentAssistant().id
+        val id = Uuid.random()
+        val draft = Conversation.ofId(id, assistantId)
+        val model = settings.findModelById(group.chatModelId) ?: settings.getChatModelOf(draft)
+        val conversation = draft.copy(
+            title = group.name.ifBlank { "Group" },
+            config = ConversationConfig(
+                groupId = group.id,
+                chatModelId = model?.id,
+                builtInSearch = model != null && BuiltInTools.Search in model.tools,
+            ),
+        )
+        conversationRepo.insertConversation(conversation)
+        settingsStore.update { current ->
+            current.copy(
+                groupChats = current.groupChats.map { item ->
+                    if (item.id == group.id) item.copy(conversationId = id) else item
+                },
+            )
+        }
+        return id
+    }
+
+    private fun chooseGroupSpeaker(settings: Settings, conversation: Conversation): SpeakerChoice? {
+        val groupId = conversation.config?.groupId ?: return null
+        val group = settings.groupChats.firstOrNull { it.id == groupId && it.enabled } ?: return null
+        val members = group.memberIds.mapNotNull { settings.getAssistantById(it)?.toGroupMember(group) }
+        val lastSpeaker = conversation.currentMessages.asReversed().firstNotNullOfOrNull { message ->
+            message.annotations.filterIsInstance<UIMessageAnnotation.GroupSpeaker>().firstOrNull()?.memberId
+        }
+        val lastUser = conversation.currentMessages.lastOrNull { it.role == MessageRole.USER }?.toText().orEmpty()
+        return nextGroupSpeaker(
+            strategy = group.activationStrategy,
+            members = members,
+            lastSpeakerId = lastSpeaker,
+            lastMessage = lastUser,
+            manualSpeakerId = conversation.config?.groupSpeakerId?.toString(),
+            allowSelfResponses = group.allowSelfResponses,
+            randomDraw = kotlin.random.Random.nextInt(0, Int.MAX_VALUE),
+        )
+    }
+
+    suspend fun restoreArchived(conversationId: Uuid, messageIds: List<Uuid>) {
+        val ids = messageIds.map { it.toString() }.toSet()
+        if (ids.isEmpty()) return
+        mutate(conversationId) { it.restoreMessages(ids) }
+    }
+
+    private suspend fun awaitSummaryReview(pending: PendingSummaryReview): String? {
+        val deferred = CompletableDeferred<String?>()
+        summaryReview = deferred
+        _pendingSummary.value = pending
+        return try {
+            deferred.await()
+        } finally {
+            if (summaryReview === deferred) summaryReview = null
+            if (_pendingSummary.value == pending) _pendingSummary.value = null
+        }
+    }
+
+    /**
+     * When the live floor count reaches the trigger, summarize the older floors,
+     * append that text to the memory lorebook, and archive or delete them.
+     * A manual call uses [force] even below the trigger.
+     */
+    private suspend fun summarizeConversation(session: ConversationSession, force: Boolean) {
+        val settings = settingsStore.awaitLoaded()
+        if (!settings.summaryEnabled && !force) return
+        val conversation = session.state.value
+        val messages = conversation.currentMessages
+        val history = messages.map { message ->
+            HistoryMessage(
+                id = message.id.toString(),
+                role = when (message.role) {
+                    MessageRole.USER -> "user"
+                    MessageRole.ASSISTANT -> "assistant"
+                    else -> "system"
+                },
+                text = message.toText(),
+                checkpoint = message.isContextCheckpoint,
+            )
+        }
+        val archived = messages.filter { it.archived }.map { it.id.toString() }.toSet()
+        val policy = FloorPolicy(
+            triggerFloors = settings.summaryTriggerFloors,
+            keepFloors = settings.summaryKeepFloors,
+            force = force,
+        )
+        val plan = planFloorSummary(
+            history,
+            policy,
+            conversation.promptState.summarizedIds + archived,
+        )
+        if (plan.dropIds.isEmpty()) {
+            if (force) {
+                addError(
+                    IllegalStateException(context.getString(R.string.chat_page_summary_nothing)),
+                    conversation.id,
+                    title = context.getString(R.string.chat_page_summary_failed),
+                )
+            }
+            return
+        }
+        val byId = history.associateBy { it.id }
+        val chunk = plan.dropIds.mapNotNull { byId[it] }
+        val chinese = settings.summaryLanguageIsChinese()
+        val template = settings.summaryPrompt.ifBlank {
+            if (chinese) SUMMARY_PROMPT_ZH else SUMMARY_PROMPT_EN
+        }
+        val systemPrompt = if (chinese) SUMMARY_SYSTEM_PROMPT_ZH else SUMMARY_SYSTEM_PROMPT_EN
+        val player = settings.displaySetting.userNickname
+        val prior = renderMemoryLore(conversation.promptState.memoryBlocks)
+        val instruction = fillSummaryPrompt(template, player, prior, formatPassage(chunk))
+        val separateModel = if (settings.summaryUseChatModel) null else settings.findModelById(settings.summaryModelId)
+        if (!settings.summaryUseChatModel && separateModel == null) {
+            addError(
+                IllegalStateException(context.getString(R.string.chat_page_summary_no_model)),
+                conversation.id,
+                title = context.getString(R.string.chat_page_summary_failed),
+            )
+        }
+        val turn = requestFactory.createContext(settings, conversation)
+        session.processingStatus.value = context.getString(R.string.chat_page_summarizing)
+        val generated = try {
+            requestFactory.generateMemorySummary(
+                turn = turn,
+                messages = messages.filter { !it.archived },
+                systemPrompt = systemPrompt,
+                instruction = instruction,
+                useChatPrefix = settings.summaryUseChatModel || separateModel == null,
+                summaryModel = separateModel,
+            )
+        } finally {
+            session.processingStatus.value = null
+        }
+        val floors = history.mapIndexed { index, message -> message.id to (index + 1) }.toMap()
+        val startFloor = floors[plan.dropIds.first()] ?: 1
+        val endFloor = floors[plan.dropIds.last()] ?: startFloor
+        val accepted = if (settings.summaryReviewBeforeCommit) {
+            awaitSummaryReview(
+                PendingSummaryReview(conversation.id, generated.trim(), startFloor, endFloor),
+            ) ?: return
+        } else {
+            generated.trim()
+        }
+        if (accepted.isBlank()) return
+        var state = commitFloorSummary(turn.promptState, history, plan, accepted)
+        if (memoryOverThreshold(state.memoryBlocks, settings.summaryConsolidationTokens)) {
+            val lastSummary = state.memoryBlocks.indexOfLast { it.kind == "summary" }
+            if (lastSummary > 0) {
+                val older = renderMemoryLore(state.memoryBlocks.subList(0, lastSummary))
+                val note = if (chinese) SUMMARY_CONSOLIDATION_NOTE_ZH else SUMMARY_CONSOLIDATION_NOTE_EN
+                val recapInstruction = fillSummaryPrompt(template, player, "", older) + "\n" + note
+                val recap = runCatching {
+                    requestFactory.generateMemorySummary(
+                        turn = turn,
+                        messages = messages.filter { !it.archived },
+                        systemPrompt = systemPrompt,
+                        instruction = recapInstruction,
+                        useChatPrefix = settings.summaryUseChatModel || separateModel == null,
+                        summaryModel = separateModel,
+                    )
+                }.getOrNull()
+                if (!recap.isNullOrBlank()) {
+                    consolidateMemory(state.memoryBlocks, recap)?.let { state = state.copy(memoryBlocks = it) }
+                }
+            }
+        }
+        val dropIds = plan.dropIds.toSet()
+        session.update { latest ->
+            val hidden = if (settings.summaryDeleteArchived) {
+                latest.deleteMessages(dropIds)
+            } else {
+                latest.archiveMessages(dropIds)
+            }
+            hidden.copy(promptState = state)
+        }
+        session.flush()
+    }
 
     suspend fun compressConversation(
         conversationId: Uuid,
@@ -1138,10 +1463,15 @@ class ChatService(
         parts: List<UIMessagePart>
     ) {
         if (parts.isEmptyInputMessage()) return
-        val settings = settingsStore.awaitLoaded()
 
         mutate(conversationId) { conversation ->
-            conversation.editMessage(messageId, parts.replaceUserRegexes(settings.getStoredAssistantOf(conversation)))
+            conversation.editMessage(messageId, parts).let { edited ->
+                edited.copy(
+                    promptState = edited.promptState.copy(
+                        frozenText = edited.promptState.frozenText - messageId.toString(),
+                    ),
+                )
+            }
         }
     }
 
@@ -1217,4 +1547,17 @@ class ChatService(
         jobs.forEach { it.join() }
         if (session.isInitialized) finishInterruptedPendingTools(session)
     }
+}
+
+data class PendingSummaryReview(
+    val conversationId: Uuid,
+    val draft: String,
+    val startFloor: Int,
+    val endFloor: Int,
+)
+
+private fun Settings.summaryLanguageIsChinese(): Boolean {
+    if (summaryPrompt == SUMMARY_PROMPT_ZH) return true
+    if (summaryPrompt.isNotBlank()) return false
+    return Locale.getDefault().language.startsWith("zh")
 }

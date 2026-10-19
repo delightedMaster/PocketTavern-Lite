@@ -2,6 +2,7 @@ package me.rerere.rikkahub.ui.pages.assistant.detail
 
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.ArrowDown01
+import me.rerere.hugeicons.stroke.FileImport
 import me.rerere.hugeicons.stroke.Delete01
 import me.rerere.hugeicons.stroke.Cancel01
 import me.rerere.hugeicons.stroke.Refresh03
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
@@ -45,6 +47,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.key
@@ -56,6 +60,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,7 +69,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachIndexed
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import me.rerere.ai.core.MessageRole
 import me.rerere.ai.provider.Model
 import me.rerere.ai.ui.UIMessage
@@ -76,7 +86,9 @@ import me.rerere.rikkahub.data.ai.transformers.TransformerContext
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantAffectScope
+import me.rerere.rikkahub.data.export.SillyTavernRegexImporter
 import me.rerere.rikkahub.data.model.AssistantRegex
+import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.toMessageNode
 import me.rerere.rikkahub.ui.components.message.ChatMessage
@@ -148,7 +160,32 @@ private fun AssistantPromptContent(
     onUpdate: (Assistant) -> Unit
 ) {
     val context = LocalContext.current
+    val toaster = LocalToaster.current
+    val scope = rememberCoroutineScope()
+    val currentAssistant by rememberUpdatedState(assistant)
     val templateTransformer = koinInject<TemplateTransformer>()
+    val regexImportedMsg = stringResource(R.string.assistant_page_regex_imported)
+    val regexImportFailedMsg = stringResource(R.string.assistant_page_regex_import_failed)
+    val regexImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val text = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                        ?: error(regexImportFailedMsg)
+                    val parsed = SillyTavernRegexImporter.parse(text)
+                    if (parsed.isEmpty()) error(regexImportFailedMsg)
+                    parsed
+                }
+            }
+            result.onSuccess { parsed ->
+                onUpdate(currentAssistant.copy(regexes = currentAssistant.regexes + parsed))
+                toaster.show(regexImportedMsg.format(parsed.size))
+            }.onFailure {
+                toaster.show(regexImportFailedMsg.format(it.message))
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -449,17 +486,24 @@ private fun AssistantPromptContent(
             title = stringResource(R.string.assistant_page_regex_title),
             description = stringResource(R.string.assistant_page_regex_desc),
             action = {
-                SectionAddButton(
-                    onClick = {
-                        onUpdate(
-                            assistant.copy(
-                                regexes = assistant.regexes + AssistantRegex(
-                                    id = Uuid.random()
+                Row {
+                    SectionAddButton(
+                        onClick = { regexImporter.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                        contentDescription = stringResource(R.string.tavern_regex_import),
+                        icon = HugeIcons.FileImport,
+                    )
+                    SectionAddButton(
+                        onClick = {
+                            onUpdate(
+                                assistant.copy(
+                                    regexes = assistant.regexes + AssistantRegex(
+                                        id = Uuid.random()
+                                    )
                                 )
                             )
-                        )
-                    }
-                )
+                        }
+                    )
+                }
             },
         )
         var expandedIds by remember { mutableStateOf(emptySet<Uuid>()) }
@@ -512,6 +556,15 @@ private fun AssistantRegexCard(
     modifier: Modifier = Modifier,
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
+    fun updateRegex(transform: (AssistantRegex) -> AssistantRegex) {
+        onUpdate(
+            assistant.copy(
+                regexes = assistant.regexes.mapIndexed { i, reg ->
+                    if (i == index) transform(reg) else reg
+                }
+            )
+        )
+    }
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = shape,
@@ -699,18 +752,46 @@ private fun AssistantRegexCard(
                         Switch(
                             checked = regex.visualOnly,
                             onCheckedChange = { visualOnly ->
-                                onUpdate(
-                                    assistant.copy(
-                                        regexes = assistant.regexes.mapIndexed { i, reg ->
-                                            if (i == index) {
-                                                reg.copy(visualOnly = visualOnly)
-                                            } else {
-                                                reg
-                                            }
-                                        }
-                                    )
-                                )
+                                updateRegex { it.copy(visualOnly = visualOnly, promptOnly = if (visualOnly) false else it.promptOnly) }
                             }
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.assistant_page_regex_prompt_only),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = regex.promptOnly,
+                            onCheckedChange = { promptOnly ->
+                                updateRegex { it.copy(promptOnly = promptOnly, visualOnly = if (promptOnly) false else it.visualOnly) }
+                            }
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = if (regex.minDepth > 0) regex.minDepth.toString() else "",
+                            onValueChange = { value ->
+                                updateRegex { it.copy(minDepth = value.toIntOrNull()?.coerceAtLeast(0) ?: 0) }
+                            },
+                            label = { Text(stringResource(R.string.assistant_page_regex_min_depth)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            value = if (regex.maxDepth > 0) regex.maxDepth.toString() else "",
+                            onValueChange = { value ->
+                                updateRegex { it.copy(maxDepth = value.toIntOrNull()?.coerceAtLeast(0) ?: 0) }
+                            },
+                            label = { Text(stringResource(R.string.assistant_page_regex_max_depth)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }

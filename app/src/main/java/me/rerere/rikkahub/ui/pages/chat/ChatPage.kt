@@ -3,12 +3,19 @@ package me.rerere.rikkahub.ui.pages.chat
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
@@ -30,6 +37,7 @@ import androidx.compose.material3.adaptive.currentWindowDpSize
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -68,11 +77,17 @@ import me.rerere.rikkahub.data.datastore.getSelectedASRProvider
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Conversation
+import me.rerere.rikkahub.data.model.GroupActivationStrategy
+import me.rerere.rikkahub.data.model.QuickMessage
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.service.ChatError
+import me.rerere.rikkahub.service.PendingSummaryReview
 import me.rerere.rikkahub.ui.components.ai.ChatAttachmentPickerActions
 import me.rerere.rikkahub.ui.components.ai.ChatInput
 import me.rerere.rikkahub.ui.components.ai.FilesPicker
+import me.rerere.rikkahub.ui.components.message.LocalHtmlCardAllowlist
+import me.rerere.rikkahub.ui.components.message.LocalTavernCardBridge
+import me.rerere.rikkahub.ui.components.message.TavernCardBridge
 import me.rerere.rikkahub.ui.components.ai.SearchMode
 import me.rerere.rikkahub.ui.components.ai.completion.WorkspaceCompletionProvider
 import me.rerere.rikkahub.ui.components.ai.rememberChatAttachmentPickerActions
@@ -291,6 +306,26 @@ private fun ChatPageContent(
     var previewMode by rememberSaveable { mutableStateOf(false) }
     val hazeState = rememberHazeState()
     var showFilesSheet by remember { mutableStateOf(false) }
+    var showBindQuickReplies by remember { mutableStateOf(false) }
+    val group = conversation.config?.groupId?.let { id ->
+        setting.groupChats.firstOrNull { it.id == id && it.enabled }
+    }
+    val speakerChoices = if (group?.activationStrategy == GroupActivationStrategy.MANUAL) {
+        group.memberIds.mapNotNull { memberId ->
+            if (memberId in group.disabledMemberIds) {
+                null
+            } else {
+                setting.assistants.firstOrNull { it.id == memberId }?.let { member ->
+                    member.id to member.name.ifBlank { "Character" }
+                }
+            }
+        }
+    } else {
+        emptyList()
+    }
+    val cardBridge = remember(vm) {
+        TavernCardBridge { messageId, requestJson -> vm.handleCard(messageId, requestJson) }
+    }
     val attachmentPickerActions = rememberChatAttachmentPickerActions(
         inputState = inputState,
         setting = setting,
@@ -312,7 +347,20 @@ private fun ChatPageContent(
     }
 
     TTSAutoPlay(vm = vm, setting = setting, conversation = conversation)
+    val pendingSummary by vm.pendingSummaryReview.collectAsStateWithLifecycle()
+    val review = pendingSummary?.takeIf { it.conversationId == conversation.id }
+    if (review != null) {
+        SummaryReviewDialog(
+            pending = review,
+            onConfirm = vm::confirmSummaryReview,
+            onCancel = vm::cancelSummaryReview,
+        )
+    }
 
+    CompositionLocalProvider(
+        LocalTavernCardBridge provides cardBridge,
+        LocalHtmlCardAllowlist provides setting.htmlCardAllowlist,
+    ) {
     Surface(
         color = MaterialTheme.colorScheme.background,
         modifier = Modifier.fillMaxSize()
@@ -408,6 +456,12 @@ private fun ChatPageContent(
                     onMoreClick = {
                         showFilesSheet = true
                     },
+                    extraQuickReplyIds = conversation.config?.quickReplyIds.orEmpty(),
+                    onRunQuickReply = vm::runQuickReply,
+                    onBindQuickReplies = { showBindQuickReplies = true },
+                    speakerChoices = speakerChoices,
+                    selectedSpeakerId = conversation.config?.groupSpeakerId,
+                    onSelectSpeaker = vm::setGroupSpeaker,
                 )
             },
             containerColor = Color.Transparent,
@@ -437,6 +491,7 @@ private fun ChatPageContent(
                         navigateToChatPage(navController, chatId = fork.id)
                     }
                 },
+                onRestoreArchived = vm::restoreArchived,
                 onDelete = {
                     if (loadingJob != null) {
                         vm.showDeleteBlockedWhileGeneratingError()
@@ -492,6 +547,107 @@ private fun ChatPageContent(
             )
         }
     }
+    val slashPrompt = vm.pendingSlashInput
+    if (slashPrompt != null) {
+        SlashInputDialog(
+            prompt = slashPrompt,
+            onSubmit = vm::submitSlashInput,
+            onDismiss = vm::dismissSlashInput,
+        )
+    }
+    if (showBindQuickReplies) {
+        QuickReplyBindDialog(
+            quickMessages = setting.quickMessages,
+            selected = conversation.config?.quickReplyIds.orEmpty(),
+            onDismiss = { showBindQuickReplies = false },
+            onSave = { ids ->
+                vm.updateQuickReplyIds(ids)
+                showBindQuickReplies = false
+            },
+        )
+    }
+    }
+}
+
+@Composable
+private fun SlashInputDialog(
+    prompt: String,
+    onSubmit: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by remember(prompt) { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.chat_page_slash_input_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (prompt.isNotBlank()) Text(prompt)
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSubmit(text) }) {
+                Text(stringResource(R.string.chat_page_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun QuickReplyBindDialog(
+    quickMessages: List<QuickMessage>,
+    selected: Set<kotlin.uuid.Uuid>,
+    onDismiss: () -> Unit,
+    onSave: (Set<kotlin.uuid.Uuid>) -> Unit,
+) {
+    var picked by remember(selected) { mutableStateOf(selected) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.chat_page_bind_quick_replies)) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                if (quickMessages.isEmpty()) {
+                    Text(stringResource(R.string.quick_messages_page_empty_title))
+                }
+                quickMessages.forEach { item ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = item.id in picked,
+                            onCheckedChange = { checked ->
+                                picked = if (checked) picked + item.id else picked - item.id
+                            },
+                        )
+                        val title = item.title.ifBlank { item.content }
+                        Text(if (item.setName.isBlank()) title else "${item.setName} · $title")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(picked) }) {
+                Text(stringResource(R.string.chat_page_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
 }
 
 @Composable
@@ -531,6 +687,7 @@ private fun ChatFilesPickerSheet(
             chatModel = chatModel,
             mcpManager = vm.mcpManager,
             onCompressContext = vm::handleCompressContext,
+            onSummarizeNow = vm::summarizeNow,
             onUpdateAssistant = vm::updateAssistant,
             onUpdateWorkspaceCwd = vm::updateWorkspaceCwd,
             showCompressDialog = showCompressDialog,
@@ -575,6 +732,11 @@ private fun TopBar(
     val titleState = useEditState<String> {
         onUpdateTitle(it)
     }
+    var showPrefixDiff by rememberSaveable { mutableStateOf(false) }
+    val promptTokens = conversation.currentMessages.sumOf { it.usage?.promptTokens ?: 0 }
+    val cachedTokens = conversation.currentMessages.sumOf { it.usage?.cachedTokens ?: 0 }
+    val cachePercent = if (promptTokens > 0) ((cachedTokens.toLong() * 100) / promptTokens).toInt() else 0
+    val hasPrefix = conversation.promptState.lastFullRequest.isNotEmpty()
 
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
@@ -618,6 +780,19 @@ private fun TopBar(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 8.sp,
                             )
+                        )
+                    }
+                    if (promptTokens > 0 || hasPrefix) {
+                        Text(
+                            text = if (promptTokens > 0) {
+                                stringResource(R.string.chat_page_cache_hit_rate, cachePercent)
+                            } else {
+                                stringResource(R.string.chat_page_prefix_diff)
+                            },
+                            modifier = Modifier.clickable { showPrefixDiff = true },
+                            maxLines = 1,
+                            color = LocalContentColor.current.copy(0.65f),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
                         )
                     }
                 }
@@ -677,4 +852,71 @@ private fun TopBar(
             }
         )
     }
+    if (showPrefixDiff) {
+        val state = conversation.promptState
+        AlertDialog(
+            onDismissRequest = { showPrefixDiff = false },
+            title = { Text(stringResource(R.string.chat_page_prefix_diff_title)) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Text(
+                        if (state.prefixDivergeAt < 0) {
+                            stringResource(R.string.chat_page_prefix_diff_stable)
+                        } else {
+                            stringResource(R.string.chat_page_prefix_diff_at, state.prefixDivergeAt)
+                        }
+                    )
+                    if (state.prefixDivergeAt >= 0) {
+                        Text(stringResource(R.string.chat_page_prefix_diff_previous))
+                        Text(state.divergePrevious.take(500))
+                        Text(stringResource(R.string.chat_page_prefix_diff_current))
+                        Text(state.divergeCurrent.take(500))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPrefixDiff = false }) {
+                    Text(stringResource(R.string.chat_page_cancel))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SummaryReviewDialog(
+    pending: PendingSummaryReview,
+    onConfirm: (String) -> Unit,
+    onCancel: () -> Unit,
+) {
+    var text by remember(pending.draft, pending.startFloor, pending.endFloor) { mutableStateOf(pending.draft) }
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = {
+            Text(stringResource(R.string.chat_page_summary_review_title, pending.startFloor, pending.endFloor))
+        },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 360.dp),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(text) }, enabled = text.isNotBlank()) {
+                Text(stringResource(R.string.chat_page_summary_commit))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancel) {
+                Text(stringResource(R.string.chat_page_cancel))
+            }
+        },
+    )
 }

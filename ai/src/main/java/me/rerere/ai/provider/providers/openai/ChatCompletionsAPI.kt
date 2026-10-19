@@ -54,6 +54,7 @@ import me.rerere.ai.util.configureSessionHeaders
 import me.rerere.ai.util.encodeBase64
 import me.rerere.ai.util.json
 import me.rerere.ai.util.mergeCustomBody
+import me.rerere.ai.util.withSortedKeys
 import me.rerere.ai.util.mergeCustomHeaders
 import me.rerere.ai.util.parseErrorDetail
 import me.rerere.ai.util.stringSafe
@@ -268,6 +269,15 @@ class ChatCompletionsAPI(
                 }
             }
 
+            // OpenAI prompt cache keys on this session. DeepSeek caches the prefix
+            // automatically; a stable user field keeps that prefix eligible.
+            if (host == "api.openai.com") {
+                params.sessionId?.let { put("prompt_cache_key", it) }
+            }
+            if (host == "api.deepseek.com") {
+                params.sessionId?.let { put("user", it) }
+            }
+
             if (params.model.abilities.contains(ModelAbility.REASONING)) {
                 val level = params.reasoningLevel
                 when (host) {
@@ -436,7 +446,7 @@ class ChatCompletionsAPI(
                     }
                 }
             }
-        }.mergeCustomBody(params.customBody)
+        }.mergeCustomBody(params.customBody).withSortedKeys()
     }
 
     private fun isModelAllowTemperature(model: Model): Boolean {

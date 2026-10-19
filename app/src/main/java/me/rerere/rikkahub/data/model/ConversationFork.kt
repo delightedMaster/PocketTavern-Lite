@@ -35,7 +35,12 @@ internal fun Conversation.fork(
             node.copy(
                 id = Uuid.random(),
                 messages = node.messages.map { message ->
-                    message.copy(parts = message.parts.map { it.mapLocalFileUrls(copyFile) })
+                    // A fork is a new chat. Archived floors belong to the source memory book,
+                    // which is not copied, so the messages are visible again.
+                    message.copy(
+                        archived = false,
+                        parts = message.parts.map { it.mapLocalFileUrls(copyFile) },
+                    )
                 },
             )
         },

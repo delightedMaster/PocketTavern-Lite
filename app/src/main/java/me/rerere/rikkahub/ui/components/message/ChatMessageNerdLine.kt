@@ -59,13 +59,9 @@ fun ChatMessageNerdLine(
                             )
                         },
                         content = {
-                            Text(text = "${usage.promptTokens.formatNumber()} tokens")
-                            // Cached tokens
-                            if (usage.cachedTokens > 0) {
-                                Text(
-                                    text = "(${message.usage?.cachedTokens?.formatNumber() ?: "0"} cached)"
-                                )
-                            }
+                            Text(
+                                text = "${usage.cachedTokens.formatNumber()}/${usage.promptTokens.formatNumber()} tokens"
+                            )
                         }
                     )
                     // Output tokens

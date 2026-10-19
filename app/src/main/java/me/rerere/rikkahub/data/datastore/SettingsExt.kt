@@ -4,8 +4,36 @@ import me.rerere.ai.provider.Model
 import me.rerere.ai.provider.ProviderSetting
 import me.rerere.asr.ASRProviderSetting
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.AssistantRegex
+import me.rerere.rikkahub.data.model.AuthorNoteEntry
+import me.rerere.rikkahub.data.model.LEGACY_AUTHOR_NOTE_ENTRY_ID
 import me.rerere.tts.provider.TTSProviderSetting
 import kotlin.uuid.Uuid
+
+/**
+ * null 与空列表刻意区分：null 才回退旧字段；用户删光条目后保存 emptyList，
+ * 旧 authorNote 不会被再次迁移出来。
+ */
+/** Card scripts run first, then global groups, matching SillyTavern's local-then-global order. */
+fun Settings.allRegexesOf(assistant: Assistant?): List<AssistantRegex> =
+    assistant?.regexes.orEmpty() + globalRegexes
+
+fun Settings.authorNoteEntriesOrLegacy(): List<AuthorNoteEntry> {
+    authorNoteEntries?.let { return it }
+    if (authorNote.isBlank()) return emptyList()
+    return listOf(
+        AuthorNoteEntry(
+            id = LEGACY_AUTHOR_NOTE_ENTRY_ID,
+            name = "旧版自定义导演备注",
+            content = authorNote,
+            enabled = true,
+            position = authorNotePosition,
+            depth = authorNoteDepth,
+            role = authorNoteRole,
+            interval = authorNoteInterval,
+        ),
+    )
+}
 
 /** 所有提供商都还没有添加模型，视为尚未完成配置。 */
 fun Settings.isNotConfigured() = providers.all { it.models.isEmpty() }

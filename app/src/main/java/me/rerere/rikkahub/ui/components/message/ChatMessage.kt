@@ -68,9 +68,11 @@ import me.rerere.hugeicons.stroke.MusicNote03
 import me.rerere.hugeicons.stroke.Video01
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
+import me.rerere.rikkahub.data.datastore.allRegexesOf
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantAffectScope
 import me.rerere.rikkahub.data.model.MessageNode
+import me.rerere.rikkahub.data.ai.cards.looksLikeCardHtml
 import me.rerere.rikkahub.data.model.replaceRegexes
 import me.rerere.rikkahub.ui.components.richtext.MarkdownBlock
 import me.rerere.rikkahub.ui.components.richtext.ZoomableAsyncImage
@@ -112,6 +114,7 @@ fun ChatMessage(
     onClearTranslation: (UIMessage) -> Unit = {},
     onToolApproval: ((toolCallId: String, approved: Boolean, reason: String) -> Unit)? = null,
     onToolAnswer: ((toolCallId: String, answer: String) -> Unit)? = null,
+    depth: Int = 0,
 ) {
     val message = node.messages[node.selectIndex]
     if (message.isContextCheckpoint) {
@@ -140,6 +143,13 @@ fun ChatMessage(
         horizontalAlignment = if (message.role == MessageRole.USER) Alignment.End else Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+        message.annotations.filterIsInstance<UIMessageAnnotation.GroupSpeaker>().firstOrNull()?.let { speaker ->
+            Text(
+                text = speaker.name,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
         if (!message.parts.isEmptyUIMessage()) {
             Row(
                 modifier = Modifier
@@ -164,12 +174,14 @@ fun ChatMessage(
         }
         ProvideTextStyle(textStyle) {
             MessagePartsBlock(
+                messageId = message.id.toString(),
                 assistant = assistant,
                 role = message.role,
                 parts = message.parts,
                 annotations = message.annotations,
                 loading = loading,
                 model = model,
+                depth = depth,
                 onToolApproval = onToolApproval,
                 onToolAnswer = onToolAnswer,
                 onUserMessageClick = if (message.role == MessageRole.USER) onEdit else null,
@@ -271,12 +283,14 @@ fun ChatMessage(
 @OptIn(FlowPreview::class)
 @Composable
 private fun MessagePartsBlock(
+    messageId: String,
     assistant: Assistant?,
     role: MessageRole,
     model: Model?,
     parts: List<UIMessagePart>,
     annotations: List<UIMessageAnnotation>,
     loading: Boolean,
+    depth: Int = 0,
     onToolApproval: ((toolCallId: String, approved: Boolean, reason: String) -> Unit)? = null,
     onToolAnswer: ((toolCallId: String, answer: String) -> Unit)? = null,
     onUserMessageClick: (() -> Unit)? = null,
@@ -285,6 +299,7 @@ private fun MessagePartsBlock(
     // 消息输出HapticFeedback
     val hapticFeedback = LocalHapticFeedback.current
     val settings = LocalSettings.current
+    val displayRegexes = settings.allRegexesOf(assistant)
     val partsState by rememberUpdatedState(parts)
 
     val handleClickCitation: (String) -> Unit = remember {
@@ -340,6 +355,8 @@ private fun MessagePartsBlock(
                                         model = model,
                                         assistant = assistant,
                                         collapsedAdaptiveWidth = isReasoningOnlyBlock,
+                                        depth = depth,
+                                        regexes = displayRegexes,
                                     )
                                 }
                             }
@@ -374,6 +391,32 @@ private fun MessagePartsBlock(
             is MessagePartBlock.ContentBlock -> key(block.index) {
                 when (val part = block.part) {
                     is UIMessagePart.Text -> {
+                        val scope = if (role == MessageRole.USER) {
+                            AssistantAffectScope.USER
+                        } else {
+                            AssistantAffectScope.ASSISTANT
+                        }
+                        val renderedText = @Composable { textModifier: Modifier ->
+                            val displayText = part.text.replaceRegexes(
+                                regexes = displayRegexes,
+                                scope = scope,
+                                visual = true,
+                                depth = depth,
+                            )
+                            if (!loading && looksLikeCardHtml(displayText) && LocalTavernCardBridge.current != null) {
+                                HtmlCardView(
+                                    messageId = messageId,
+                                    html = displayText,
+                                    modifier = textModifier,
+                                )
+                            } else {
+                                MarkdownBlock(
+                                    content = displayText,
+                                    onClickCitation = handleClickCitation,
+                                    modifier = textModifier,
+                                )
+                            }
+                        }
                         val textContent = @Composable {
                             if (role == MessageRole.USER) {
                                 ChatMessageBubble(
@@ -385,14 +428,7 @@ private fun MessagePartsBlock(
                                         .padding(start = 48.dp)
                                         .animateContentSize(),
                                 ) {
-                                    MarkdownBlock(
-                                        content = part.text.replaceRegexes(
-                                            assistant = assistant,
-                                            scope = AssistantAffectScope.USER,
-                                            visual = true,
-                                        ),
-                                        onClickCitation = handleClickCitation
-                                    )
+                                    renderedText(Modifier)
                                 }
                             } else {
                                 if (settings.displaySetting.showAssistantBubble) {
@@ -401,26 +437,10 @@ private fun MessagePartsBlock(
                                         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = settings.displaySetting.bubbleOpacity),
                                         modifier = Modifier.animateContentSize(),
                                     ) {
-                                        MarkdownBlock(
-                                            content = part.text.replaceRegexes(
-                                                assistant = assistant,
-                                                scope = AssistantAffectScope.ASSISTANT,
-                                                visual = true,
-                                            ),
-                                            onClickCitation = handleClickCitation,
-                                        )
+                                        renderedText(Modifier)
                                     }
                                 } else {
-                                    MarkdownBlock(
-                                        content = part.text.replaceRegexes(
-                                            assistant = assistant,
-                                            scope = AssistantAffectScope.ASSISTANT,
-                                            visual = true,
-                                        ),
-                                        onClickCitation = handleClickCitation,
-                                        modifier = Modifier
-                                            .animateContentSize()
-                                    )
+                                    renderedText(Modifier.animateContentSize())
                                 }
                             }
                         }
@@ -516,9 +536,9 @@ private fun MessagePartsBlock(
         }
     }
 
-    // Annotations (always rendered at the end)
-    if (annotations.isNotEmpty()) {
-        ChatMessageCitations(annotations = annotations)
+    val citations = annotations.filterIsInstance<UIMessageAnnotation.UrlCitation>()
+    if (citations.isNotEmpty()) {
+        ChatMessageCitations(annotations = citations)
     }
 }
 
@@ -569,15 +589,9 @@ private fun ChatMessageBubble(
 }
 
 @Composable
-private fun ChatMessageCitations(annotations: List<UIMessageAnnotation>) {
+private fun ChatMessageCitations(annotations: List<UIMessageAnnotation.UrlCitation>) {
     var expand by remember { mutableStateOf(false) }
-    val urls = remember(annotations) {
-        annotations.map { annotation ->
-            when (annotation) {
-                is UIMessageAnnotation.UrlCitation -> annotation.url
-            }
-        }
-    }
+    val urls = remember(annotations) { annotations.map { it.url } }
     Column(
         modifier = Modifier.animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec()),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -603,22 +617,18 @@ private fun ChatMessageCitations(annotations: List<UIMessageAnnotation>) {
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         annotations.fastForEachIndexed { index, annotation ->
-                            when (annotation) {
-                                is UIMessageAnnotation.UrlCitation -> {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Favicon(annotation.url, modifier = Modifier.size(20.dp))
-                                        Text(
-                                            text = buildAnnotatedString {
-                                                append("${index + 1}. ")
-                                                withLink(LinkAnnotation.Url(annotation.url)) {
-                                                    append(annotation.title.urlDecode())
-                                                }
-                                            }
-                                        )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Favicon(annotation.url, modifier = Modifier.size(20.dp))
+                                Text(
+                                    text = buildAnnotatedString {
+                                        append("${index + 1}. ")
+                                        withLink(LinkAnnotation.Url(annotation.url)) {
+                                            append(annotation.title.urlDecode())
+                                        }
                                     }
-                                }
+                                )
                             }
                         }
                     }
