@@ -26,6 +26,8 @@ git submodule update --init
 
 ## 功能
 
+- 24 个提供商预设和自定义端点，支持 OpenAI Chat Completions / Responses、Anthropic Messages、Gemini generateContent / Interactions 与 Vertex AI；可分别测试连接和实际发送消息，见 [接口与测试说明](docs/PROVIDER_COMPATIBILITY.md)。
+
 - 导入兼容性报告：角色卡、世界书 / 预设、正则及快捷回复导入后显示实际导入数量、跳过项和未实现功能，可复制报告。解析成功不表示第三方脚本完全兼容。
 - 原生 Android 使用：不包含浏览器远程聊天服务和通用文档解析。普通复制粘贴、图片附件及酒馆数据导入保留，联网搜索保留。
 - Skills / Agent / MCP 的用途与保留范围见 [调研记录](docs/AGENT_SKILLS_MCP_RESEARCH.md)。

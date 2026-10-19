@@ -320,6 +320,7 @@ private fun ProviderConfigureOpenAI(
                 }
             },
             headlineContent = { Text(stringResource(R.string.setting_provider_page_response_api)) },
+            supportingContent = { Text(if (provider.useResponseApi) "当前：Responses" else "当前：Chat Completions") },
         )
         switchItem(
             checked = provider.includeHistoryReasoning,
@@ -447,6 +448,7 @@ private fun ProviderConfigureGoogle(
                 checked = provider.useInteractionsApi,
                 onCheckedChange = { onEdit(provider.copy(useInteractionsApi = it)) },
                 headlineContent = { Text("Interactions API (Beta)") },
+                supportingContent = { Text(if (provider.useInteractionsApi) "当前：Interactions" else "当前：generateContent") },
             )
         }
     }

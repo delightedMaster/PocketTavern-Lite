@@ -6,19 +6,25 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,201 +34,182 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
-import me.rerere.ai.core.ReasoningLevel
-import me.rerere.ai.core.Tool
+import me.rerere.ai.provider.Model
 import me.rerere.ai.provider.ModelType
+import me.rerere.ai.provider.ProviderDiagnostics
 import me.rerere.ai.provider.ProviderManager
 import me.rerere.ai.provider.ProviderSetting
-import me.rerere.ai.provider.TextGenerationParams
-import me.rerere.ai.ui.StreamChunk
-import me.rerere.ai.ui.UIMessage
-import me.rerere.ai.ui.UIMessagePart
+import me.rerere.ai.provider.textApiLabel
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Connect
-import me.rerere.rikkahub.R
-import me.rerere.rikkahub.ui.components.ai.ModelSelector
 import me.rerere.rikkahub.ui.theme.extendColors
 import me.rerere.rikkahub.utils.UiState
 import org.koin.compose.koinInject
+import kotlin.time.TimeSource
 
 @Composable
-fun ProviderConnectionTester(
-    internalProvider: ProviderSetting,
-) {
+fun ProviderConnectionTester(internalProvider: ProviderSetting) {
     var showTestDialog by remember { mutableStateOf(false) }
     val providerManager = koinInject<ProviderManager>()
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
 
-    IconButton(onClick = { showTestDialog = true }) {
-        Icon(HugeIcons.Connect, null)
+    TextButton(onClick = { showTestDialog = true }) {
+        Icon(HugeIcons.Connect, contentDescription = null)
+        Text("测试连接")
     }
 
     if (showTestDialog) {
-        var model by remember(internalProvider) {
-            mutableStateOf(internalProvider.models.firstOrNull { it.type == ModelType.CHAT })
+        // This scope is disposed with the dialog, cancelling any unfinished request.
+        val scope = rememberCoroutineScope()
+        val diagnostics = remember(internalProvider) {
+            ProviderDiagnostics(providerManager.getProviderByType(internalProvider), internalProvider)
         }
-        var nonStreamingState: UiState<String> by remember { mutableStateOf(UiState.Idle) }
-        var streamingState: UiState<String> by remember { mutableStateOf(UiState.Idle) }
+        var models by remember { mutableStateOf(internalProvider.models.filter { it.type == ModelType.CHAT }) }
+        var model by remember { mutableStateOf(models.firstOrNull() ?: Model()) }
+        var message by remember { mutableStateOf("你好，请简短回复，确认连接正常。") }
+        var streaming by remember { mutableStateOf(true) }
+        var showModels by remember { mutableStateOf(false) }
+        var running by remember { mutableStateOf(false) }
+        var connectionState: UiState<String> by remember { mutableStateOf(UiState.Idle) }
+        var messageState: UiState<String> by remember { mutableStateOf(UiState.Idle) }
         var toolsState: UiState<String> by remember { mutableStateOf(UiState.Idle) }
         var streamingText by remember { mutableStateOf("") }
 
-        fun resetStates() {
-            nonStreamingState = UiState.Idle
-            streamingState = UiState.Idle
-            toolsState = UiState.Idle
-            streamingText = ""
+        fun runTest(setState: (UiState<String>) -> Unit, action: suspend () -> String) {
+            if (running) return
+            running = true
+            setState(UiState.Loading)
+            scope.launch {
+                val started = TimeSource.Monotonic.markNow()
+                try {
+                    val result = action()
+                    setState(UiState.Success("耗时 ${started.elapsedNow().inWholeMilliseconds} ms\n$result"))
+                } catch (e: TimeoutCancellationException) {
+                    setState(UiState.Error(IllegalStateException("测试超过 90 秒，请检查网络或稍后重试", e)))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    setState(UiState.Error(e))
+                } finally {
+                    running = false
+                }
+            }
         }
 
         AlertDialog(
             onDismissRequest = { showTestDialog = false },
-            title = {
-                Text(stringResource(R.string.setting_provider_page_test_connection))
-            },
+            title = { Text("连接与消息测试") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ModelSelector(
-                        modelId = model?.id,
-                        providers = listOf(internalProvider),
-                        type = ModelType.CHAT,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        model = it
-                    }
-
-                    TestResultItem(
-                        label = stringResource(R.string.setting_provider_page_test_non_streaming),
-                        state = nonStreamingState,
-                        resultText = (nonStreamingState as? UiState.Success)?.data ?: ""
+                Column(
+                    modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text("${internalProvider.name} · ${internalProvider.textApiLabel}")
+                    Text(
+                        "使用当前填写的配置。读取模型列表只检查该接口；发送消息才能确认所选模型可用，会产生正常 API 用量。测试不会保存为聊天。",
+                        style = MaterialTheme.typography.bodySmall,
                     )
-
-                    TestResultItem(
-                        label = stringResource(R.string.setting_provider_page_test_streaming),
-                        state = streamingState,
-                        resultText = streamingText
-                    )
-
-                    TestResultItem(
-                        label = stringResource(R.string.setting_provider_page_test_tool_call),
-                        state = toolsState,
-                        resultText = (toolsState as? UiState.Success)?.data ?: ""
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTestDialog = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (model == null) return@TextButton
-                        val provider = providerManager.getProviderByType(internalProvider)
-                        resetStates()
-                        scope.launch {
-                            launch {
-                                runCatching {
-                                    nonStreamingState = UiState.Loading
-                                    val result = provider.generateText(
-                                        providerSetting = internalProvider,
-                                        messages = listOf(
-                                            UIMessage.system("You are a helpful assistant"),
-                                            UIMessage.user("hello"),
-                                        ),
-                                        params = TextGenerationParams(
-                                            model = model!!,
-                                            customHeaders = model!!.customHeaders,
-                                            customBody = model!!.customBodies,
-                                            reasoningLevel = ReasoningLevel.AUTO
-                                        )
-                                    )
-                                    val text = result.message.parts
-                                        .filterIsInstance<UIMessagePart.Text>()
-                                        .joinToString("") { it.text }
-                                    nonStreamingState = UiState.Success(text)
-                                }.onFailure { nonStreamingState = UiState.Error(it) }
+                    FilledTonalButton(
+                        enabled = !running,
+                        onClick = {
+                            runTest({ connectionState = it }) {
+                                val fetched = diagnostics.listModels().filter { it.type == ModelType.CHAT }
+                                models = (models + fetched).distinctBy { it.modelId }
+                                if (model.modelId.isBlank()) model = models.firstOrNull() ?: model
+                                "模型列表接口已响应，返回 ${fetched.size} 个聊天模型。若列表为空，可手填模型 ID 测试。"
                             }
-                            launch {
-                                runCatching {
-                                    streamingState = UiState.Loading
-                                    val flow = provider.streamText(
-                                        providerSetting = internalProvider,
-                                        messages = listOf(
-                                            UIMessage.system("You are a helpful assistant"),
-                                            UIMessage.user("hello"),
-                                        ),
-                                        params = TextGenerationParams(
-                                            model = model!!,
-                                            customHeaders = model!!.customHeaders,
-                                            customBody = model!!.customBodies,
-                                            reasoningLevel = ReasoningLevel.AUTO
-                                        )
+                        },
+                    ) { Text("测试连接 / 读取模型") }
+                    TestResultItem("连接", connectionState, (connectionState as? UiState.Success)?.data.orEmpty())
+                    OutlinedTextField(
+                        value = model.modelId,
+                        onValueChange = { value ->
+                            model = models.firstOrNull { it.modelId == value.trim() }
+                                ?: Model(modelId = value.trim())
+                            messageState = UiState.Idle
+                            toolsState = UiState.Idle
+                            streamingText = ""
+                        },
+                        enabled = !running,
+                        label = { Text("模型 ID（可手填）") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (models.isNotEmpty()) {
+                        Column {
+                            TextButton(enabled = !running, onClick = { showModels = true }) { Text("从模型列表选择") }
+                            DropdownMenu(expanded = showModels, onDismissRequest = { showModels = false }) {
+                                models.forEach { item ->
+                                    DropdownMenuItem(
+                                        text = { Text(item.modelId) },
+                                        onClick = {
+                                            model = item
+                                            showModels = false
+                                            messageState = UiState.Idle
+                                            toolsState = UiState.Idle
+                                            streamingText = ""
+                                        },
                                     )
-                                    flow.collect { chunk ->
-                                        if (chunk is StreamChunk.TextDelta) {
-                                            streamingText += chunk.text
-                                        }
-                                    }
-                                    streamingState = UiState.Success("")
-                                }.onFailure { streamingState = UiState.Error(it) }
-                            }
-                            launch {
-                                runCatching {
-                                    toolsState = UiState.Loading
-                                    val testTool = Tool(
-                                        name = "get_current_time",
-                                        description = "Get the current date and time.",
-                                        execute = { emptyList() }
-                                    )
-                                    val result = provider.generateText(
-                                        providerSetting = internalProvider,
-                                        messages = listOf(
-                                            UIMessage.system("You are a helpful assistant"),
-                                            UIMessage.user("Use the get_current_time tool."),
-                                        ),
-                                        params = TextGenerationParams(
-                                            model = model!!,
-                                            tools = listOf(testTool),
-                                            customHeaders = model!!.customHeaders,
-                                            customBody = model!!.customBodies,
-                                            reasoningLevel = ReasoningLevel.AUTO
-                                        )
-                                    )
-                                    val message = result.message
-                                    val toolCall = message.parts
-                                        .filterIsInstance<UIMessagePart.Tool>()
-                                        .firstOrNull()
-                                    val resultText = if (toolCall != null) {
-                                        context.getString(
-                                            R.string.setting_provider_page_test_tool_called,
-                                            toolCall.toolName,
-                                            toolCall.input
-                                        )
-                                    } else {
-                                        val text = message.parts
-                                            .filterIsInstance<UIMessagePart.Text>()
-                                            .joinToString("") { it.text }
-                                        context.getString(
-                                            R.string.setting_provider_page_test_tool_not_called,
-                                            text
-                                        )
-                                    }
-                                    toolsState = UiState.Success(resultText)
-                                }.onFailure { toolsState = UiState.Error(it) }
+                                }
                             }
                         }
                     }
-                ) {
-                    Text(stringResource(R.string.setting_provider_page_test))
+                    OutlinedTextField(
+                        value = message,
+                        onValueChange = { message = it; messageState = UiState.Idle; streamingText = "" },
+                        enabled = !running,
+                        label = { Text("测试消息") },
+                        minLines = 2,
+                        maxLines = 5,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("流式回复", modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = streaming,
+                            onCheckedChange = { streaming = it; messageState = UiState.Idle; streamingText = "" },
+                            enabled = !running,
+                        )
+                    }
+                    FilledTonalButton(
+                        enabled = !running && model.modelId.isNotBlank() && message.isNotBlank(),
+                        onClick = {
+                            val selected = model
+                            val prompt = message
+                            val useStreaming = streaming
+                            streamingText = ""
+                            runTest({ messageState = it }) {
+                                val reply = diagnostics.send(selected, prompt, useStreaming) { streamingText = it }
+                                "模型：${selected.modelId}\n$reply"
+                            }
+                        },
+                    ) { Text("发送测试消息") }
+                    TestResultItem(
+                        if (streaming) "流式消息" else "普通消息",
+                        messageState,
+                        (messageState as? UiState.Success)?.data.orEmpty(),
+                    )
+                    if (streamingText.isNotBlank() && messageState !is UiState.Success) {
+                        SelectionContainer { Text(streamingText) }
+                    }
+                    TextButton(
+                        enabled = !running && model.modelId.isNotBlank(),
+                        onClick = {
+                            val selected = model
+                            runTest({ toolsState = it }) { diagnostics.testTools(selected) }
+                        },
+                    ) { Text("单独测试工具调用（可选）") }
+                    TestResultItem("工具调用", toolsState, (toolsState as? UiState.Success)?.data.orEmpty())
                 }
-            }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTestDialog = false }) { Text(if (running) "停止并关闭" else "完成") }
+            },
         )
     }
 }
@@ -264,13 +251,13 @@ private fun TestResultItem(
                     color = MaterialTheme.extendColors.green6
                 )
                 if (resultText.isNotBlank()) {
-                    Text(
-                        text = resultText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    SelectionContainer {
+                        Text(
+                            text = resultText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
             is UiState.Error -> Text(

@@ -63,9 +63,17 @@ jobs:
             --tests 'me.rerere.rikkahub.data.datastore.RemovedCapabilitiesTest' \
             --tests 'me.rerere.rikkahub.data.datastore.SettingsFieldsTest' \
             --tests 'me.rerere.rikkahub.data.datastore.SettingsStoreTest' \
+            --tests 'me.rerere.rikkahub.data.datastore.DefaultProvidersTest' \
             --tests 'me.rerere.rikkahub.data.ai.tools.ExternalWebSearchTest' \
             --tests 'me.rerere.rikkahub.data.ai.tools.SkillsToolsTest' \
             --tests 'me.rerere.rikkahub.data.model.ConversationMessagesTest'
+
+      - name: Test provider diagnostics
+        run: |
+          bash ./gradlew :ai:testDebugUnitTest \
+            --tests 'me.rerere.ai.provider.ProviderDiagnosticsTest' \
+            --tests 'me.rerere.ai.provider.stream.StreamTraceReplayTest' \
+            --tests 'me.rerere.ai.provider.providers.google.InteractionsApiTest'
 
       - name: Build signed release APK
         if: steps.signing.outputs.signed == 'true'
@@ -92,7 +100,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-results
-          path: app/build/reports/tests/
+          path: |
+            app/build/reports/tests/
+            ai/build/reports/tests/
           if-no-files-found: ignore
 
       - name: Remove signing file
