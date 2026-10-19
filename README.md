@@ -103,10 +103,11 @@ git submodule update --init
 2. **已完成**：缓存友好的提示词组装和追加式记忆总结。
 3. **已完成**：沙箱 WebView 里的 HTML 前端卡、群聊、快捷回复，以及 tag 发布时的签名流程。
 4. **已完成**（0.1.1）：更新检查改到本仓库的 GitHub Releases。去掉 AI 翻译、图片/视频生成、收藏页和语音服务。聊天附件里的图片保留。
+5. **已完成**（0.1.2）：导入兼容性报告、模型提供商与连接测试，移除设备工具、内置 Web 服务及通用文档解析。
 
 ## English
 
-PocketTavern-Lite is a lightweight, Android-first roleplay chat app. It tracks RikkaHub 3.0.0 and adds SillyTavern character cards (V2/V3 PNG and JSON, including alternate greetings), lorebooks, presets (`prompts` + `prompt_order`), regex scripts, author's notes, sandboxed HTML front-end cards, quick replies, and basic group chats. Heavy unrelated forks features are intentionally absent. The app id is `io.github.delightedmaster.pockettavern`, version 0.1.1, Firebase is optional, and the license is AGPL-3.0. Build with `git submodule update --init`, `./gradlew :app:assembleDebug`.
+PocketTavern-Lite is a lightweight, Android-first roleplay chat app. It tracks RikkaHub 3.0.0 and adds SillyTavern character cards (V2/V3 PNG and JSON, including alternate greetings), lorebooks, presets (`prompts` + `prompt_order`), regex scripts, author's notes, sandboxed HTML front-end cards, quick replies, and basic group chats. Heavy unrelated forks features are intentionally absent. The app id is `io.github.delightedmaster.pockettavern`, version 0.1.2, Firebase is optional, and the license is AGPL-3.0. Build with `git submodule update --init`, `./gradlew :app:assembleDebug`.
 
 Prompt order is the system prompt, the character card, this chat's memory lorebook, the visible history, then a dynamic tail (keyword-triggered lore, variables, author's note, time, and the current speaker). Triggered entries are not placed before the character card. Every 40 floors the older messages are summarized and only the latest 10 stay visible. Both numbers are on the prompt page under author's note: "Summarize at floors" and "Floors to keep". The summary is appended to this chat's memory lorebook with a `---` floor-range separator and is never rewritten. When that entry grows past the token threshold (default 2000), the same turn folds the older blocks into a versioned recap. The default summary model is the chat model, so the summary request reuses the chat prefix. A separate connection profile runs without the main preset. There is a manual "summarize now" action and an optional review before the summary is saved. Summarized messages are archived by default (hidden, omitted from the prompt, restored in one tap) or deleted when that setting is on.
 

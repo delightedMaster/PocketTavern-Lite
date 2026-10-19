@@ -38,5 +38,5 @@
 
 - `:app:compileDebugKotlin` 通过。
 - `:app:testDebugUnitTest` 的导入报告 / 预设、旧配置、设置持久化、搜索和 Skills 回归检查共 49 项通过，0 失败。
-- Manifest、工作流 YAML / shell 语法、已移除模块的引用与版本号检查通过。版本保持 0.1.1 / 194。
-- 本地通过临时 Gradle init 脚本跳过未改动的工作区 C++ 构建，仅验证 Kotlin 和 JVM 测试；该临时脚本不属于项目改动。本分支尚未构建完整 APK，也未推送。
+- Manifest、工作流 YAML / shell 语法、已移除模块的引用与版本号检查通过。当时验证的版本为 0.1.1 / 194；本轮更新后版本为 0.1.2 / 195。
+- 本地通过临时 Gradle init 脚本跳过未改动的工作区 C++ 构建，仅验证 Kotlin 和 JVM 测试；该临时脚本不属于项目改动。该次本地验证未构建完整 APK；后续提交已推送至 PR #4，由 GitHub Actions 构建。
