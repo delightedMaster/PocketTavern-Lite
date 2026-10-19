@@ -2,13 +2,20 @@
 
 ## 0.1.1
 
+- 更新提示和详情明确显示 PocketTavern-Lite，更新来源继续使用本项目的 GitHub Releases。
+- 修复没有 APK 附件时把发布网页当作安装包下载的问题，改为打开发布页面；尚无正式发布时不显示检查失败。
+- 移除 Android 和网页端残留的模型收藏列表、收藏按钮、拖拽排序及收藏写入接口。
+- 禁用旧备份中残留的图像生成工具、图像输出和 TTS 工具，保留聊天图片输入。
+- 清理已移除功能的运行时依赖注册及消息翻译、收藏修改方法。保留旧数据库表及序列化字段，兼容已有数据。
+- 媒体创作、媒体和图像生成、AI 翻译、语音服务、消息收藏及收藏页面继续保持移除。
+
 Update checks read this repository's GitHub releases and compare the tag with `versionName`. Notification settings can turn the check off, or pause it. The About page, share text, and update download links point at PocketTavern-Lite. RikkaHub stays credited there and in the README. The GitHub Release body for a `v*` tag is the matching section of this file.
 
 Removed from the app:
 
 - AI translation (the translator page, in-chat translate, and translation settings).
 - Image and video generation, including the media-service settings page and the `:mediagen` module. Chat image attachments, for sending pictures to vision models, stay.
-- The Favorites page and the per-message favorite action. Pinning a model in the model list stays.
+- The Favorites page, per-message favorite action, and model favorites in both the Android and browser interfaces.
 - Speech services: text-to-speech, speech recognition, the voice-mode input, and the `:speech` module.
 
 Room keeps the old translation, favorites, generated-media, and media-creation tables so an existing database still opens. The app no longer reads or writes them.

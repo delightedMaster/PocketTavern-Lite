@@ -140,11 +140,6 @@ data class UpdateBuiltInToolRequest(
 )
 
 @Serializable
-data class UpdateFavoriteModelsRequest(
-    val modelIds: List<String>,
-)
-
-@Serializable
 data class WebAuthTokenRequest(
     val password: String,
 )

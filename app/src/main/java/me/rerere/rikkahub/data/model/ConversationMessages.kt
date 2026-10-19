@@ -72,22 +72,10 @@ internal fun Conversation.editMessage(messageId: Uuid, parts: List<UIMessagePart
     return upsertMessage(node.id, edited)
 }
 
-/** 设置消息的翻译，[translation] 为 null 时清除；消息不存在时原样返回 */
-internal fun Conversation.withTranslation(messageId: Uuid, translation: String?): Conversation {
-    val node = getMessageNodeByMessageId(messageId) ?: return this
-    return upsertMessage(node.id, node.messages.first { it.id == messageId }.copy(translation = translation))
-}
-
 /** 切换节点选中的分支，调用方负责校验节点和下标 */
 internal fun Conversation.selectBranch(nodeId: Uuid, selectIndex: Int): Conversation = copy(
     messageNodes = messageNodes.map { node ->
         if (node.id == nodeId) node.copy(selectIndex = selectIndex) else node
-    }
-)
-
-internal fun Conversation.withNodeFavorite(nodeId: Uuid, favorite: Boolean): Conversation = copy(
-    messageNodes = messageNodes.map { node ->
-        if (node.id == nodeId) node.copy(isFavorite = favorite) else node
     }
 )
 

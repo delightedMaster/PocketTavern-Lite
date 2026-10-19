@@ -38,35 +38,36 @@ class UpdateChecker(
 
     private fun checkUpdate(): Flow<UiState<UpdateInfo>> = flow {
         emit(UiState.Loading)
-        emit(
-            UiState.Success(
-                data = try {
-                    val response = client.newCall(
-                        Request.Builder()
-                            .url(RELEASES_URL)
-                            .get()
-                            .addHeader("Accept", "application/vnd.github+json")
-                            .addHeader(
-                                "User-Agent",
-                                "PocketTavern-Lite ${BuildConfig.VERSION_NAME} #${BuildConfig.VERSION_CODE}"
-                            )
-                            .build()
-                    ).await()
-                    if (response.isSuccessful) {
-                        json.decodeFromString<GitHubRelease>(response.body.string()).toUpdateInfo()
-                    } else {
-                        throw Exception("Failed to fetch update info")
-                    }
-                } catch (e: Exception) {
-                    throw Exception("Failed to fetch update info", e)
-                }
-            )
-        )
+        val state = client.newCall(
+            Request.Builder()
+                .url(RELEASES_URL)
+                .get()
+                .addHeader("Accept", "application/vnd.github+json")
+                .addHeader(
+                    "User-Agent",
+                    "PocketTavern-Lite ${BuildConfig.VERSION_NAME} #${BuildConfig.VERSION_CODE}"
+                )
+                .build()
+        ).await().use { response ->
+            when {
+                // GitHub returns 404 when this repository has no published stable release yet.
+                response.code == 404 -> UiState.Idle
+                response.isSuccessful -> UiState.Success(
+                    json.decodeFromString<GitHubRelease>(response.body.string()).toUpdateInfo()
+                )
+                else -> error("PocketTavern-Lite update check failed (HTTP ${response.code})")
+            }
+        }
+        emit(state)
     }.catch {
         emit(UiState.Error(it))
     }.flowOn(Dispatchers.IO)
 
     fun downloadUpdate(context: Context, download: UpdateDownload) {
+        if (!download.isApk) {
+            context.openUrl(download.url)
+            return
+        }
         runCatching {
             val request = DownloadManager.Request(download.url.toUri()).apply {
                 // 设置下载时通知栏的标题和描述
@@ -93,7 +94,7 @@ class UpdateChecker(
 }
 
 @Serializable
-private data class GitHubRelease(
+internal data class GitHubRelease(
     val tag_name: String = "",
     val body: String = "",
     val published_at: String = "",
@@ -102,13 +103,13 @@ private data class GitHubRelease(
 )
 
 @Serializable
-private data class GitHubAsset(
+internal data class GitHubAsset(
     val name: String = "",
     val browser_download_url: String = "",
     val size: Long = 0,
 )
 
-private fun GitHubRelease.toUpdateInfo(): UpdateInfo {
+internal fun GitHubRelease.toUpdateInfo(): UpdateInfo {
     val apkDownloads = assets
         .filter { it.name.endsWith(".apk", ignoreCase = true) && it.browser_download_url.isNotBlank() }
         .map { asset ->
@@ -119,9 +120,9 @@ private fun GitHubRelease.toUpdateInfo(): UpdateInfo {
             )
         }
     val downloads = apkDownloads.ifEmpty {
-        listOf(
+        if (html_url.isBlank()) emptyList() else listOf(
             UpdateDownload(
-                name = "GitHub Release",
+                name = "PocketTavern-Lite · GitHub Release",
                 url = html_url,
                 size = "0",
             )
@@ -140,7 +141,10 @@ data class UpdateDownload(
     val name: String,
     val url: String,
     val size: String
-)
+) {
+    val isApk: Boolean
+        get() = name.endsWith(".apk", ignoreCase = true)
+}
 
 @Serializable
 data class UpdateInfo(
