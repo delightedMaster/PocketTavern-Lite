@@ -1,10 +1,5 @@
 package me.rerere.rikkahub.ui.components.ai
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -52,7 +47,6 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,9 +59,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -85,7 +77,6 @@ import me.rerere.ai.provider.Model
 import me.rerere.ai.provider.ModelAbility
 import me.rerere.ai.provider.ModelType
 import me.rerere.ai.ui.UIMessagePart
-import me.rerere.asr.ASRStatus
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Add01
 import me.rerere.hugeicons.stroke.ArrowUp02
@@ -104,18 +95,11 @@ import me.rerere.rikkahub.ui.components.ai.completion.ChatCompletionItem
 import me.rerere.rikkahub.ui.components.ai.completion.ChatCompletionList
 import me.rerere.rikkahub.ui.components.ai.completion.ChatCompletionProvider
 import me.rerere.rikkahub.ui.components.ui.KeepScreenOn
-import me.rerere.rikkahub.ui.components.ui.permission.PermissionManager
-import me.rerere.rikkahub.ui.components.ui.permission.PermissionRecordAudio
-import me.rerere.rikkahub.ui.components.ui.permission.rememberPermissionState
-import me.rerere.rikkahub.ui.context.LocalASRState
 import me.rerere.rikkahub.ui.context.LocalSettings
 import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.ui.hooks.ChatInputState
-import me.rerere.rikkahub.utils.SoundEffectPlayer
 import org.koin.compose.koinInject
 import kotlin.time.Duration.Companion.seconds
-import me.rerere.rikkahub.ui.pages.chat.VoicePhase
-import me.rerere.rikkahub.ui.pages.chat.VoiceSessionState
 import kotlin.uuid.Uuid
 
 @Composable
@@ -142,9 +126,6 @@ fun ChatInput(
     onBeginEditQueuedMessage: (Uuid) -> QueuedMessage? = { null },
     onFinishEditQueuedMessage: (Uuid, List<UIMessagePart>?) -> Unit = { _, _ -> },
     onResumeMessageQueue: () -> Unit = {},
-    onStartVoiceMode: (() -> Unit)? = null,
-    voiceState: VoiceSessionState = VoiceSessionState(),
-    onStopVoiceMode: () -> Unit = {},
     extraQuickReplyIds: Set<Uuid> = emptySet(),
     onRunQuickReply: (String) -> Unit = {},
     onBindQuickReplies: (() -> Unit)? = null,
@@ -185,37 +166,6 @@ fun ChatInput(
         focusManager.clearFocus(force = true)
         keyboardController?.hide()
         if (loading && state.isEmpty()) onCancelClick() else onLongSendClick()
-    }
-
-    val asr = LocalASRState.current
-    val asrState by asr.state.collectAsState()
-    val hapticFeedback = LocalHapticFeedback.current
-    val soundEffectPlayer: SoundEffectPlayer = koinInject()
-    LaunchedEffect(Unit) {
-        soundEffectPlayer.preload(R.raw.asr_start, R.raw.asr_stop)
-    }
-    val asrPermission = rememberPermissionState(PermissionRecordAudio)
-    PermissionManager(permissionState = asrPermission)
-    var asrBaseText by remember { mutableStateOf("") }
-    LaunchedEffect(asrState.status) {
-        when (asrState.status) {
-            ASRStatus.Listening -> {
-                hapticFeedback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
-                soundEffectPlayer.play(R.raw.asr_start)
-            }
-
-            ASRStatus.Stopping -> {
-                hapticFeedback.performHapticFeedback(HapticFeedbackType.GestureEnd)
-                soundEffectPlayer.play(R.raw.asr_stop)
-            }
-
-            else -> {}
-        }
-    }
-    LaunchedEffect(asrState.errorMessage) {
-        asrState.errorMessage?.takeIf { it.isNotBlank() }?.let { message ->
-            toaster.show(message = message, type = ToastType.Error)
-        }
     }
 
     // 底部渐变遮罩：从输入区顶部一直过渡到屏幕底部（键盘弹出时到键盘上沿），避免消息透到系统导航栏
@@ -301,16 +251,6 @@ fun ChatInput(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    if (voiceState.phase != VoicePhase.Off) {
-                        VoiceModeRow(
-                            state = voiceState,
-                            onStop = onStopVoiceMode,
-                            onRetry = { onStartVoiceMode?.invoke() },
-                        )
-                        androidx.compose.material3.HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                        )
-                    }
                     if (state.messageContent.isNotEmpty()) {
                         MediaFileInputRow(state = state)
                     }
@@ -388,47 +328,16 @@ fun ChatInput(
                             )
                         }
 
-                        if (!voiceState.isActive && (asrState.isAvailable || asrState.isRecording)) {
-                            AsrButton(
-                                state = asrState,
-                                onClick = {
-                                    when (asrState.status) {
-                                        ASRStatus.Listening -> asr.stop()
-                                        ASRStatus.Idle, ASRStatus.Error -> {
-                                            if (!asrPermission.allRequiredPermissionsGranted) {
-                                                asrPermission.requestPermissions()
-                                            } else {
-                                                asrBaseText = state.textContent.text.toString()
-                                                asr.start { transcript ->
-                                                    val spacer =
-                                                        if (asrBaseText.isBlank() || transcript.isBlank()) "" else " "
-                                                    state.setMessageText(asrBaseText + spacer + transcript)
-                                                }
-                                            }
-                                        }
-
-                                        ASRStatus.Connecting, ASRStatus.Stopping -> {}
-                                    }
-                                }
-                            )
-                        }
-
                         if (loading) {
                             KeepScreenOn()
                         }
 
-                        AnimatedVisibility(
-                            visible = !asrState.isRecording,
-                            enter = fadeIn() + scaleIn(),
-                            exit = fadeOut() + scaleOut(),
-                        ) {
-                            SendButton(
-                                loading = loading,
-                                empty = state.isEmpty(),
-                                onClick = { sendMessage() },
-                                onLongClick = { sendMessageWithoutAnswer() },
-                            )
-                        }
+                        SendButton(
+                            loading = loading,
+                            empty = state.isEmpty(),
+                            onClick = { sendMessage() },
+                            onLongClick = { sendMessageWithoutAnswer() },
+                        )
                     }
                 }
             }

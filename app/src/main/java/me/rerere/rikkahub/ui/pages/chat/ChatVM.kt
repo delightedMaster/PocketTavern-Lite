@@ -3,12 +3,9 @@ package me.rerere.rikkahub.ui.pages.chat
 import android.app.Application
 import android.content.Context
 import android.util.Log
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -41,11 +38,8 @@ import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.data.model.Conversation
-import me.rerere.rikkahub.data.model.MessageNode
-import me.rerere.rikkahub.data.model.NodeFavoriteTarget
 import me.rerere.rikkahub.data.model.getAssistantOf
 import me.rerere.rikkahub.data.model.getChatModelOf
-import me.rerere.rikkahub.data.repository.FavoriteRepository
 import me.rerere.rikkahub.service.ChatError
 import me.rerere.rikkahub.service.ChatService
 import me.rerere.rikkahub.ui.hooks.writeStringPreference
@@ -53,7 +47,6 @@ import me.rerere.rikkahub.ui.hooks.ChatInputState
 import me.rerere.rikkahub.utils.UiState
 import me.rerere.rikkahub.utils.UpdateChecker
 import me.rerere.rikkahub.web.ApiException
-import java.util.Locale
 import kotlin.uuid.Uuid
 
 private const val TAG = "ChatVM"
@@ -66,7 +59,6 @@ class ChatVM(
     val updateChecker: UpdateChecker,
     private val analytics: FirebaseAnalytics?,
     private val filesManager: FilesManager,
-    private val favoriteRepository: FavoriteRepository,
 ) : ViewModel() {
     private val _conversationId: Uuid = Uuid.parse(id)
     val conversation: StateFlow<Conversation> = chatService.getConversationFlow(_conversationId)
@@ -80,10 +72,6 @@ class ChatVM(
     private var chatVarOverlay: Map<String, String>? = null
     private var globalVarOverlay: Map<String, String>? = null
     private var messageVarOverlay: Map<String, Map<String, String>>? = null
-
-    val voiceSession = VoiceSessionController(viewModelScope, context::getString) {
-        chatService.enqueueVoiceMessage(_conversationId, it)
-    }
 
     // 异步任务 (从ChatService获取，响应式)
     val conversationJob: StateFlow<Job?> =
@@ -113,7 +101,6 @@ class ChatVM(
     }
 
     override fun onCleared() {
-        voiceSession.stop()
         super.onCleared()
         // 移除对话引用
         chatService.removeConversationReference(_conversationId)
@@ -219,6 +206,7 @@ class ChatVM(
     val updateState = settingsStore.settingsFlow
         .map { settings ->
             !settings.init &&
+                settings.displaySetting.updateCheckEnabled &&
                 settings.displaySetting.updateCheckDisabledUntilEpochMillis <= System.currentTimeMillis()
         }
         .distinctUntilChanged()
@@ -355,19 +343,9 @@ class ChatVM(
         }
     }
 
-    fun translateMessage(message: UIMessage, targetLanguage: Locale) {
-        chatService.translateMessage(_conversationId, message, targetLanguage)
-    }
-
     fun generateTitle(conversation: Conversation, force: Boolean = false) {
         viewModelScope.launch {
             chatService.generateTitle(conversation.id, force)
-        }
-    }
-
-    fun clearTranslationField(messageId: Uuid) {
-        viewModelScope.launch {
-            chatService.clearTranslationField(_conversationId, messageId)
         }
     }
 
@@ -391,26 +369,6 @@ class ChatVM(
     fun updateWorkspaceCwd(workspaceCwd: String?) {
         viewModelScope.launch {
             chatService.updateWorkspaceCwd(_conversationId, workspaceCwd)
-        }
-    }
-
-    fun toggleMessageFavorite(node: MessageNode) {
-        viewModelScope.launch {
-            val currentlyFavorited = favoriteRepository.isNodeFavorited(_conversationId, node.id)
-            if (currentlyFavorited) {
-                favoriteRepository.removeNodeFavorite(_conversationId, node.id)
-            } else {
-                favoriteRepository.addNodeFavorite(
-                    NodeFavoriteTarget(
-                        conversationId = _conversationId,
-                        conversationTitle = conversation.value.title,
-                        nodeId = node.id,
-                        node = node
-                    )
-                )
-            }
-
-            chatService.setNodeFavorite(_conversationId, node.id, favorite = !currentlyFavorited)
         }
     }
 

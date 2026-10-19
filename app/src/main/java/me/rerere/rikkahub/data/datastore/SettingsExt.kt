@@ -2,12 +2,10 @@ package me.rerere.rikkahub.data.datastore
 
 import me.rerere.ai.provider.Model
 import me.rerere.ai.provider.ProviderSetting
-import me.rerere.asr.ASRProviderSetting
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantRegex
 import me.rerere.rikkahub.data.model.AuthorNoteEntry
 import me.rerere.rikkahub.data.model.LEGACY_AUTHOR_NOTE_ENTRY_ID
-import me.rerere.tts.provider.TTSProviderSetting
 import kotlin.uuid.Uuid
 
 /**
@@ -87,20 +85,6 @@ fun Settings.getAssistantById(id: Uuid): Assistant? {
 /** 该助手绑定的快捷消息，顺序跟随全局快捷消息列表。 */
 fun Settings.getQuickMessagesOfAssistant(assistant: Assistant) =
     quickMessages.filter { it.id in assistant.quickMessageIds }
-
-/** 当前选中的 TTS 提供商，选中的 ID 已不存在时回退到第一个。 */
-fun Settings.getSelectedTTSProvider(): TTSProviderSetting? {
-    return selectedTTSProviderId?.let { id ->
-        ttsProviders.find { it.id == id }
-    } ?: ttsProviders.firstOrNull()
-}
-
-/** 当前选中的 ASR 提供商，未选择或选中的 ID 已不存在时回退到第一个。 */
-fun Settings.getSelectedASRProvider(): ASRProviderSetting? {
-    return selectedASRProviderId?.let { id ->
-        asrProviders.find { it.id == id }
-    } ?: asrProviders.firstOrNull()
-}
 
 /**
  * 查找模型实际使用的提供商配置。

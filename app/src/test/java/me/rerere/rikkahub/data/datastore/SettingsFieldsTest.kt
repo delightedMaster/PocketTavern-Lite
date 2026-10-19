@@ -7,8 +7,6 @@ import kotlinx.serialization.descriptors.elementNames
 import me.rerere.ai.core.MessageRole
 import me.rerere.ai.core.ReasoningLevel
 import me.rerere.ai.provider.ProviderSetting
-import me.rerere.asr.ASRProviderSetting
-import me.rerere.mediagen.provider.MediaGenerationProviderSetting
 import me.rerere.rikkahub.data.ai.mcp.McpServerConfig
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantAffectScope
@@ -63,7 +61,6 @@ class SettingsFieldsTest {
         assertEquals(STORED_KEYS, stored.keys)
         assertEquals(false, stored["dynamic_color"])
         assertEquals(9090, stored["web_server_port"])
-        assertEquals(1.5f, stored["default_tts_playback_speed"])
         assertEquals("title", stored["title_prompt"])
         assertEquals("00000000-0000-0000-0000-000000000001", stored["chat_model"])
         assertEquals("LOW", stored["fast_model_reasoning_level"])
@@ -77,11 +74,8 @@ class SettingsFieldsTest {
 
         assertEquals(DEFAULT_AUTO_MODEL_ID, settings.chatModelId)
         assertEquals(DEFAULT_AUTO_MODEL_ID, settings.fastModelId)
-        assertEquals(DEFAULT_AUTO_MODEL_ID, settings.translateModeId)
         assertEquals(DEFAULT_MODE_INJECTIONS, settings.modeInjections)
         assertEquals(DEFAULT_ASSISTANT_ID, settings.assistantId)
-        assertEquals(DEFAULT_SYSTEM_TTS_ID, settings.selectedTTSProviderId)
-        assertEquals(null, settings.selectedASRProviderId)
         assertEquals(true, settings.dynamicColor)
         assertEquals(8080, settings.webServerPort)
     }
@@ -94,13 +88,13 @@ class SettingsFieldsTest {
     }
 
     @Test
-    fun `clearing the asr provider removes its key`() {
+    fun `clearing the active persona removes its key`() {
         val preferences = mutablePreferencesOf().apply { putSettings(SAMPLE) }
 
-        preferences.putSettings(SAMPLE.copy(selectedASRProviderId = null), persisted = SAMPLE)
+        preferences.putSettings(SAMPLE.copy(activePersonaId = null), persisted = SAMPLE)
 
-        assertFalse(SettingsStore.SELECTED_ASR_PROVIDER in preferences)
-        assertEquals(null, preferences.toSettings().selectedASRProviderId)
+        assertFalse(SettingsStore.ACTIVE_PERSONA_ID in preferences)
+        assertEquals(null, preferences.toSettings().activePersonaId)
     }
 
     @Test
@@ -130,13 +124,8 @@ private val SAMPLE = Settings(
     chatModelId = id(1),
     fastModelId = id(2),
     fastModelReasoningLevel = ReasoningLevel.LOW,
-    imageGenerationModelId = id(3),
     enableAutoTitle = false,
     titlePrompt = "title",
-    translateModeId = id(4),
-    translatePrompt = "translate",
-    translateThinkingBudget = 1024,
-    translateTargetLanguage = "ja",
     enableSuggestion = false,
     suggestionPrompt = "suggestion",
     ocrModelId = id(5),
@@ -154,13 +143,6 @@ private val SAMPLE = Settings(
     mcpServers = listOf(McpServerConfig.SseTransportServer(id = id(8), url = "https://example.com/sse")),
     webDavConfig = WebDavConfig(url = "https://dav.example.com"),
     s3Config = S3Config(bucket = "backup"),
-    uploadS3Config = S3Config(bucket = "upload"),
-    mediaGenerationProviders = listOf(MediaGenerationProviderSetting.OpenAI(id = id(9))),
-    ttsProviders = DEFAULT_TTS_PROVIDERS.take(1),
-    selectedTTSProviderId = id(10),
-    defaultTTSPlaybackSpeed = 1.5f,
-    asrProviders = listOf(ASRProviderSetting.OpenAIRealtime(id = id(11))),
-    selectedASRProviderId = id(11),
     modeInjections = listOf(PromptInjection.ModeInjection(id = id(14), name = "mode")),
     lorebooks = listOf(Lorebook(id = id(12), name = "lorebook")),
     regexGroups = listOf(
@@ -210,7 +192,6 @@ private val SAMPLE = Settings(
     webServerAccessPassword = "secret",
     webServerLocalhostOnly = true,
     backupReminderConfig = BackupReminderConfig(enabled = true),
-    sponsorAlertDismissedAt = 7,
 )
 
 private val STORED_KEYS = setOf(
@@ -224,14 +205,9 @@ private val STORED_KEYS = setOf(
     "chat_model",
     "fast_model",
     "fast_model_reasoning_level",
-    "translate_model",
     "enable_suggestion",
     "enable_auto_title",
-    "image_generation_model",
     "title_prompt",
-    "translation_prompt",
-    "translate_thinking_budget",
-    "translate_target_language",
     "suggestion_prompt",
     "ocr_model",
     "ocr_prompt",
@@ -245,13 +221,6 @@ private val STORED_KEYS = setOf(
     "mcp_servers",
     "webdav_config",
     "s3_config",
-    "upload_s3_config",
-    "media_generation_providers",
-    "tts_providers",
-    "selected_tts_provider",
-    "default_tts_playback_speed",
-    "asr_providers",
-    "selected_asr_provider",
     "web_server_enabled",
     "web_server_port",
     "web_server_jwt_enabled",
@@ -294,5 +263,4 @@ private val STORED_KEYS = setOf(
     "macro_chat_variables",
     "group_chats",
     "backup_reminder_config",
-    "sponsor_alert_dismissed_at",
 )

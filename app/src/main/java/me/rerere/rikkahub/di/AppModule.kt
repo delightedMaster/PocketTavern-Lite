@@ -11,7 +11,6 @@ import me.rerere.rikkahub.data.ai.tools.ChatToolFactory
 import me.rerere.rikkahub.data.event.AppEventBus
 import me.rerere.rikkahub.service.ChatNotificationManager
 import me.rerere.rikkahub.service.ChatService
-import me.rerere.rikkahub.service.MediaCreationService
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceTerminalSessionManager
 import me.rerere.rikkahub.utils.EmojiData
 import me.rerere.rikkahub.utils.EmojiUtils
@@ -19,7 +18,6 @@ import me.rerere.rikkahub.utils.JsonInstant
 import me.rerere.rikkahub.utils.SoundEffectPlayer
 import me.rerere.rikkahub.utils.UpdateChecker
 import me.rerere.rikkahub.web.WebServerManager
-import me.rerere.tts.provider.TTSManager
 import org.koin.dsl.module
 
 val appModule = module {
@@ -30,7 +28,7 @@ val appModule = module {
     }
 
     single {
-        LocalTools(get(), get(), get(), get())
+        LocalTools(get(), get())
     }
 
     single {
@@ -46,10 +44,6 @@ val appModule = module {
 
     single<EmojiData> {
         EmojiUtils.loadEmoji(get())
-    }
-
-    single {
-        TTSManager(get())
     }
 
     if (me.rerere.rikkahub.BuildConfig.ENABLE_FIREBASE) {
@@ -113,23 +107,10 @@ val appModule = module {
             conversationRepo = get(),
             requestFactory = get(),
             memoryConsolidationScheduler = get(),
-            translationHandler = get(),
             metaGenerator = get(),
             mcpManager = get(),
             filesManager = get(),
             folderRepository = get()
-        )
-    }
-
-    single {
-        MediaCreationService(
-            context = get(),
-            appScope = get(),
-            settingsStore = get(),
-            repository = get(),
-            manager = get(),
-            remoteFileStore = get(),
-            okHttpClient = get(),
         )
     }
 

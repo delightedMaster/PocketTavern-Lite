@@ -21,7 +21,8 @@ import me.rerere.rikkahub.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-private const val API_URL = "https://updates.rikka-ai.com/"
+private const val RELEASES_URL =
+    "https://api.github.com/repos/delightedMaster/PocketTavern-Lite/releases/latest"
 
 class UpdateChecker(
     private val client: OkHttpClient,
@@ -42,16 +43,17 @@ class UpdateChecker(
                 data = try {
                     val response = client.newCall(
                         Request.Builder()
-                            .url(API_URL)
+                            .url(RELEASES_URL)
                             .get()
+                            .addHeader("Accept", "application/vnd.github+json")
                             .addHeader(
                                 "User-Agent",
-                                "RikkaHub ${BuildConfig.VERSION_NAME} #${BuildConfig.VERSION_CODE}"
+                                "PocketTavern-Lite ${BuildConfig.VERSION_NAME} #${BuildConfig.VERSION_CODE}"
                             )
                             .build()
                     ).await()
                     if (response.isSuccessful) {
-                        json.decodeFromString<UpdateInfo>(response.body.string())
+                        json.decodeFromString<GitHubRelease>(response.body.string()).toUpdateInfo()
                     } else {
                         throw Exception("Failed to fetch update info")
                     }
@@ -88,6 +90,49 @@ class UpdateChecker(
             context.openUrl(download.url) // 跳转到下载页面
         }
     }
+}
+
+@Serializable
+private data class GitHubRelease(
+    val tag_name: String = "",
+    val body: String = "",
+    val published_at: String = "",
+    val html_url: String = "",
+    val assets: List<GitHubAsset> = emptyList(),
+)
+
+@Serializable
+private data class GitHubAsset(
+    val name: String = "",
+    val browser_download_url: String = "",
+    val size: Long = 0,
+)
+
+private fun GitHubRelease.toUpdateInfo(): UpdateInfo {
+    val apkDownloads = assets
+        .filter { it.name.endsWith(".apk", ignoreCase = true) && it.browser_download_url.isNotBlank() }
+        .map { asset ->
+            UpdateDownload(
+                name = asset.name,
+                url = asset.browser_download_url,
+                size = asset.size.toString(),
+            )
+        }
+    val downloads = apkDownloads.ifEmpty {
+        listOf(
+            UpdateDownload(
+                name = "GitHub Release",
+                url = html_url,
+                size = "0",
+            )
+        )
+    }
+    return UpdateInfo(
+        version = tag_name.removePrefix("v").removePrefix("V"),
+        publishedAt = published_at,
+        changelog = body,
+        downloads = downloads,
+    )
 }
 
 @Serializable

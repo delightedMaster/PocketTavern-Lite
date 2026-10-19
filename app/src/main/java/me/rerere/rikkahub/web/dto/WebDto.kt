@@ -231,7 +231,6 @@ data class MessageDto(
     val modelSnapshot: ModelSnapshot? = null,
     val usage: TokenUsage? = null,
     val generationTimeMs: Long? = null,
-    val translation: String? = null,
     val isContextCheckpoint: Boolean = false,
 )
 
@@ -374,6 +373,5 @@ fun UIMessage.toDto() = MessageDto(
     modelSnapshot = modelSnapshot,
     usage = usage,
     generationTimeMs = generationTimeMs,
-    translation = translation,
     isContextCheckpoint = isContextCheckpoint,
 )
