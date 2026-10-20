@@ -55,21 +55,7 @@ jobs:
           fi
 
       - name: Run regression tests
-        run: |
-          bash ./gradlew :app:testDebugUnitTest \
-            --tests 'me.rerere.rikkahub.utils.VersionTest' \
-            --tests 'me.rerere.rikkahub.utils.UpdateReleaseTest' \
-            --tests 'me.rerere.rikkahub.data.export.*' \
-            --tests 'me.rerere.rikkahub.data.datastore.RemovedCapabilitiesTest' \
-            --tests 'me.rerere.rikkahub.data.datastore.SettingsFieldsTest' \
-            --tests 'me.rerere.rikkahub.data.datastore.SettingsStoreTest' \
-            --tests 'me.rerere.rikkahub.data.datastore.DefaultProvidersTest' \
-            --tests 'me.rerere.rikkahub.data.datastore.RetiredProvidersTest' \
-            --tests 'me.rerere.rikkahub.data.datastore.AssistantDefaultsTest' \
-            --tests 'me.rerere.rikkahub.data.ai.VertexServiceAccountCredentialsTest' \
-            --tests 'me.rerere.rikkahub.data.ai.tools.ExternalWebSearchTest' \
-            --tests 'me.rerere.rikkahub.data.ai.tools.SkillsToolsTest' \
-            --tests 'me.rerere.rikkahub.data.model.ConversationMessagesTest'
+        run: bash ./gradlew :app:testDebugUnitTest
 
       - name: Test provider diagnostics
         run: |
