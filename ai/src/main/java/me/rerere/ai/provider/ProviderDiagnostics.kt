@@ -3,9 +3,12 @@ package me.rerere.ai.provider
 import kotlinx.coroutines.withTimeout
 import me.rerere.ai.core.ReasoningLevel
 import me.rerere.ai.core.Tool
+import me.rerere.ai.provider.providers.openai.isCommandCode
+import me.rerere.ai.provider.providers.openai.isOpenCodeGo
 import me.rerere.ai.ui.StreamChunk
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.ui.UIMessagePart
+import kotlin.uuid.Uuid
 
 /** Runs actual provider requests without creating a conversation or executing returned tools. */
 class ProviderDiagnostics<T : ProviderSetting>(
@@ -13,6 +16,8 @@ class ProviderDiagnostics<T : ProviderSetting>(
     private val setting: T,
     private val timeoutMillis: Long = 90_000,
 ) {
+    private val sessionId = Uuid.random().toString()
+
     suspend fun listModels(): List<Model> = withTimeout(timeoutMillis) {
         provider.listModels(setting)
     }
@@ -68,7 +73,7 @@ class ProviderDiagnostics<T : ProviderSetting>(
         customHeaders = customHeaders,
         customBody = customBodies,
         reasoningLevel = ReasoningLevel.AUTO,
-        sessionId = null,
+        sessionId = sessionId,
     )
 
     private fun UIMessage.text() = parts.filterIsInstance<UIMessagePart.Text>().joinToString("") { it.text }
@@ -76,7 +81,11 @@ class ProviderDiagnostics<T : ProviderSetting>(
 
 val ProviderSetting.textApiLabel: String
     get() = when (this) {
-        is ProviderSetting.OpenAI -> if (useResponseApi) "OpenAI Responses" else "OpenAI Chat Completions"
+        is ProviderSetting.OpenAI -> when {
+            isOpenCodeGo || isCommandCode -> "按模型选择 Chat Completions / Responses / Messages"
+            useResponseApi -> "OpenAI Responses"
+            else -> "OpenAI Chat Completions"
+        }
         is ProviderSetting.Claude -> "Anthropic Messages"
         is ProviderSetting.Google -> when {
             vertexAI -> "Vertex AI generateContent"

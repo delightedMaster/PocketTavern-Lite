@@ -55,23 +55,14 @@ jobs:
           fi
 
       - name: Run regression tests
-        run: |
-          bash ./gradlew :app:testDebugUnitTest \
-            --tests 'me.rerere.rikkahub.utils.VersionTest' \
-            --tests 'me.rerere.rikkahub.utils.UpdateReleaseTest' \
-            --tests 'me.rerere.rikkahub.data.export.*' \
-            --tests 'me.rerere.rikkahub.data.datastore.RemovedCapabilitiesTest' \
-            --tests 'me.rerere.rikkahub.data.datastore.SettingsFieldsTest' \
-            --tests 'me.rerere.rikkahub.data.datastore.SettingsStoreTest' \
-            --tests 'me.rerere.rikkahub.data.datastore.DefaultProvidersTest' \
-            --tests 'me.rerere.rikkahub.data.ai.tools.ExternalWebSearchTest' \
-            --tests 'me.rerere.rikkahub.data.ai.tools.SkillsToolsTest' \
-            --tests 'me.rerere.rikkahub.data.model.ConversationMessagesTest'
+        run: bash ./gradlew :app:testDebugUnitTest
 
       - name: Test provider diagnostics
         run: |
           bash ./gradlew :ai:testDebugUnitTest \
             --tests 'me.rerere.ai.provider.ProviderDiagnosticsTest' \
+            --tests 'me.rerere.ai.provider.providers.openai.HostedModelApiTest' \
+            --tests 'me.rerere.ai.util.RequestHeadersTest' \
             --tests 'me.rerere.ai.provider.stream.StreamTraceReplayTest' \
             --tests 'me.rerere.ai.provider.providers.google.InteractionsApiTest'
 

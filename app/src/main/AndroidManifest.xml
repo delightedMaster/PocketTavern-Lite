@@ -86,6 +86,11 @@
       </intent-filter>
     </activity>
     <activity
+      android:name="com.journeyapps.barcodescanner.CaptureActivity"
+      android:exported="false"
+      android:screenOrientation="fullSensor"
+      tools:replace="android:screenOrientation" />
+    <activity
       android:name="com.yalantis.ucrop.UCropActivity"
       android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
 
@@ -106,16 +111,6 @@
       <meta-data
         android:name="android.support.FILE_PROVIDER_PATHS"
         android:resource="@xml/file_paths" />
-    </provider>
-    <provider
-      android:name=".service.WorkspaceDocumentsProvider"
-      android:authorities="${applicationId}.documents"
-      android:exported="true"
-      android:grantUriPermissions="true"
-      android:permission="android.permission.MANAGE_DOCUMENTS">
-      <intent-filter>
-        <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
-      </intent-filter>
     </provider>
     <provider
       android:name="androidx.startup.InitializationProvider"

@@ -97,9 +97,11 @@ import me.rerere.hugeicons.stroke.MagicWand01
 import me.rerere.hugeicons.stroke.Share03
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.export.LorebookSerializer
-import me.rerere.rikkahub.data.export.SillyTavernRegexImporter
-import me.rerere.rikkahub.data.model.RegexGroup
-import me.rerere.rikkahub.data.model.RegexGroupSource
+import me.rerere.rikkahub.data.export.LorebookImport
+import me.rerere.rikkahub.data.model.LorebookKind
+import kotlinx.coroutines.CancellationException
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import me.rerere.rikkahub.data.export.ModeInjectionSerializer
 import me.rerere.rikkahub.ui.hooks.rememberExporter
 import me.rerere.rikkahub.ui.hooks.rememberImporter
@@ -188,11 +190,8 @@ fun PromptPage(vm: PromptVM = koinViewModel()) {
 
                     PromptTab.LOREBOOKS -> LorebookTab(
                         lorebooks = settings.lorebooks,
-                        regexGroups = settings.regexGroups,
                         onUpdate = { vm.updateSettings { latest -> latest.copy(lorebooks = it) } },
-                        onRegexGroups = { groups ->
-                            vm.updateSettings { latest -> latest.copy(regexGroups = groups) }
-                        },
+                        onImport = vm::importLorebook,
                     )
 
                     PromptTab.AUTHOR_NOTE -> AuthorNoteTab(
@@ -634,14 +633,12 @@ private fun getRoleLabel(role: MessageRole): String = when (role) {
 @Composable
 private fun LorebookTab(
     lorebooks: List<Lorebook>,
-    regexGroups: List<RegexGroup>,
     onUpdate: (List<Lorebook>) -> Unit,
-    onRegexGroups: (List<RegexGroup>) -> Unit,
+    onImport: suspend (LorebookImport) -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(true) }
     val lazyListState = rememberLazyListState()
     val toaster = LocalToaster.current
-    val currentLorebooks by rememberUpdatedState(lorebooks)
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
         val newList = lorebooks.toMutableList()
         val item = newList.removeAt(from.index)
@@ -658,45 +655,24 @@ private fun LorebookTab(
     }
     val importSuccessMsg = stringResource(R.string.export_import_success)
     val importFailedMsg = stringResource(R.string.export_import_failed)
-    val presetFolderName = stringResource(R.string.tavern_regex_preset_folder)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val currentGroups by rememberUpdatedState(regexGroups)
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching {
+            try {
+                val imported = withContext(Dispatchers.IO) {
                     val json = LorebookSerializer.readUri(context, uri)
                     val fileName = LorebookSerializer.getUriFileName(context, uri)?.removeSuffix(".json")
-                    val book = LorebookSerializer.importFromJson(json, fileName)
-                    val regexes = SillyTavernRegexImporter.parseFromPreset(json)
-                    Triple(book, (fileName?.takeIf { it.isNotBlank() } ?: book.name) to regexes,
-                        ImportCompatibility.inspect(ImportKind.LOREBOOK, json, book.entries.size))
+                    LorebookImport.parse(json, fileName)
                 }
-            }
-            result.onSuccess { (book, namedRegexes, report) ->
-                onUpdate(currentLorebooks + book)
-                val (rawName, regexes) = namedRegexes
-                if (regexes.isNotEmpty()) {
-                    val name = rawName.ifBlank { presetFolderName }
-                    val existing = currentGroups.firstOrNull {
-                        it.source == RegexGroupSource.PRESET && it.name == name
-                    }
-                    val groups = if (existing != null) {
-                        currentGroups.map { if (it.id == existing.id) it.copy(regexes = regexes) else it }
-                    } else {
-                        currentGroups + RegexGroup(
-                            name = name,
-                            source = RegexGroupSource.PRESET,
-                            regexes = regexes,
-                        )
-                    }
-                    onRegexGroups(groups)
-                }
+                // One persisted settings update: a preset cannot succeed without saving its regexes.
+                onImport(imported)
                 toaster.show(importSuccessMsg)
-                ImportReportState.show(report)
-            }.onFailure { error ->
+                ImportReportState.show(imported.report)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
                 toaster.show(importFailedMsg.format(error.message))
                 ImportReportState.show(ImportCompatibility.failure(ImportKind.LOREBOOK, error.message))
             }
@@ -938,7 +914,7 @@ private fun LorebookEditSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = stringResource(R.string.prompt_page_edit_lorebook),
+                text = stringResource(if (book.kind == LorebookKind.PRESET) R.string.prompt_page_edit_preset else R.string.prompt_page_edit_lorebook),
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
@@ -996,6 +972,11 @@ private fun LorebookEditSheet(
                             entry = entry,
                             shape = cardGroupItemShape(index, book.entries.size),
                             onEdit = { entryEditState.open(entry) },
+                            onEnabledChange = { enabled ->
+                                onEdit(book.copy(entries = book.entries.map {
+                                    if (it.id == entry.id) it.copy(enabled = enabled) else it
+                                }))
+                            },
                             onDelete = {
                                 onEdit(book.copy(entries = book.entries - entry))
                             }
@@ -1035,6 +1016,7 @@ private fun RegexInjectionEntryCard(
     entry: PromptInjection.RegexInjection,
     shape: Shape,
     onEdit: () -> Unit,
+    onEnabledChange: (Boolean) -> Unit,
     onDelete: () -> Unit
 ) {
     Surface(
@@ -1069,12 +1051,16 @@ private fun RegexInjectionEntryCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                if (!entry.enabled) {
-                    Tag(type = TagType.WARNING) {
-                        Text(stringResource(R.string.prompt_page_disabled))
-                    }
-                }
             }
+            val enabledLabel = stringResource(
+                R.string.prompt_page_entry_enable,
+                entry.name.ifBlank { stringResource(R.string.prompt_page_unnamed_entry) },
+            )
+            Switch(
+                checked = entry.enabled,
+                onCheckedChange = onEnabledChange,
+                modifier = Modifier.semantics { contentDescription = enabledLabel },
+            )
             ItemActionMenu(
                 actions = listOf(
                     ItemAction(

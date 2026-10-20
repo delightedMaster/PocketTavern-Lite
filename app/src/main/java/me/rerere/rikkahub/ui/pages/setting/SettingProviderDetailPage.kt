@@ -134,7 +134,7 @@ import me.rerere.rikkahub.ui.hooks.useEditState
 import me.rerere.rikkahub.ui.pages.assistant.detail.CustomBodies
 import me.rerere.rikkahub.ui.pages.assistant.detail.CustomHeaders
 import me.rerere.rikkahub.ui.pages.setting.components.ProviderConfigure
-import me.rerere.rikkahub.ui.pages.setting.components.ProviderConnectionTester
+import me.rerere.rikkahub.ui.pages.setting.components.ProviderConnectionTestDialog
 import me.rerere.rikkahub.ui.pages.setting.components.SettingProviderBalanceOption
 import me.rerere.rikkahub.ui.theme.CustomColors
 import me.rerere.rikkahub.ui.theme.extendColors
@@ -295,6 +295,15 @@ private fun SettingProviderConfigPage(
     var internalProvider by remember(provider) { mutableStateOf(provider) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var expanded by rememberSaveable { mutableStateOf(true) }
+    var showConnectionTest by rememberSaveable { mutableStateOf(false) }
+
+    // Keep the dialog outside the toolbar: IME visibility removes toolbar content.
+    if (showConnectionTest) {
+        ProviderConnectionTestDialog(
+            internalProvider = internalProvider,
+            onDismissRequest = { showConnectionTest = false },
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -356,9 +365,10 @@ private fun SettingProviderConfigPage(
                 expanded = expanded,
                 colors = CustomColors.floatingToolbarColors,
                 leadingContent = {
-                    ProviderConnectionTester(
-                        internalProvider = internalProvider,
-                    )
+                    TextButton(onClick = { showConnectionTest = true }) {
+                        Icon(HugeIcons.Connect, contentDescription = null)
+                        Text("测试连接")
+                    }
 
                     if (!internalProvider.builtIn) {
                         IconButton(

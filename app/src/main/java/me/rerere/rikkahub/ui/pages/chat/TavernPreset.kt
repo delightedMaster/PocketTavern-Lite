@@ -36,7 +36,7 @@ fun assistantToPresetJson(assistant: Assistant): JsonObject = buildJsonObject {
     put(
         "settings",
         buildJsonObject {
-            put("max_context", JsonPrimitive(assistant.contextMessageLimit.takeIf { it > 0 } ?: 2000000))
+            put("max_context", JsonPrimitive(assistant.contextTokenLimit ?: 2000000))
             put("max_completion_tokens", JsonPrimitive(assistant.maxTokens ?: 300))
             put("reply_count", JsonPrimitive(1))
             put("should_stream", JsonPrimitive(assistant.streamOutput))
@@ -105,7 +105,8 @@ fun applyPresetToAssistant(assistant: Assistant, preset: JsonObject): Assistant 
         temperature = settingsObj?.num("temperature")?.toFloat() ?: assistant.temperature,
         topP = settingsObj?.num("top_p")?.toFloat() ?: assistant.topP,
         topK = settingsObj?.int("top_k") ?: assistant.topK,
-        maxTokens = settingsObj?.int("max_completion_tokens") ?: assistant.maxTokens,
+        maxTokens = settingsObj?.int("max_completion_tokens")?.takeIf { it > 0 } ?: assistant.maxTokens,
+        contextTokenLimit = settingsObj?.int("max_context")?.takeIf { it > 0 } ?: assistant.contextTokenLimit,
         streamOutput = settingsObj?.bool("should_stream") ?: assistant.streamOutput,
         enableWebSearch = settingsObj?.bool("enable_web_search") ?: assistant.enableWebSearch,
         presetMessages = if (contentPrompts.isNotEmpty()) messages else assistant.presetMessages,

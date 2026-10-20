@@ -18,7 +18,14 @@ import kotlin.uuid.Uuid
  * 模式注入和 Lorebook 同样随会话固定，沿用 [Conversation.modeInjectionIds] 与 [Conversation.lorebookIds]。
  */
 @Serializable
+data class GenerationLimits(
+    val contextTokens: Int? = null,
+    val maxReplyTokens: Int? = null,
+)
+
+@Serializable
 data class ConversationConfig(
+    val generationLimits: GenerationLimits? = null,
     val chatModelId: Uuid? = null,
     val reasoningLevel: ReasoningLevel = ReasoningLevel.AUTO,
     val enableWebSearch: Boolean = false,
@@ -36,6 +43,7 @@ data class ConversationConfig(
 
 // 内置搜索是模型的开关，不在助手上，由调用方另行填入
 private fun Assistant.toConversationConfig() = ConversationConfig(
+    generationLimits = GenerationLimits(contextTokenLimit, maxTokens),
     chatModelId = chatModelId,
     reasoningLevel = reasoningLevel,
     enableWebSearch = enableWebSearch,
@@ -45,6 +53,8 @@ private fun Assistant.toConversationConfig() = ConversationConfig(
 )
 
 private fun Assistant.withConversationConfig(config: ConversationConfig) = copy(
+    contextTokenLimit = if (config.generationLimits != null) config.generationLimits.contextTokens else contextTokenLimit,
+    maxTokens = if (config.generationLimits != null) config.generationLimits.maxReplyTokens else maxTokens,
     chatModelId = config.chatModelId,
     reasoningLevel = config.reasoningLevel,
     enableWebSearch = config.enableWebSearch,

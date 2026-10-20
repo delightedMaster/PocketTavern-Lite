@@ -22,13 +22,11 @@ import me.rerere.rikkahub.data.ai.group.toGroupMember
 import me.rerere.rikkahub.data.ai.tools.ChatToolFactory
 import me.rerere.rikkahub.data.ai.transformers.Base64ImageToLocalFileTransformer
 import me.rerere.rikkahub.data.ai.transformers.InputMessageTransformer
-import me.rerere.rikkahub.data.ai.transformers.OcrTransformer
 import me.rerere.rikkahub.data.ai.transformers.OutputMessageTransformer
 import me.rerere.rikkahub.data.ai.transformers.PlaceholderTransformer
 import me.rerere.rikkahub.data.ai.transformers.RegexOutputTransformer
 import me.rerere.rikkahub.data.ai.transformers.TemplateTransformer
 import me.rerere.rikkahub.data.ai.transformers.ThinkTagTransformer
-import me.rerere.rikkahub.data.ai.transformers.WorkspaceReminderTransformer
 import me.rerere.rikkahub.data.ai.transformers.onGenerationFinish
 import me.rerere.rikkahub.data.ai.transformers.transformThinkTags
 import me.rerere.rikkahub.data.ai.transformers.transforms
@@ -42,7 +40,6 @@ import me.rerere.rikkahub.data.model.MemoryFile
 import me.rerere.rikkahub.data.model.getAssistantOf
 import me.rerere.rikkahub.data.model.getChatModelOf
 import me.rerere.rikkahub.data.repository.MemoryRepository
-import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.data.repository.memoryId
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -64,7 +61,6 @@ class ChatTurnContext(
     val conversationSystemPrompt: String?,
     val conversationModeInjectionIds: Set<Uuid>,
     val conversationLorebookIds: Set<Uuid>,
-    val workspaceCwd: String?,
     val memories: List<MemoryFile>,
     val tools: List<Tool>,
     var promptState: me.rerere.rikkahub.data.ai.assembly.PromptCacheState,
@@ -81,13 +77,10 @@ class ChatRequestFactory(
     private val chatToolFactory: ChatToolFactory,
     private val memoryRepository: MemoryRepository,
     templateTransformer: TemplateTransformer,
-    workspaceRepository: WorkspaceRepository,
 ) {
     private val inputTransformers: List<InputMessageTransformer> = listOf(
         PlaceholderTransformer,
-        OcrTransformer,
         templateTransformer,
-        WorkspaceReminderTransformer(workspaceRepository),
     )
 
     private val outputTransformers: List<OutputMessageTransformer> = listOf(
@@ -119,13 +112,11 @@ class ChatRequestFactory(
             conversationSystemPrompt = conversation.customSystemPrompt,
             conversationModeInjectionIds = conversation.modeInjectionIds,
             conversationLorebookIds = conversation.lorebookIds,
-            workspaceCwd = conversation.workspaceCwd,
             memories = if (assistant.enableMemory) memoryRepository.getFiles(assistant.memoryId) else emptyList(),
             tools = chatToolFactory.createTools(
                 settings = settings,
                 assistant = assistant,
                 model = model,
-                workspaceCwd = conversation.workspaceCwd,
             ),
             promptState = conversation.promptState,
             groupCards = if (members.isEmpty()) emptyList() else groupCardLines(members),
@@ -136,7 +127,7 @@ class ChatRequestFactory(
 
     /**
      * 本轮交给 runAgent 的请求和钩子。[messages] 的最后一条是助手消息时从它继续，否则新建一条助手消息。
-     * [processingStatus] 用来显示 OCR 这类输入转换的进度。
+     * [processingStatus] 用来显示输入转换的进度。
      */
     fun createAgent(
         turn: ChatTurnContext,
@@ -212,7 +203,7 @@ class ChatRequestFactory(
         messages: List<UIMessage>,
         compressPrompt: String,
     ): String {
-        val (requestMessages, params) = buildStep(turn, messages)
+        val (requestMessages, params) = buildStep(turn, messages, compressionPrompt = compressPrompt)
         // 压缩指令不经过输入转换器，模板转换器会把其中的花括号当成模板语法
         val result = withRetry(
             policy = turn.settings.retryPolicy(),
@@ -273,13 +264,14 @@ class ChatRequestFactory(
         turn: ChatTurnContext,
         messages: List<UIMessage>,
         processingStatus: MutableStateFlow<String?> = MutableStateFlow(null),
+        compressionPrompt: String? = null,
     ): StepRequest {
         val assistant = turn.assistant
         val chatUserMessageCount = messages.count { it.role == MessageRole.USER }
         val chatMessageCount = messages.size
         val previousRequest = turn.promptState.lastFullRequest
         val layered = turn.layeredPrompt(messages)
-        val requestMessages = layered.messages.transforms(
+        val expandedMessages = layered.messages.transforms(
             transformers = inputTransformers,
             context = context,
             model = turn.model,
@@ -289,9 +281,21 @@ class ChatRequestFactory(
             conversationModeInjectionIds = turn.conversationModeInjectionIds,
             conversationLorebookIds = turn.conversationLorebookIds,
             processingStatus = processingStatus,
-            workspaceCwd = turn.workspaceCwd,
             chatUserMessageCount = chatUserMessageCount,
             chatMessageCount = chatMessageCount,
+        )
+        val limit = assistant.contextTokenLimit ?: turn.model.contextLength.takeIf { it > 0 }
+        val toolTokens = if (limit == null) 0 else turn.tools.sumOf {
+            me.rerere.rikkahub.data.ai.transformers.estimateTokens(
+                it.name + it.description + it.parameters().toString()
+            ) + 12
+        }
+        val requestMessages = fitContextTokenBudget(
+            expandedMessages,
+            limit,
+            if (compressionPrompt == null) assistant.maxTokens else null,
+            toolTokens + (compressionPrompt?.let { me.rerere.rikkahub.data.ai.transformers.estimateTokens(it) + 8 } ?: 0),
+            allowHistoryTrim = compressionPrompt == null,
         )
         val texts = requestMessages.map { it.toText() }
         val diverge = me.rerere.rikkahub.data.ai.assembly.firstDivergence(previousRequest, texts)

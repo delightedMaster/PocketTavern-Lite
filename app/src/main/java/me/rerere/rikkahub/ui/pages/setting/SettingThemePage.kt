@@ -325,7 +325,7 @@ private fun CustomThemeItem(
             .padding(horizontal = 8.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable { onSelect() },
-        headlineContent = { Text(theme.name.ifEmpty { "Unnamed" }) },
+        headlineContent = { Text(theme.name.ifEmpty { stringResource(R.string.setting_theme_page_unnamed) }) },
         leadingContent = {
             Box(contentAlignment = Alignment.Center) {
                 Canvas(
@@ -640,7 +640,7 @@ private fun ColorPickerRow(
             singleLine = true,
             isError = hslCodeError,
             supportingText = if (hslCodeError) {
-                { Text("Use hsl(267 36% 48%)") }
+                { Text(stringResource(R.string.setting_theme_page_hsl_hint)) }
             } else {
                 null
             },

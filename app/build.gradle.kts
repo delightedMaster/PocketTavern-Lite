@@ -37,8 +37,8 @@ android {
         applicationId = "io.github.delightedmaster.pockettavern"
         minSdk = 26
         targetSdk = 37
-        versionCode = 195
-        versionName = "0.1.2"
+        versionCode = 196
+        versionName = "0.1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -122,7 +122,6 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
-            pickFirsts += "lib/*/libtermux.so"
         }
     }
     tasks.withType<KotlinCompile>().configureEach {
@@ -185,7 +184,6 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.browser)
     implementation(libs.androidx.profileinstaller)
-    implementation(libs.termux.terminal.view)
     implementation(libs.guava.listenablefuture)
 
     // Compose
@@ -266,10 +264,9 @@ dependencies {
     // zxing
     implementation(libs.zxing.core)
 
-    // quickie (qrcode scanner)
-    implementation(libs.quickie.bundled)
-    implementation(libs.barcode.scanning)
-    implementation(libs.androidx.camera.core)
+    // Camera QR scanning shares the ZXing decoder; no bundled ML model.
+    implementation(libs.zxing.embedded)
+    implementation(libs.androidx.exifinterface)
 
     // Room
     implementation(libs.androidx.room.runtime)
@@ -317,7 +314,6 @@ dependencies {
     implementation(project(":common"))
     implementation(project(":material3"))
     implementation(project(":ui"))
-    implementation(project(":workspace"))
     implementation(project(":oauth"))
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar", "*.aar"))))
     implementation(kotlin("reflect"))

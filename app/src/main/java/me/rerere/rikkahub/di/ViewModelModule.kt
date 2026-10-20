@@ -15,8 +15,6 @@ import me.rerere.rikkahub.ui.pages.extensions.PromptVM
 import me.rerere.rikkahub.ui.pages.extensions.QuickMessagesVM
 import me.rerere.rikkahub.ui.pages.extensions.skills.SkillDetailVM
 import me.rerere.rikkahub.ui.pages.extensions.skills.SkillsVM
-import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceDetailVM
-import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceVM
 import me.rerere.rikkahub.ui.pages.setting.SettingVM
 import me.rerere.rikkahub.ui.pages.share.handler.ShareHandlerVM
 import org.koin.core.module.dsl.viewModel
@@ -48,7 +46,6 @@ val viewModelModule = module {
             memoryConsolidationScheduler = get(),
             filesManager = get(),
             skillManager = get(),
-            workspaceRepository = get(),
         )
     }
     viewModel<MemoryFileVM> {
@@ -70,14 +67,6 @@ val viewModelModule = module {
     viewModelOf(::GroupChatsVM)
     viewModelOf(::SkillsVM)
     viewModelOf(::SkillDetailVM)
-    viewModelOf(::WorkspaceVM)
-    viewModel<WorkspaceDetailVM> {
-        WorkspaceDetailVM(
-            id = it.get(),
-            repository = get(),
-            terminalSessionManager = get(),
-        )
-    }
     viewModelOf(::SearchVM)
     viewModelOf(::StatsVM)
 }

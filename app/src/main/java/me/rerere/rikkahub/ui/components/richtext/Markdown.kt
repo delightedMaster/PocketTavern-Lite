@@ -1,5 +1,8 @@
 package me.rerere.rikkahub.ui.components.richtext
 
+import me.rerere.rikkahub.data.ai.cards.shouldRenderCardCode
+import me.rerere.rikkahub.ui.components.message.HtmlCardView
+import me.rerere.rikkahub.ui.components.message.LocalTavernCardBridge
 import android.content.ClipData
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -130,7 +133,8 @@ fun MarkdownBlock(
     content: String,
     modifier: Modifier = Modifier,
     style: TextStyle = LocalTextStyle.current,
-    onClickCitation: (String) -> Unit = {}
+    onClickCitation: (String) -> Unit = {},
+    htmlMessageId: String? = null,
 ) {
     val enableLatexRendering = LocalSettings.current.displaySetting.enableLatexRendering
     val enableQuoteHighlight = LocalSettings.current.displaySetting.enableQuoteHighlight
@@ -151,10 +155,14 @@ fun MarkdownBlock(
     }
 
     val currentOnClickCitation by rememberUpdatedState(onClickCitation)
-    val components = remember(enableLatexRendering) {
+    val components = remember(enableLatexRendering, htmlMessageId) {
         MarkdownComponents(
             codeBlock = { block ->
-                HighlightCodeBlock(
+                if (htmlMessageId != null && LocalTavernCardBridge.current != null &&
+                    shouldRenderCardCode(block.language, block.code, block.closed)
+                ) {
+                    HtmlCardView(messageId = htmlMessageId, html = block.code)
+                } else HighlightCodeBlock(
                     code = block.code,
                     language = block.language ?: "plaintext",
                     modifier = Modifier.fillMaxWidth(),

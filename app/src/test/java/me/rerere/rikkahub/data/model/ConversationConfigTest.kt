@@ -62,6 +62,7 @@ class ConversationConfigTest {
 
         assertEquals(
             ConversationConfig(
+                generationLimits = GenerationLimits(),
                 chatModelId = modelA.id,
                 reasoningLevel = ReasoningLevel.HIGH,
                 enableWebSearch = true,
@@ -220,4 +221,25 @@ class ConversationConfigTest {
         assertEquals(setOf(conversationInjection), bound.modeInjectionIds)
         assertEquals(setOf(lorebook), bound.lorebookIds)
     }
+    @Test
+    fun `generation lengths are isolated to the current conversation and can be cleared`() {
+        val configured = assistant.copy(contextTokenLimit = 131072, maxTokens = 16384)
+        val bound = conversation(configured).bindConfig(settings(configured))
+        val stored = configured.copy(contextTokenLimit = 32000, maxTokens = 2048)
+        assertEquals(131072, settings(stored).getAssistantOf(bound).contextTokenLimit)
+        val view = settings(stored).getAssistantOf(bound)
+        val changed = bound.withAssistantUpdate(view.copy(contextTokenLimit = null, maxTokens = null), settings(stored))
+        assertNull(settings(stored).getAssistantOf(changed).contextTokenLimit)
+        assertNull(settings(stored).getAssistantOf(changed).maxTokens)
+        assertEquals(stored, view.copy(contextTokenLimit = null, maxTokens = null).withoutConversationFields(bound, stored))
+    }
+
+    @Test
+    fun `old conversation configs without generation lengths retain inherited values`() {
+        val stored = assistant.copy(contextTokenLimit = 65536, maxTokens = 8192)
+        val old = conversation(stored).copy(config = ConversationConfig())
+        assertEquals(65536, settings(stored).getAssistantOf(old).contextTokenLimit)
+        assertEquals(8192, settings(stored).getAssistantOf(old).maxTokens)
+    }
+
 }

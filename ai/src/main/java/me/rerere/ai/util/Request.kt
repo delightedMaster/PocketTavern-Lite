@@ -33,8 +33,9 @@ fun ProviderSetting.mergeCustomHeaders(headers: List<CustomHeader> = emptyList()
 fun Request.Builder.configureReferHeaders(url: String): Request.Builder {
     val httpUrl = url.toHttpUrl()
     return when (httpUrl.host) {
-        "aihubmix.com" -> {
-            addHeader("APP-Code", "DKHA9468")
+        "opencode.ai" -> {
+            if (build().header("User-Agent").isNullOrBlank()) header("User-Agent", "PocketTavern-Lite")
+            this
         }
 
         "openrouter.ai" -> {
@@ -48,12 +49,20 @@ fun Request.Builder.configureReferHeaders(url: String): Request.Builder {
 }
 
 fun Request.Builder.configureSessionHeaders(url: String, sessionId: String?): Request.Builder = apply {
-    if (sessionId != null) {
+    if (!sessionId.isNullOrBlank()) {
         header("X-Session-ID", sessionId)
         if (url.toHttpUrl().host == "opencode.ai") {
             header("x-opencode-session", sessionId)
         }
     }
+}
+
+// Hosted Messages APIs document Bearer authentication, while Anthropic uses x-api-key.
+fun Request.Builder.configureClaudeApiKey(url: String, apiKey: String): Request.Builder = apply {
+    addHeader("x-api-key", apiKey)
+    if (url.toHttpUrl().host in setOf("opencode.ai", "api.commandcode.ai") &&
+        build().header("Authorization") == null
+    ) header("Authorization", "Bearer $apiKey")
 }
 
 fun ResponseBody.stringSafe(): String? {

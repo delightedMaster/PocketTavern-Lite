@@ -114,3 +114,14 @@ private fun Model.findModelProviderFromList(providers: List<ProviderSetting>): P
     }
     return null
 }
+
+
+/** The chat UI currently requires at least one role; any template may be removed once another role exists. */
+internal fun Settings.withoutAssistant(assistantId: Uuid): Settings {
+    val remaining = assistants.filterNot { it.id == assistantId }
+    if (remaining.isEmpty() || remaining.size == assistants.size) return this
+    return copy(
+        assistants = remaining,
+        assistantId = if (this.assistantId == assistantId) remaining.first().id else this.assistantId,
+    )
+}

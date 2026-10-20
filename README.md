@@ -6,7 +6,7 @@ PocketTavern-Lite 是一个面向 Android 的轻量角色扮演聊天应用，�
 
 ## 目标
 
-- **轻量**：不带情侣空间、生活中心、QQ/微信机器人、主动消息、插件沙箱、语音/视频通话、语音合成与识别、AI 翻译、图片/视频生成、收藏页、设备工具或 Python 运行时。
+- **轻量**：不带情侣空间、生活中心、QQ/微信机器人、主动消息、插件沙箱、语音/视频通话、语音合成与识别、AI 翻译、图片/视频生成、收藏页、设备工具、工作区终端或 Python 运行时。
 - **Android 优先**：Kotlin + Jetpack Compose，安装包与 RikkaHub 可以并存。
 - **高缓存命中**：同一轮对话里，世界书注入和宏的取值按用户轮冻结，避免工具循环每一步都改写前缀。
 - **SillyTavern 兼容**：角色卡 V1/V2/V3（PNG 与 JSON，含多开场白）、世界书（粘性、冷却、分组、递归、预算、扫描深度、插入位置）、作者备注、预设（`prompts` + `prompt_order`）和正则脚本（仅显示 / 仅提示词 / 深度范围）。
@@ -15,7 +15,7 @@ PocketTavern-Lite 是一个面向 Android 的轻量角色扮演聊天应用，�
 
 ## 构建
 
-需要 JDK 21、Android SDK（含 CMake 3.22.1 与 NDK）。
+需要 JDK 21 和 Android SDK。工作区与终端模块已移除，无需安装 CMake 或 NDK。
 
 ```bash
 git submodule update --init
@@ -26,11 +26,11 @@ git submodule update --init
 
 ## 功能
 
-- 24 个提供商预设和自定义端点，支持 OpenAI Chat Completions / Responses、Anthropic Messages、Gemini generateContent / Interactions 与 Vertex AI；可分别测试连接和实际发送消息，见 [接口与测试说明](docs/PROVIDER_COMPATIBILITY.md)。
+- 22 个提供商预设和自定义端点，支持 OpenAI Chat Completions / Responses、Anthropic Messages、Gemini generateContent / Interactions 与 Vertex AI；可分别测试连接和实际发送消息，见 [接口与测试说明](docs/PROVIDER_COMPATIBILITY.md)。
 
 - 导入兼容性报告：角色卡、世界书 / 预设、正则及快捷回复导入后显示实际导入数量、跳过项和未实现功能，可复制报告。解析成功不表示第三方脚本完全兼容。
-- 原生 Android 使用：不包含浏览器远程聊天服务和通用文档解析。普通复制粘贴、图片附件及酒馆数据导入保留，联网搜索保留。
-- Skills / Agent / MCP 的用途与保留范围见 [调研记录](docs/AGENT_SKILLS_MCP_RESEARCH.md)。
+- 原生 Android 使用：不包含浏览器远程聊天服务和通用文档解析。普通文字复制粘贴及酒馆数据导入保留，聊天图片附件与 OCR 已移除，联网搜索保留。
+- 技能（Skills）保留只读写作说明与参考资料加载，不执行脚本。Skills / Agent / MCP 的用途与保留范围见 [调研记录](docs/AGENT_SKILLS_MCP_RESEARCH.md)。
 
 - SillyTavern 角色卡 V1/V2/V3（PNG 与 JSON，含多开场白）、世界书、预设（`prompts` + `prompt_order`）、正则（仅显示 / 仅提示词 / 深度范围）和作者备注。
 - 缓存友好的提示词顺序：系统/预设、角色卡、本会话的记忆世界书、可见历史，然后是动态尾部（关键词触发的世界书、变量、作者备注、时间、当前发言者）。触发的条目不会放到角色卡前面。

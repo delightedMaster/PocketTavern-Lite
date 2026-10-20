@@ -58,7 +58,6 @@ ChatService.sendMessage()
             │       ├── Denied  → 输出 {"error": "denied by user"}
             │       ├── Answered → 直接使用用户提供的答案
             │       └── Auto / Approved → toolDef.execute(args)
-            │               ├── 若输出超 32KB 且有 shell 权限 → 截断并写入文件
             │               └── CancellationException 必须向上传播（不能吞掉）
             │
             └─ 将执行结果写回 messages → emit → 继续下一 Step
@@ -100,9 +99,7 @@ onSuccess
 | 2  | `PromptInjectionTransformer`   | 注入 ModeInjection 和 Lorebook 触发的提示词       |
 | 3  | `PlaceholderTransformer`       | 替换消息中的 `{{placeholder}}` 占位符             |
 | 4  | `DocumentAsPromptTransformer`  | 将文档附件转换为文本内容注入消息                         |
-| 5  | `OcrTransformer`               | 对图片 Part 执行 OCR，将识别结果附加为文本               |
 | 6  | `TemplateTransformer`          | 用 Pebble 模板引擎渲染消息（可访问 time/date/role 变量） |
-| 7  | `WorkspaceReminderTransformer` | 若对话关联 Workspace，注入工作区路径提示                |
 
 `PromptInjectionTransformer` 支持四种注入位置：
 
@@ -137,21 +134,14 @@ onSuccess
 
 ### 工具注册顺序
 
-`handleMessageComplete()` 中按如下顺序构建工具列表：
+`ChatToolFactory.createTools()` 按如下顺序构建工具列表：
 
-1. **Search Tools**（`createSearchTools`）— 当 `settings.enableWebSearch = true` 时
-2. **Local Tools**（`localTools.getTools(assistant.localTools)`）— 按助手配置启用：
-  - `JavascriptEngine`：执行 JS 代码片段
-  - `TimeInfo`：获取当前时间
-  - `Clipboard`：读写剪贴板
-  - `Tts`：文字转语音
-  - `AskUser`：向用户提问（需审批）
-  - `ScreenTime`：获取屏幕使用时间
-3. **Conversation Tools**（`createConversationTools`）— `enableRecentChatsReference = true` 时，查询历史对话
-4. **Workspace Tools**（`createWorkspaceToolsIfReady`）— Workspace Shell 就绪时注入，含 `workspace_shell`
-5. **Skill Tools**（`createSkillTools`）— 助手启用的 Skill 列表
-6. **MCP Tools** — 所有已连接 MCP 服务器的工具，命名格式 `mcp__{serverName}__{toolName}`
-7. **Memory Tools**（`buildMemoryTools`，内置于 GenerationHandler）— `enableMemory = true` 时，支持记忆的增删改
+1. **Memory Tools** — 启用记忆时提供记忆读写。
+2. **Search Tools** — 角色开启联网搜索且模型未使用内建搜索时提供。
+3. **Local Tools** — 按角色配置启用时间信息、JavaScript、提问等工具；不含日历、屏幕时间、剪贴板和语音。
+4. **Conversation Tools** — 启用历史对话引用时提供。
+5. **Skill Tools** — 只读加载启用的技能及其参考文件，不执行脚本。
+6. **MCP Tools** — 已连接服务器的工具，命名格式为 `mcp__{serverName}__{toolName}`。
 
 ### 工具审批状态机
 
@@ -167,15 +157,9 @@ Pending ──── 用户操作 ────► Approved → 执行工具
 审批流程由 `ChatService.handleToolApproval()` 触发，更新状态后重新调用 `handleMessageComplete()`，`GenerationHandler` 检测到
 `canResumeExecution` 的 Tool 后直接跳过本轮生成，进入工具执行阶段。
 
-### 工具输出截断
+### 工具输出
 
-当 Workspace Shell 工具可用且工具输出超过 **32KB** 时，输出被截断：
-
-- 前 4KB 保留在消息中
-- 完整输出写入 `filesDir/tool_outputs/{toolCallId}.txt`
-- 消息中附带 shell 读取指令提示
-
-`search_web` 不参与截断：结果体积由用户设置的结果数决定，且结果列表 UI 与引用跳转依赖完整的 JSON。
+工作区及 Shell 已移除，工具结果不再截断到需要终端读取的文件。搜索结果的体积由用户设置的结果数决定，结果列表 UI 与引用跳转保留完整 JSON。
 
 ---
 
@@ -221,14 +205,11 @@ app/src/main/java/me/rerere/rikkahub/
     │   ├── ThinkTagTransformer.kt
     │   ├── RegexOutputTransformer.kt
     │   ├── DocumentAsPromptTransformer.kt
-    │   ├── OcrTransformer.kt
     │   ├── Base64ImageToLocalFileTransformer.kt
     │   ├── PlaceholderTransformer.kt
-    │   └── WorkspaceReminderTransformer.kt
     └── tools/
         ├── SearchTools.kt
         ├── ConversationTools.kt
-        ├── WorkspaceTools.kt
         ├── SkillsTools.kt
         ├── MemoryTools.kt
         └── local/

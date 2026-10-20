@@ -23,6 +23,17 @@ class ProviderDiagnosticsTest {
     )
 
     @Test
+    fun `diagnostic calls retain one session ID for the lifetime of the dialog`() = runTest {
+        val provider = FakeProvider()
+        val diagnostics = ProviderDiagnostics(provider, setting)
+        diagnostics.send(model, "first", false)
+        val first = provider.params!!.sessionId
+        diagnostics.send(model, "second", false)
+        assertFalse(first.isNullOrBlank())
+        assertEquals(first, provider.params!!.sessionId)
+    }
+
+    @Test
     fun `failed model listing does not prevent sending with a manual model id`() = runTest {
         val provider = FakeProvider().apply { listFailure = IllegalStateException("HTTP 403") }
         val diagnostics = ProviderDiagnostics(provider, setting)

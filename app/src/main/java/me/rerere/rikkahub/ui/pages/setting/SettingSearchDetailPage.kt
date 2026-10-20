@@ -449,7 +449,7 @@ internal fun DoubaoOptions(
         )
     }
 
-    FormItem(label = { Text("Mode") }) {
+    FormItem(label = { Text(stringResource(R.string.setting_search_detail_mode)) }) {
         val modes = DoubaoSearchMode.entries
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             modes.forEachIndexed { index, mode ->

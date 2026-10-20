@@ -72,7 +72,7 @@ import me.rerere.rikkahub.data.datastore.allRegexesOf
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantAffectScope
 import me.rerere.rikkahub.data.model.MessageNode
-import me.rerere.rikkahub.data.ai.cards.looksLikeCardHtml
+import me.rerere.rikkahub.data.ai.cards.isStandaloneCardHtml
 import me.rerere.rikkahub.data.model.replaceRegexes
 import me.rerere.rikkahub.ui.components.richtext.MarkdownBlock
 import me.rerere.rikkahub.ui.components.richtext.ZoomableAsyncImage
@@ -212,10 +212,6 @@ fun ChatMessage(
             }
         }
 
-        EditedFilesList(
-            parts = message.parts,
-            assistant = assistant,
-        )
 
         ProvideTextStyle(textStyle) {
             ChatMessageNerdLine(message = message)
@@ -387,7 +383,7 @@ private fun MessagePartsBlock(
                                 visual = true,
                                 depth = depth,
                             )
-                            if (!loading && looksLikeCardHtml(displayText) && LocalTavernCardBridge.current != null) {
+                            if (!loading && isStandaloneCardHtml(displayText) && LocalTavernCardBridge.current != null) {
                                 HtmlCardView(
                                     messageId = messageId,
                                     html = displayText,
@@ -396,6 +392,7 @@ private fun MessagePartsBlock(
                             } else {
                                 MarkdownBlock(
                                     content = displayText,
+                                    htmlMessageId = messageId,
                                     onClickCitation = handleClickCitation,
                                     modifier = textModifier,
                                 )

@@ -78,18 +78,14 @@ import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.GroupActivationStrategy
 import me.rerere.rikkahub.data.model.QuickMessage
-import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.service.ChatError
 import me.rerere.rikkahub.service.PendingSummaryReview
-import me.rerere.rikkahub.ui.components.ai.ChatAttachmentPickerActions
 import me.rerere.rikkahub.ui.components.ai.ChatInput
 import me.rerere.rikkahub.ui.components.ai.FilesPicker
 import me.rerere.rikkahub.ui.components.message.LocalHtmlCardAllowlist
 import me.rerere.rikkahub.ui.components.message.LocalTavernCardBridge
 import me.rerere.rikkahub.ui.components.message.TavernCardBridge
 import me.rerere.rikkahub.ui.components.ai.SearchMode
-import me.rerere.rikkahub.ui.components.ai.completion.WorkspaceCompletionProvider
-import me.rerere.rikkahub.ui.components.ai.rememberChatAttachmentPickerActions
 import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.ui.context.Navigator
@@ -295,7 +291,6 @@ private fun ChatPageContent(
 ) {
     val scope = rememberCoroutineScope()
     val toaster = LocalToaster.current
-    val workspaceRepository: WorkspaceRepository = koinInject()
 
     var previewMode by rememberSaveable { mutableStateOf(false) }
     val hazeState = rememberHazeState()
@@ -320,25 +315,9 @@ private fun ChatPageContent(
     val cardBridge = remember(vm) {
         TavernCardBridge { messageId, requestJson -> vm.handleCard(messageId, requestJson) }
     }
-    val attachmentPickerActions = rememberChatAttachmentPickerActions(
-        inputState = inputState,
-        setting = setting,
-        onAttachmentAdded = { showFilesSheet = false },
-    )
-    val allowAudioVideoAttachments =
-        currentChatModel?.findProvider(setting.providers) is ProviderSetting.Google
 
-    val completionProviders = remember(assistant.workspaceId, conversation.workspaceCwd, workspaceRepository) {
-        assistant.workspaceId?.let { workspaceId ->
-            listOf(
-                WorkspaceCompletionProvider(
-                    workspaceId = workspaceId.toString(),
-                    repository = workspaceRepository,
-                    currentCwd = conversation.workspaceCwd,
-                )
-            )
-        }.orEmpty()
-    }
+
+
 
     val pendingSummary by vm.pendingSummaryReview.collectAsStateWithLifecycle()
     val review = pendingSummary?.takeIf { it.conversationId == conversation.id }
@@ -394,8 +373,7 @@ private fun ChatPageContent(
                     assistant = assistant,
                     chatModel = currentChatModel,
                     hazeState = hazeState,
-                    completionProviders = completionProviders,
-                    onCancelClick = {
+                            onCancelClick = {
                         vm.stopGeneration()
                     },
                     onUpdateSearchMode = { mode ->
@@ -515,12 +493,10 @@ private fun ChatPageContent(
 
         if (showFilesSheet) {
             ChatFilesPickerSheet(
-                inputState = inputState,
                 conversation = conversation,
                 assistant = assistant,
                 chatModel = currentChatModel,
                 vm = vm,
-                attachmentPickerActions = attachmentPickerActions,
                 onDismiss = { showFilesSheet = false },
             )
         }
@@ -630,12 +606,10 @@ private fun QuickReplyBindDialog(
 
 @Composable
 private fun ChatFilesPickerSheet(
-    inputState: ChatInputState,
     conversation: Conversation,
     assistant: Assistant,
     chatModel: Model?,
     vm: ChatVM,
-    attachmentPickerActions: ChatAttachmentPickerActions,
     onDismiss: () -> Unit,
 ) {
     var showCompressDialog by remember { mutableStateOf(false) }
@@ -655,22 +629,15 @@ private fun ChatFilesPickerSheet(
     ) {
         FilesPicker(
             conversation = conversation,
-            state = inputState,
             assistant = assistant,
             chatModel = chatModel,
             mcpManager = vm.mcpManager,
             onCompressContext = vm::handleCompressContext,
             onSummarizeNow = vm::summarizeNow,
             onUpdateAssistant = vm::updateAssistant,
-            onUpdateWorkspaceCwd = vm::updateWorkspaceCwd,
             showCompressDialog = showCompressDialog,
             onShowCompressDialogChange = { showCompressDialog = it },
             onDismiss = { dismissAll() },
-            onTakePic = attachmentPickerActions.onTakePicture,
-            onPickImage = attachmentPickerActions.onPickImage,
-            onPickVideo = attachmentPickerActions.onPickVideo,
-            onPickAudio = attachmentPickerActions.onPickAudio,
-            onSketch = attachmentPickerActions.onSketch,
         )
     }
 }

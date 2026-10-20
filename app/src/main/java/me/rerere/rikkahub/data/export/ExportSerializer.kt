@@ -20,6 +20,7 @@ import me.rerere.rikkahub.data.model.AssistantAffectScope
 import me.rerere.rikkahub.data.model.AssistantRegex
 import me.rerere.rikkahub.data.model.InjectionPosition
 import me.rerere.rikkahub.data.model.Lorebook
+import me.rerere.rikkahub.data.model.LorebookKind
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.QuickMessage
 import me.rerere.rikkahub.ui.pages.assistant.detail.mapSelectiveLogic
@@ -250,6 +251,7 @@ object LorebookSerializer : ExportSerializer<Lorebook> {
                 id = Uuid.random(),
                 name = fileName ?: LocalDateTime.now().toLocalString(),
                 description = "SillyTavern 预设导入",
+                kind = LorebookKind.PRESET,
                 enabled = true,
                 entries = entries,
             )
@@ -496,7 +498,7 @@ object SillyTavernRegexImporter {
             is kotlinx.serialization.json.JsonArray -> element.filterIsInstance<JsonObject>()
             is JsonObject -> listOf(element)
             else -> emptyList()
-        }.mapNotNull(::parseRegex)
+        }.mapNotNull { runCatching { parseRegex(it) }.getOrNull() }
     }.getOrDefault(emptyList())
 
     /**
@@ -505,7 +507,7 @@ object SillyTavernRegexImporter {
      */
     fun parseFromPreset(json: String): List<AssistantRegex> = runCatching {
         val obj = Json.parseToJsonElement(json) as? JsonObject ?: return@runCatching emptyList()
-        val scripts = obj["extensions"]?.jsonObject?.get("regex_scripts") as? JsonArray
+        val scripts = (obj["extensions"] as? JsonObject)?.get("regex_scripts") as? JsonArray
             ?: return@runCatching emptyList()
         parse(scripts.toString())
     }.getOrDefault(emptyList())

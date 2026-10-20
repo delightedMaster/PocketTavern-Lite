@@ -89,9 +89,6 @@ val dataSourceModule = module {
         get<AppDatabase>().managedFileDao()
     }
 
-    single {
-        get<AppDatabase>().workspaceDao()
-    }
 
     single {
         get<AppDatabase>().folderDao()

@@ -59,9 +59,13 @@ const val TAVERN_CARD_SHIM = """
     var h = Math.max(body ? body.scrollHeight : 0, root ? root.scrollHeight : 0);
     if (window.PocketTavern && window.PocketTavern.reportHeight) window.PocketTavern.reportHeight(h);
   }
+  function observeBody() {
+    if (window.ResizeObserver && document.body) new ResizeObserver(report).observe(document.body);
+    report();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', observeBody, {once:true});
+  else observeBody();
   window.addEventListener('load', report);
-  if (window.ResizeObserver && document.body) new ResizeObserver(report).observe(document.body);
-  setTimeout(report, 0);
 })();
 """
 
@@ -73,6 +77,20 @@ private val CARD_TAG = Regex(
 const val MVU_VARIABLE = "mvu.stat_data"
 
 fun looksLikeCardHtml(text: String): Boolean = CARD_TAG.containsMatchIn(text)
+
+/** Only standalone raw HTML bypasses Markdown. Fenced blocks are handled by the Markdown parser. */
+fun isStandaloneCardHtml(text: String): Boolean = CARD_TAG.find(text.trimStart())?.range?.first == 0 ||
+    text.trimStart().startsWith("<!doctype html", ignoreCase = true)
+
+fun shouldRenderCardCode(language: String?, code: String, closed: Boolean): Boolean {
+    if (!closed || code.isBlank()) return false
+    val lang = language.orEmpty().trim().lowercase()
+    return when (lang) {
+        "html", "htm" -> code.contains('<')
+        "" -> isStandaloneCardHtml(code)
+        else -> false
+    }
+}
 
 /** Full document with the shim in the head. The card cannot see app storage or keys. */
 fun cardDocument(source: String): String {

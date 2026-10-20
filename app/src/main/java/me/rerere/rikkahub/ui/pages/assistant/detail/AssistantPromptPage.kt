@@ -679,7 +679,7 @@ private fun AssistantRegexCard(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.assistant_page_regex_find_regex)) },
-                        placeholder = { Text("e.g., \\b\\w+@\\w+\\.\\w+\\b") },
+                        placeholder = { Text(stringResource(R.string.assistant_page_regex_find_example)) },
                     )
 
                     OutlinedTextField(
@@ -699,7 +699,7 @@ private fun AssistantRegexCard(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.assistant_page_regex_replace_string)) },
-                        placeholder = { Text("e.g., [EMAIL]") }
+                        placeholder = { Text(stringResource(R.string.assistant_page_regex_replace_example)) }
                     )
 
                     Text(
