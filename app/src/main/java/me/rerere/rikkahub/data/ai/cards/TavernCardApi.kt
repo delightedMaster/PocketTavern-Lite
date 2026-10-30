@@ -84,6 +84,8 @@ fun isStandaloneCardHtml(text: String): Boolean = CARD_TAG.find(text.trimStart()
 
 fun shouldRenderCardCode(language: String?, code: String, closed: Boolean): Boolean {
     if (!closed || code.isBlank()) return false
+    // Same rule as 酒馆助手: presets often fence a full page as ```text or ```xml.
+    if (containsFullHtmlPage(code)) return true
     val lang = language.orEmpty().trim().lowercase()
     return when (lang) {
         "html", "htm" -> code.contains('<')
@@ -91,6 +93,10 @@ fun shouldRenderCardCode(language: String?, code: String, closed: Boolean): Bool
         else -> false
     }
 }
+
+private fun containsFullHtmlPage(code: String): Boolean =
+    (code.contains("<body", ignoreCase = true) && code.contains("</body>", ignoreCase = true)) ||
+        (code.contains("<html", ignoreCase = true) && code.contains("</html>", ignoreCase = true))
 
 /** Full document with the shim in the head. The card cannot see app storage or keys. */
 fun cardDocument(source: String): String {
@@ -107,6 +113,24 @@ fun cardDocument(source: String): String {
     }
     return """<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">$shim<style>html,body{margin:0;padding:0;background:transparent;}</style></head><body>$trimmed</body></html>"""
 }
+
+/**
+ * Hosts allowed out of the box: script/style CDNs, web fonts and the image hosts cards link most.
+ * A host also covers its subdomains, so `jsdelivr.net` includes cdn/fastly/testingcf.
+ */
+val DEFAULT_HTML_CARD_ALLOWLIST = listOf(
+    "jsdelivr.net",
+    "unpkg.com",
+    "cdnjs.cloudflare.com",
+    "code.jquery.com",
+    "cdn.tailwindcss.com",
+    "fonts.googleapis.com",
+    "fonts.gstatic.com",
+    "fonts.loli.net",
+    "gstatic.loli.net",
+    "files.catbox.moe",
+    "i.imgur.com",
+)
 
 /** data/about are local. http(s) only when the host is on the allowlist. file and javascript are blocked. */
 fun cardRequestAllowed(url: String, allowlist: List<String>): Boolean {

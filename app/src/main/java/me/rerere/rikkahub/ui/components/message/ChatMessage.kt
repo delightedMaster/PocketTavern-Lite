@@ -72,7 +72,9 @@ import me.rerere.rikkahub.data.datastore.allRegexesOf
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantAffectScope
 import me.rerere.rikkahub.data.model.MessageNode
+import me.rerere.rikkahub.data.ai.cards.CardSegment
 import me.rerere.rikkahub.data.ai.cards.isStandaloneCardHtml
+import me.rerere.rikkahub.data.ai.cards.splitCardSegments
 import me.rerere.rikkahub.data.model.replaceRegexes
 import me.rerere.rikkahub.ui.components.richtext.MarkdownBlock
 import me.rerere.rikkahub.ui.components.richtext.ZoomableAsyncImage
@@ -383,12 +385,36 @@ private fun MessagePartsBlock(
                                 visual = true,
                                 depth = depth,
                             )
-                            if (!loading && isStandaloneCardHtml(displayText) && LocalTavernCardBridge.current != null) {
+                            val cardsEnabled = LocalTavernCardBridge.current != null
+                            val segments = remember(displayText, cardsEnabled) {
+                                if (cardsEnabled) splitCardSegments(displayText) else emptyList()
+                            }
+                            if (!loading && cardsEnabled && isStandaloneCardHtml(displayText)) {
                                 HtmlCardView(
                                     messageId = messageId,
                                     html = displayText,
                                     modifier = textModifier,
                                 )
+                            } else if (segments.any { it is CardSegment.Html }) {
+                                // 正文后面跟着的状态栏等原始 HTML 直接在消息里渲染，不用另开网页预览
+                                Column(modifier = textModifier) {
+                                    segments.forEachIndexed { index, segment ->
+                                        key(index) {
+                                            when (segment) {
+                                                is CardSegment.Html -> HtmlCardView(
+                                                    messageId = messageId,
+                                                    html = segment.text,
+                                                )
+
+                                                is CardSegment.Prose -> MarkdownBlock(
+                                                    content = segment.text,
+                                                    htmlMessageId = messageId,
+                                                    onClickCitation = handleClickCitation,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             } else {
                                 MarkdownBlock(
                                     content = displayText,
