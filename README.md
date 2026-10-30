@@ -27,22 +27,23 @@ git submodule update --init
 ## 功能
 
 - 22 个提供商预设和自定义端点，支持 OpenAI Chat Completions / Responses、Anthropic Messages、Gemini generateContent / Interactions 与 Vertex AI；可分别测试连接和实际发送消息，见 [接口与测试说明](docs/PROVIDER_COMPATIBILITY.md)。
-
 - 导入兼容性报告：角色卡、世界书 / 预设、正则及快捷回复导入后显示实际导入数量、跳过项和未实现功能，可复制报告。解析成功不表示第三方脚本完全兼容。
-- 原生 Android 使用：不包含浏览器远程聊天服务和通用文档解析。普通文字复制粘贴及酒馆数据导入保留，聊天图片附件与 OCR 已移除，联网搜索保留。
+- 原生 Android 使用：不包含浏览器远程聊天服务和通用文档解析。普通文字复制粘贴、角色卡图片导入及酒馆数据导入保留，联网搜索保留。
 - 技能（Skills）保留只读写作说明与参考资料加载，不执行脚本。Skills / Agent / MCP 的用途与保留范围见 [调研记录](docs/AGENT_SKILLS_MCP_RESEARCH.md)。
-
 - SillyTavern 角色卡 V1/V2/V3（PNG 与 JSON，含多开场白）、世界书、预设（`prompts` + `prompt_order`）、正则（仅显示 / 仅提示词 / 深度范围）和作者备注。
 - 缓存友好的提示词顺序：系统/预设、角色卡、本会话的记忆世界书、可见历史，然后是动态尾部（关键词触发的世界书、变量、作者备注、时间、当前发言者）。触发的条目不会放到角色卡前面。
 - 记忆与总结。默认每 40 层总结更早的楼层，只把最近 10 层继续发给模型。两个数字都在「提示词 → 作者备注」里，标签是「达到多少楼层时总结」和「保留楼层」。摘要追加到这个会话自己的记忆世界书，分隔是 `---` 加楼层范围，旧摘要不会被改写。记忆超过 token 阈值（默认 2000）时，同一次总结把更早的块收成一条带版本号的回顾。默认用当前聊天模型，这样摘要请求能复用聊天前缀；换一个连接时不带主预设。可以先审阅再保存。已总结的消息默认归档（不进提示词，界面隐藏，一键恢复），也可以改成直接删除。聊天菜单里有「立即总结」。
 - HTML 前端卡、快捷回复和群聊，见下面三节。
 - Claude 在记忆世界书末尾和历史末尾打缓存断点。OpenAI 使用 `prompt_cache_key`，DeepSeek 使用会话 `user`。Gemini 的 `cachedContents` 接口没有接。
 - 更新检查读取 [本仓库的 GitHub Releases](https://github.com/delightedMaster/PocketTavern-Lite/releases)，用标签和 `versionName` 做语义化版本比较。通知设置里可以关闭。
-- 聊天可以附带图片，发给支持视觉输入的模型。不包含 AI 翻译、收藏页、语音合成/识别，以及图片和视频生成。
+- 不包含聊天附件（图片 / 文件）与 OCR、AI 翻译、收藏页、语音合成/识别，以及图片和视频生成。角色卡 PNG 导入不受影响。
 
 ## HTML 前端卡与酒馆助手
 
-消息在显示层正则之后，如果含有 `html`、`body`、`div`、`style`、`script`、`iframe`、`table`、`section` 或 `canvas` 标签，就在单独的 WebView 里渲染。单独的 `<br>` 仍按 Markdown 显示。流式生成过程中先显示 Markdown，生成结束后再挂上卡片。
+消息经过显示层正则后，以下内容在单独的 WebView 里渲染，其余正文仍按 Markdown 显示，单独的 `<br>` 也按 Markdown 处理：
+
+- 整条消息以 `<!DOCTYPE html>` 或 `html`、`body`、`div`、`style`、`script`、`iframe`、`table`、`section`、`canvas` 标签开头。这种情况等生成结束后才渲染，生成过程中先显示 Markdown。
+- 已闭合的代码块，满足其一：语言标记为 `html` / `htm`；没有语言标记且内容以上述标签开头；或者不论语言标记，内容同时含有 `<body` 和 `</body>`（或 `<html` 和 `</html>`），与酒馆助手的前端渲染规则一致。一条消息可以混排正文和多个卡片，顺序保持不变。未闭合的代码块（流式生成中）先按代码显示。
 
 每条消息一个 WebView。JavaScript 只能调用注入的 `PocketTavern` 接口，看不到 API key，也读不到应用存储。DOM storage 关闭。默认拦截所有网络请求；在「HTML 卡片域名」里写上域名后，该域名及其子域名可以加载。高度由卡片上报，限制在 32–720 dp。
 
@@ -102,16 +103,17 @@ git submodule update --init
 1. **已完成**：以 RikkaHub 3.0.0 为基线，接上 SillyTavern 角色卡、世界书、预设、正则和作者备注。
 2. **已完成**：缓存友好的提示词组装和追加式记忆总结。
 3. **已完成**：沙箱 WebView 里的 HTML 前端卡、群聊、快捷回复，以及 tag 发布时的签名流程。
-4. **已完成**（0.1.1）：更新检查改到本仓库的 GitHub Releases。去掉 AI 翻译、图片/视频生成、收藏页和语音服务。聊天附件里的图片保留。
+4. **已完成**（0.1.1）：更新检查改到本仓库的 GitHub Releases。去掉 AI 翻译、图片/视频生成、收藏页和语音服务。聊天附件里的图片当时保留，0.1.3 起移除。
 5. **已完成**（0.1.2）：导入兼容性报告、模型提供商与连接测试，移除设备工具、内置 Web 服务及通用文档解析。
+6. **已完成**（0.1.3）：聊天内渲染 HTML 代码块，上下文与最大回复 token 设置，预设与附带正则一起导入；移除工作区与终端、聊天附件和 OCR；更新模型提供商预设并新增 Vertex AI 认证方式。
 
 ## English
 
-PocketTavern-Lite is a lightweight, Android-first roleplay chat app. It tracks RikkaHub 3.0.0 and adds SillyTavern character cards (V2/V3 PNG and JSON, including alternate greetings), lorebooks, presets (`prompts` + `prompt_order`), regex scripts, author's notes, sandboxed HTML front-end cards, quick replies, and basic group chats. Heavy unrelated forks features are intentionally absent. The app id is `io.github.delightedmaster.pockettavern`, version 0.1.2, Firebase is optional, and the license is AGPL-3.0. Build with `git submodule update --init`, `./gradlew :app:assembleDebug`.
+PocketTavern-Lite is a lightweight, Android-first roleplay chat app. It tracks RikkaHub 3.0.0 and adds SillyTavern character cards (V2/V3 PNG and JSON, including alternate greetings), lorebooks, presets (`prompts` + `prompt_order`), regex scripts, author's notes, sandboxed HTML front-end cards, quick replies, and basic group chats. Heavy unrelated forks features are intentionally absent. The app id is `io.github.delightedmaster.pockettavern`, version 0.1.3, Firebase is optional, and the license is AGPL-3.0. Build with `git submodule update --init`, `./gradlew :app:assembleDebug`.
 
 Prompt order is the system prompt, the character card, this chat's memory lorebook, the visible history, then a dynamic tail (keyword-triggered lore, variables, author's note, time, and the current speaker). Triggered entries are not placed before the character card. Every 40 floors the older messages are summarized and only the latest 10 stay visible. Both numbers are on the prompt page under author's note: "Summarize at floors" and "Floors to keep". The summary is appended to this chat's memory lorebook with a `---` floor-range separator and is never rewritten. When that entry grows past the token threshold (default 2000), the same turn folds the older blocks into a versioned recap. The default summary model is the chat model, so the summary request reuses the chat prefix. A separate connection profile runs without the main preset. There is a manual "summarize now" action and an optional review before the summary is saved. Summarized messages are archived by default (hidden, omitted from the prompt, restored in one tap) or deleted when that setting is on.
 
-HTML cards render after the visual regex, one sandboxed WebView per message. Network is blocked unless the host is listed under "HTML card hosts". The card cannot see API keys or app storage. Supported 酒馆助手 calls are `getChatMessages`, `getVariables`, `setVariables` / `replaceVariables` / `insertOrAssignVariables` (merge), `triggerSlash`, and `Mvu.getMvuData` / `Mvu.replaceMvuData` (stored as `mvu.stat_data`). `generateRaw`, `eventEmit`, `SillyTavern.getContext`, iframe messaging, and full STscript are absent. Variables stay in the dynamic tail.
+HTML cards render after the visual regex in sandboxed WebViews: a message that starts with an HTML tag, or a closed code block tagged `html`, or any closed code block that holds `<body>…</body>` or `<html>…</html>` (the 酒馆助手 rule). Text and several cards can mix in one message. Network is blocked unless the host is listed under "HTML card hosts". The card cannot see API keys or app storage. Supported 酒馆助手 calls are `getChatMessages`, `getVariables`, `setVariables` / `replaceVariables` / `insertOrAssignVariables` (merge), `triggerSlash`, and `Mvu.getMvuData` / `Mvu.replaceMvuData` (stored as `mvu.stat_data`). `generateRaw`, `eventEmit`, `SillyTavern.getContext`, iframe messaging, and full STscript are absent. Variables stay in the dynamic tail.
 
 Quick replies import SillyTavern JSON, bind to a character or to the chat, and show as buttons above the input. The slash commands are `/send`, `/trigger`, `/setvar`, `/getvar`, `/gen`, and `/input`.
 
@@ -119,7 +121,7 @@ Group chats use natural, list, pooled, or manual speaker order. Member cards sta
 
 Release signing reads `storeFile`, `storePassword`, `keyAlias`, and `keyPassword` from `local.properties` (paths relative to the app module) or `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. A tag push of `v*` builds the release APK and uses the matching `CHANGELOG.md` section as the GitHub Release body. GitHub secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` sign it when all four are present; otherwise the attached APK is unsigned.
 
-Update checks use this repository's GitHub releases and compare the tag with `versionName`. Notification settings can turn that check off. AI translation, the favorites page, speech recognition and synthesis, and image/video generation are not included. Sending a picture in chat, for a vision model, remains.
+Update checks use this repository's GitHub releases and compare the tag with `versionName`. Notification settings can turn that check off. Chat attachments (images and files) with OCR, AI translation, the favorites page, speech recognition and synthesis, and image/video generation are not included. Importing PNG character cards still works.
 
 ## 致谢 / Acknowledgements
 

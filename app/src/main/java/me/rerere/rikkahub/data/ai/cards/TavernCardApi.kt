@@ -84,6 +84,8 @@ fun isStandaloneCardHtml(text: String): Boolean = CARD_TAG.find(text.trimStart()
 
 fun shouldRenderCardCode(language: String?, code: String, closed: Boolean): Boolean {
     if (!closed || code.isBlank()) return false
+    // Same rule as 酒馆助手: presets often fence a full page as ```text or ```xml.
+    if (containsFullHtmlPage(code)) return true
     val lang = language.orEmpty().trim().lowercase()
     return when (lang) {
         "html", "htm" -> code.contains('<')
@@ -91,6 +93,10 @@ fun shouldRenderCardCode(language: String?, code: String, closed: Boolean): Bool
         else -> false
     }
 }
+
+private fun containsFullHtmlPage(code: String): Boolean =
+    (code.contains("<body", ignoreCase = true) && code.contains("</body>", ignoreCase = true)) ||
+        (code.contains("<html", ignoreCase = true) && code.contains("</html>", ignoreCase = true))
 
 /** Full document with the shim in the head. The card cannot see app storage or keys. */
 fun cardDocument(source: String): String {

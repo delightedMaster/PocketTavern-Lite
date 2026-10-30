@@ -12,6 +12,15 @@ class CardAutoRenderTest {
     }
 
     @Test
+    fun `full pages render whatever the fence language like 酒馆助手`() {
+        assertTrue(shouldRenderCardCode("text", "<!DOCTYPE html>\n<html><body><div>状态栏</div></body></html>", true))
+        assertTrue(shouldRenderCardCode("xml", "<head><style>p{}</style></head>\n<BODY>ok</BODY>", true))
+        assertTrue(shouldRenderCardCode(null, "前端界面：\n<body><script>init()</script></body>", true))
+        assertFalse(shouldRenderCardCode("text", "<body>未闭合", true))
+        assertFalse(shouldRenderCardCode("text", "<html><body>ok</body></html>", false))
+    }
+
+    @Test
     fun `unfinished fences and HTML strings in other languages stay as source code`() {
         assertFalse(shouldRenderCardCode("html", "<html><script>", false))
         assertFalse(shouldRenderCardCode("python", "print('<div>hi</div>')", true))
