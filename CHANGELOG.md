@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 正文后面另起一行的原始 HTML（状态栏等）直接在消息里原位渲染成卡片，不再需要从菜单另开网页预览；紧挨着的 `<style>` 和内容合成一张卡片。
+- HTML 卡片默认放行常用 CDN、字体和图床（jsdelivr、unpkg、cdnjs、jQuery、Tailwind、Google Fonts 及其镜像、catbox、imgur）。原先为空的域名列表升级后换成默认值，自己填过的保留。
 - 不论语言标记，闭合代码块里含有完整页面（`<body>…</body>` 或 `<html>…</html>`）时按前端卡渲染，与酒馆助手一致；常见于用 ```text、```xml 包裹状态栏的预设。
 - README 修正：聊天附件已移除的描述前后一致，补充 0.1.3 路线和 HTML 渲染规则。
 

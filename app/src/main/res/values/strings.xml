@@ -1813,7 +1813,7 @@
   <string name="tavern_regex_preset_folder">Preset</string>
   <string name="tavern_regex_unnamed_group">Untitled folder</string>
   <string name="prompt_page_html_allowlist">HTML card hosts</string>
-  <string name="prompt_page_html_allowlist_desc">Empty blocks every network request. A host here, or its subdomains, may load.</string>
+  <string name="prompt_page_html_allowlist_desc">A host here, or its subdomains, may load. Defaults to common CDNs, fonts and image hosts. Empty blocks every network request.</string>
   <string name="quick_messages_page_import">Import JSON</string>
   <string name="quick_messages_page_imported">Imported</string>
   <string name="quick_messages_page_import_failed">Could not read that quick reply file</string>

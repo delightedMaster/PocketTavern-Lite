@@ -6,6 +6,7 @@ import kotlinx.serialization.Transient
 import me.rerere.ai.core.MessageRole
 import me.rerere.ai.core.ReasoningLevel
 import me.rerere.ai.provider.ProviderSetting
+import me.rerere.rikkahub.data.ai.cards.DEFAULT_HTML_CARD_ALLOWLIST
 import me.rerere.rikkahub.data.ai.mcp.McpServerConfig
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_SUGGESTION_PROMPT
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_TITLE_PROMPT
@@ -95,7 +96,7 @@ data class Settings(
     /** Empty uses the built-in prompt for the current language. */
     val summaryPrompt: String = "",
     /** Hosts an HTML card may fetch. Empty blocks every network request. */
-    val htmlCardAllowlist: List<String> = emptyList(),
+    val htmlCardAllowlist: List<String> = DEFAULT_HTML_CARD_ALLOWLIST,
     // null = 尚未物化的新格式，继续兼容旧 authorNote
     val authorNoteEntries: List<AuthorNoteEntry>? = null,
     val macroGlobalVariables: Map<String, String> = emptyMap(),

@@ -114,6 +114,24 @@ fun cardDocument(source: String): String {
     return """<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">$shim<style>html,body{margin:0;padding:0;background:transparent;}</style></head><body>$trimmed</body></html>"""
 }
 
+/**
+ * Hosts allowed out of the box: script/style CDNs, web fonts and the image hosts cards link most.
+ * A host also covers its subdomains, so `jsdelivr.net` includes cdn/fastly/testingcf.
+ */
+val DEFAULT_HTML_CARD_ALLOWLIST = listOf(
+    "jsdelivr.net",
+    "unpkg.com",
+    "cdnjs.cloudflare.com",
+    "code.jquery.com",
+    "cdn.tailwindcss.com",
+    "fonts.googleapis.com",
+    "fonts.gstatic.com",
+    "fonts.loli.net",
+    "gstatic.loli.net",
+    "files.catbox.moe",
+    "i.imgur.com",
+)
+
 /** data/about are local. http(s) only when the host is on the allowlist. file and javascript are blocked. */
 fun cardRequestAllowed(url: String, allowlist: List<String>): Boolean {
     val uri = runCatching { URI(url) }.getOrNull() ?: return false
