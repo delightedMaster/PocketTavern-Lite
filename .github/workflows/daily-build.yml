@@ -78,6 +78,28 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
+      - name: Rename and package nightly assets
+        run: |
+          cd app/build/outputs/apk/release
+          for file in *.apk; do
+            [ -f "$file" ] || continue
+            case "$file" in
+              *arm64-v8a*)
+                mv "$file" "PocketTavern-Lite-nightly-arm64-v8a.apk"
+                ;;
+              *x86_64*)
+                mv "$file" "PocketTavern-Lite-nightly-x86_64.apk"
+                ;;
+              *universal*)
+                mv "$file" "PocketTavern-Lite-nightly-universal.apk"
+                ;;
+              *)
+                mv "$file" "PocketTavern-Lite-nightly-${file}"
+                ;;
+            esac
+          done
+          sha256sum *.apk > sha256sums.txt
+
       # 把 APK 直接发布为 Prerelease，用户点链接即可下载单个 apk，无需登录、无需解压
       - name: Publish nightly prerelease
         uses: softprops/action-gh-release@v2
@@ -90,4 +112,6 @@ jobs:
             自动每日构建（commit `${{ github.sha }}`）
 
             > ⚠️ 开发版本，可能不稳定，仅供测试。
-          files: app/build/outputs/apk/release/*.apk
+          files: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/release/sha256sums.txt

@@ -66,6 +66,29 @@ jobs:
           chmod +x gradlew
           ./gradlew :app:assembleRelease
 
+      - name: Rename and package release assets
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          cd app/build/outputs/apk/release
+          for file in *.apk; do
+            [ -f "$file" ] || continue
+            case "$file" in
+              *arm64-v8a*)
+                mv "$file" "PocketTavern-Lite-${TAG}-arm64-v8a.apk"
+                ;;
+              *x86_64*)
+                mv "$file" "PocketTavern-Lite-${TAG}-x86_64.apk"
+                ;;
+              *universal*)
+                mv "$file" "PocketTavern-Lite-${TAG}-universal.apk"
+                ;;
+              *)
+                mv "$file" "PocketTavern-Lite-${TAG}-${file}"
+                ;;
+            esac
+          done
+          sha256sum *.apk > sha256sums.txt
+
       - name: Release notes from CHANGELOG
         env:
           SIGNED: ${{ steps.signing.outputs.signed }}
@@ -93,5 +116,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/*.apk
+          files: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/release/sha256sums.txt
           body_path: release-notes.md
