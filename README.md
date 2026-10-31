@@ -1,135 +1,103 @@
 # PocketTavern-Lite
 
-PocketTavern-Lite 是一个面向 Android 的轻量角色扮演聊天应用，界面和交互沿用 SillyTavern 的习惯：角色卡、世界书、预设和正则脚本可以直接拿来用。它从 [RikkaHub](https://github.com/rikkahub/rikkahub) 3.0.0 出发，只保留聊天本身需要的部分，目标是装得下、开得快，并且让模型请求的前缀尽量稳定，从而提高提示词缓存命中率。
+<p align="center">
+  <b>简体中文</b> | <a href="README_EN.md">English</a>
+</p>
 
-协议：AGPL-3.0。上游版权声明保留。
+PocketTavern-Lite 是一款面向 Android 平台的轻量、高效角色扮演（RP）聊天客户端。项目基于 [RikkaHub](https://github.com/rikkahub/rikkahub) 3.0.0 构建，深度对齐 [SillyTavern](https://github.com/SillyTavern/SillyTavern)（酒馆）核心生态资产与交互习惯，专注于纯粹、流畅的移动端沉浸式对话体验。
 
-## 目标
+开源协议：[AGPL-3.0](LICENSE)。保留所有上游版权声明与开源授权。
 
-- **轻量**：不带情侣空间、生活中心、QQ/微信机器人、主动消息、插件沙箱、语音/视频通话、语音合成与识别、AI 翻译、图片/视频生成、收藏页、设备工具、工作区终端或 Python 运行时。
-- **Android 优先**：Kotlin + Jetpack Compose，安装包与 RikkaHub 可以并存。
-- **高缓存命中**：同一轮对话里，世界书注入和宏的取值按用户轮冻结，避免工具循环每一步都改写前缀。
-- **SillyTavern 兼容**：角色卡 V1/V2/V3（PNG 与 JSON，含多开场白）、世界书（粘性、冷却、分组、递归、预算、扫描深度、插入位置）、作者备注、预设（`prompts` + `prompt_order`）和正则脚本（仅显示 / 仅提示词 / 深度范围）。
+---
 
-应用显示名是 **PocketTavern-Lite**，`applicationId` 为 `io.github.delightedmaster.pockettavern`。Firebase 默认关闭，没有 `app/google-services.json` 也能编译；需要遥测时加上 `-Prikkahub.enableFirebase=true`。
+## 核心特性
 
-## 构建
+- 🚀 **轻量专注与纯原生架构**：使用现代 Kotlin + Jetpack Compose 打造，聚焦角色扮演核心交互，启动迅速、内存占用极低，可与官方 RikkaHub 共存运行。
+- 🎭 **全面对齐 SillyTavern 生态**：
+  - **角色卡**：完整支持 V1、V2 及 V3 规范（PNG 嵌入与 JSON），支持多开场白、角色专属配置与备选问候语。
+  - **预设编排**：支持 `prompts` 与 `prompt_order` 精确编排，支持作者备注（Author's Note）深度与频率控制。
+  - **世界书（Lorebook）**：支持关键词匹配、递归扫描、插入深度、Token 预算控制与动态条目追加。
+  - **正则脚本（Regex）**：支持显示层（Display）与提示词层（Prompt）正则处理；内置**在线正则脚本编辑器**，支持直接编写、调试并在模型原文上即时预览替换效果。
+- 🎨 **原位 HTML 与前端卡片渲染**：
+  - **正文原位渲染**：正文后另起一行的原始 HTML（状态栏、好感度、属性面板等）直接在消息流中原位渲染为交互卡片，紧邻的 `<style>` 与内容自动合并，阅读自然流畅。
+  - **整页代码块渲染**：支持酒馆助手卡片规范，代码块包含完整网页结构（`<body>...</body>` 或 `<html>...</html>`）时直接渲染为卡片，兼容 `text`、`xml`、`html` 等常见标记。
+  - **沙箱安全与网络放行**：独立 WebView 沙箱隔离，禁用敏感本地存储并屏蔽 API Key 访问；默认放行常用脚本 CDN（jsdelivr、unpkg、cdnjs、jQuery、Tailwind）、字体库（Google Fonts 及其国内镜像）和图床（catbox、imgur），同时支持用户自定义域名白名单。
+  - **酒馆助手 JS API 基础兼容**：支持 `getChatMessages`、`getVariables`、`setVariables`、`triggerSlash` 及 `Mvu`（`mvu.stat_data`）等状态栏与属性变量交互。
+- ⚡ **高缓存命中的提示词编排架构**：
+  - 请求上下文划分为**稳定前缀**（系统预设、角色卡设定、记忆世界书、可见历史）与**动态尾部**（触发词条、动态变量、作者备注、当前时间与发言者）。
+  - 动态宏与变量按用户轮次冻结，避免工具调用导致前缀变动，最大化利用 Anthropic（Claude 缓存断点）、OpenAI（`prompt_cache_key`）与 DeepSeek 等模型的 Prompt Caching 机制，大幅缩短生成首字延迟并降低 API 成本。
+- 🧠 **渐进式长对话记忆总结**：
+  - 支持按楼层自动触发记忆压缩与提炼（默认达 40 层时总结更早消息，保留最近 10 层活跃上下文）。
+  - 结构化摘要以 `---` 楼层范围分隔符自动追加沉淀至该会话专属的记忆世界书中，历史旧摘要永久保留。当记忆条目超出预算阈值时，自动归纳为版本化回顾。
+  - 支持一键手动即时总结与保存前审阅；已总结的消息默认一键归档（隐藏且不占 Token，可随时完整还原）。
+- 🌐 **广泛的模型提供商支持与独立诊断**：
+  - 内置 20+ 提供商预设及灵活的自定义端点，支持 OpenAI Chat Completions / Responses 协议、Anthropic Messages 协议、Google Gemini `generateContent` / `Interactions` 以及 Google Vertex AI（支持 Express 及服务账号 JSON 认证）。
+  - 内置提供商连通性测试与消息收发实时诊断工具。
+- 📲 **应用内无缝自动更新与安装**：
+  - 内置基于 OkHttpClient 的独立下载器，支持应用全局网络代理设置与国内加速镜像兜底（`gh-proxy.com`）。
+  - 拥有专属通知渠道，显示实时下载进度与百分比；下载完成后通过 FileProvider 自动唤起系统安装器。
+  - 支持设备 ABI 架构（`arm64-v8a` / `x86_64`）智能识别与最优安装包推荐。
+- 👥 **多人群聊与快捷回复**：
+  - **多人群聊**：支持自然轮换（根据用户提及的角色自动应答）、列表顺序、随机池与手动点选发言；群成员共享记忆世界书，成员卡稳定留在前缀中以保护缓存。
+  - **快捷回复（Quick Replies）**：支持导入 SillyTavern 快捷回复配置，并在输入框上方以操作栏常驻展示，支持 `/send`、`/trigger`、`/setvar`、`/getvar`、`/gen`、`/input` 等基础宏指令。
 
-需要 JDK 21 和 Android SDK。工作区与终端模块已移除，无需安装 CMake 或 NDK。
+---
 
+## 快速上手与构建
+
+### 基础要求
+- **构建环境**：JDK 21、Android SDK（平台 API 34+）
+- **设备要求**：Android 8.0（API Level 26）及以上，推荐 64 位设备（`arm64-v8a` 或 `x86_64`）
+
+### 编译源码
 ```bash
+# 克隆仓库并拉取子模块
+git clone https://github.com/delightedMaster/PocketTavern-Lite.git
+cd PocketTavern-Lite
 git submodule update --init
+
+# 构建 Debug APK
 ./gradlew :app:assembleDebug
 ```
+构建产物输出路径为 `app/build/outputs/apk/debug/app-debug.apk`。
 
-调试包的 applicationId 带 `.debug` 后缀。与上游同步的方法见 [docs/UPSTREAM.md](docs/UPSTREAM.md)。
+---
 
-## 功能
+## 签名与发布配置
 
-- 22 个提供商预设和自定义端点，支持 OpenAI Chat Completions / Responses、Anthropic Messages、Gemini generateContent / Interactions 与 Vertex AI；可分别测试连接和实际发送消息，见 [接口与测试说明](docs/PROVIDER_COMPATIBILITY.md)。
-- 导入兼容性报告：角色卡、世界书 / 预设、正则及快捷回复导入后显示实际导入数量、跳过项和未实现功能，可复制报告。解析成功不表示第三方脚本完全兼容。
-- 原生 Android 使用：不包含浏览器远程聊天服务和通用文档解析。普通文字复制粘贴、角色卡图片导入及酒馆数据导入保留，联网搜索保留。
-- 技能（Skills）保留只读写作说明与参考资料加载，不执行脚本。Skills / Agent / MCP 的用途与保留范围见 [调研记录](docs/AGENT_SKILLS_MCP_RESEARCH.md)。
-- SillyTavern 角色卡 V1/V2/V3（PNG 与 JSON，含多开场白）、世界书、预设（`prompts` + `prompt_order`）、正则（仅显示 / 仅提示词 / 深度范围）和作者备注。
-- 缓存友好的提示词顺序：系统/预设、角色卡、本会话的记忆世界书、可见历史，然后是动态尾部（关键词触发的世界书、变量、作者备注、时间、当前发言者）。触发的条目不会放到角色卡前面。
-- 记忆与总结。默认每 40 层总结更早的楼层，只把最近 10 层继续发给模型。两个数字都在「提示词 → 作者备注」里，标签是「达到多少楼层时总结」和「保留楼层」。摘要追加到这个会话自己的记忆世界书，分隔是 `---` 加楼层范围，旧摘要不会被改写。记忆超过 token 阈值（默认 2000）时，同一次总结把更早的块收成一条带版本号的回顾。默认用当前聊天模型，这样摘要请求能复用聊天前缀；换一个连接时不带主预设。可以先审阅再保存。已总结的消息默认归档（不进提示词，界面隐藏，一键恢复），也可以改成直接删除。聊天菜单里有「立即总结」。
-- HTML 前端卡、快捷回复和群聊，见下面三节。
-- Claude 在记忆世界书末尾和历史末尾打缓存断点。OpenAI 使用 `prompt_cache_key`，DeepSeek 使用会话 `user`。Gemini 的 `cachedContents` 接口没有接。
-- 更新检查读取 [本仓库的 GitHub Releases](https://github.com/delightedMaster/PocketTavern-Lite/releases)，用标签和 `versionName` 做语义化版本比较。通知设置里可以关闭。
-- 不包含聊天附件（图片 / 文件）与 OCR、AI 翻译、收藏页、语音合成/识别，以及图片和视频生成。角色卡 PNG 导入不受影响。
+若需要构建正式签名的 Release 版本，可通过在 `local.properties`（位于项目根目录，路径相对于 app 模块）配置密钥信息，或设置相应的环境变量：
 
-## HTML 前端卡与酒馆助手
+| `local.properties` 配置项 | 环境变量 | 说明 |
+| --- | --- | --- |
+| `storeFile` | `ANDROID_KEYSTORE_FILE` | 签名密钥文件路径（如 `release.keystore`） |
+| `storePassword` | `ANDROID_KEYSTORE_PASSWORD` | 密钥库密码 |
+| `keyAlias` | `ANDROID_KEY_ALIAS` | 密钥别名 |
+| `keyPassword` | `ANDROID_KEY_PASSWORD` | 密钥密码 |
 
-消息经过显示层正则后，以下内容在单独的 WebView 里渲染，其余正文仍按 Markdown 显示，单独的 `<br>` 也按 Markdown 处理：
+> 当上述 4 项完整配置时，`./gradlew :app:assembleRelease` 将生成已签名的 Release APK；若未提供则生成未签名安装包。推送 `v*` 语义化标签至 GitHub 时，自动化流水线将自动编译并发布 GitHub Release 资产。
 
-- 整条消息以 `<!DOCTYPE html>` 或 `html`、`body`、`div`、`style`、`script`、`iframe`、`table`、`section`、`canvas` 标签开头。这种情况等生成结束后才渲染，生成过程中先显示 Markdown。
-- 正文中间或后面另起一行写的原始 HTML（例如状态栏 `<style>…</style><div>…</div>`），从该行开头到对应的结束标签为止，直接在消息里原位渲染，不需要另开网页预览。紧挨着的几段 HTML 合成一张卡片，所以前面的 `<style>` 能作用到后面的内容。结束标签还没生成出来时先按文字显示；代码块里的 HTML 不受影响。
-- 已闭合的代码块，满足其一：语言标记为 `html` / `htm`；没有语言标记且内容以上述标签开头；或者不论语言标记，内容同时含有 `<body` 和 `</body>`（或 `<html` 和 `</html>`），与酒馆助手的前端渲染规则一致。一条消息可以混排正文和多个卡片，顺序保持不变。未闭合的代码块（流式生成中）先按代码显示。
+---
 
-每条消息一个 WebView。JavaScript 只能调用注入的 `PocketTavern` 接口，看不到 API key，也读不到应用存储。DOM storage 关闭。网络请求只放行「HTML 卡片域名」里的域名及其子域名，默认包含常用的脚本 CDN、字体和图床：`jsdelivr.net`、`unpkg.com`、`cdnjs.cloudflare.com`、`code.jquery.com`、`cdn.tailwindcss.com`、`fonts.googleapis.com`、`fonts.gstatic.com`、`fonts.loli.net`、`gstatic.loli.net`、`files.catbox.moe`、`i.imgur.com`。清空则拦截所有网络请求。高度由卡片上报，限制在 32–720 dp。
+## 开发路线
 
-变量写在动态尾部，不进系统提示词或角色卡。尾部只放全局变量、本聊天变量，以及最新一条消息自己的变量。
+- **0.1.0**：以 RikkaHub 3.0.0 为基础，完成 SillyTavern 核心资产（角色卡、世界书、预设、正则与作者备注）深度集成。
+- **0.1.1**：清理冗余模块，确立轻量角色扮演定位，完善基于 GitHub Releases 的更新检查。
+- **0.1.2**：实现导入兼容性诊断报告，重构模型提供商管理与连通性测试工具。
+- **0.1.3**：支持聊天内 HTML 代码块渲染，引入上下文与输出 Token 精确预算管理，支持预设与正则一并导入。
+- **0.1.4**：实现正文后原始 HTML 原位渲染及整页代码块识别，放行常用前端 CDN、字体与图床安全白名单。
+- **0.1.5**（当前版本）：
+  - 升级应用内自动更新引擎（支持代理、加速镜像、状态栏进度通知及下载后自动唤起安装）。
+  - 新增酒馆正则脚本在线编辑与即时预览调试弹窗（RegexScriptEditor）。
+  - 优化 CI/CD 构建流水线，自动规范构建产物命名（版本号 + ABI 标识）并生成 SHA-256 校验文件。
+  - 全面重写中英文双语技术文档。
 
-支持的酒馆助手（JS-Slash-Runner）调用：
+---
 
-| 调用 | 行为 |
-| --- | --- |
-| `getChatMessages(range)` | 读已存储的消息文本。`range` 可省略、`"all"`、数字（`-1` 是最后一条，`0` 是第一条）、`"start-end"` 或 `{start, end}` |
-| `getVariables({type})` | `chat`（默认）、`global` 或 `message`（这张卡片所在的消息） |
-| `setVariables` / `replaceVariables` / `insertOrAssignVariables` | 按 key 合并，不会清掉表里的其他变量 |
-| `triggerSlash(command)` | 走下面列出的基础斜杠命令 |
-| `Mvu.getMvuData({type})` / `Mvu.replaceMvuData(data, {type})` | `chat` 或 `message`。JSON 存在变量 `mvu.stat_data` |
+## 致谢与上游开源项目
 
-没有实现：`generateRaw`、`eventEmit`、`SillyTavern.getContext`、iframe 消息，以及完整的 STscript。
+- [RikkaHub](https://github.com/rikkahub/rikkahub)：优秀的原生 Android AI 对话客户端基线。本项目保留 RikkaHub 的 Git 历史与上游版权声明。
+- [MiaoWuNYA/rikkahub-sillytavern-android](https://github.com/MiaoWuNYA/rikkahub-sillytavern-android)：提供了将酒馆核心逻辑接入 Android 端的宝贵设计经验与实现参考。
+- [SillyTavern](https://github.com/SillyTavern/SillyTavern)：强大的角色扮演与前端交互生态标准制定者。
+- [Summaryception](https://github.com/Lodactio/Extension-Summaryception)（AGPL-3.0）：内置总结提示词基于其 narrative 叙事预设进行深度优化与适配。
 
-## 快捷回复
-
-扩展页可以管理快捷回复，也可以导入 SillyTavern 的 JSON（v2 的 `qrList`、v1 的 `quickReplies`，或直接一个数组）。角色卡上的绑定仍然有效，聊天里还可以再绑定一组，按钮出现在输入框上方。隐藏的按钮不显示。
-
-只执行这些斜杠命令，命令之间用换行或 `|` 分开。没有斜杠的一行会作为用户消息发送。
-
-- `/send text` 发送并生成回复
-- `/trigger name` 按标题运行另一条快捷回复，最多几层
-- `/setvar key value` 或 `/setvar key=value` 写入本聊天变量
-- `/getvar key` 把值放进输入框
-- `/gen` 在最后一条是用户消息时生成；`/gen text` 先发送这段文字
-- `/input prompt` 询问一行，并把回答放进输入框。它不会挡住后面的命令
-
-## 群聊
-
-扩展页里新建群聊，选择成员和发言顺序：自然、列表、随机、手动。打开后是一条普通会话，成员共用这本记忆世界书。
-
-成员卡按名单顺序放在稳定前缀里，禁言的成员也留在前缀中，这样关掉某个人不会把缓存打乱。当前发言者的名字只出现在动态尾部。整个群使用同一个模型。自然顺序不另外调用模型：用户刚发的消息里只提到一名成员时由那个人接话，否则按列表。手动顺序在输入框上方点选。
-
-## 签名
-
-发布签名不放进仓库。四个值都有时才给 release 包签名，少一个就打未签名的 release 包：
-
-| `local.properties`（相对 app 模块） | 环境变量 |
-| --- | --- |
-| `storeFile` | `ANDROID_KEYSTORE_FILE` |
-| `storePassword` | `ANDROID_KEYSTORE_PASSWORD` |
-| `keyAlias` | `ANDROID_KEY_ALIAS` |
-| `keyPassword` | `ANDROID_KEY_PASSWORD` |
-
-推送 `v*` tag 时，`.github/workflows/release.yml` 会构建 release APK 并挂到 GitHub Release。仓库里如果有下面四个 secret，就用它们签名；否则上传未签名包：
-
-- `ANDROID_KEYSTORE_BASE64`（keystore 文件的 base64）
-- `ANDROID_KEYSTORE_PASSWORD`
-- `ANDROID_KEY_ALIAS`
-- `ANDROID_KEY_PASSWORD`
-
-## 路线
-
-1. **已完成**：以 RikkaHub 3.0.0 为基线，接上 SillyTavern 角色卡、世界书、预设、正则和作者备注。
-2. **已完成**：缓存友好的提示词组装和追加式记忆总结。
-3. **已完成**：沙箱 WebView 里的 HTML 前端卡、群聊、快捷回复，以及 tag 发布时的签名流程。
-4. **已完成**（0.1.1）：更新检查改到本仓库的 GitHub Releases。去掉 AI 翻译、图片/视频生成、收藏页和语音服务。聊天附件里的图片当时保留，0.1.3 起移除。
-5. **已完成**（0.1.2）：导入兼容性报告、模型提供商与连接测试，移除设备工具、内置 Web 服务及通用文档解析。
-6. **已完成**（0.1.3）：聊天内渲染 HTML 代码块，上下文与最大回复 token 设置，预设与附带正则一起导入；移除工作区与终端、聊天附件和 OCR；更新模型提供商预设并新增 Vertex AI 认证方式。
-7. **已完成**（0.1.4）：正文后的原始 HTML 和任意语言标记里的完整页面直接在聊天内渲染，HTML 卡片默认放行常用 CDN、字体和图床。
-
-## English
-
-PocketTavern-Lite is a lightweight, Android-first roleplay chat app. It tracks RikkaHub 3.0.0 and adds SillyTavern character cards (V2/V3 PNG and JSON, including alternate greetings), lorebooks, presets (`prompts` + `prompt_order`), regex scripts, author's notes, sandboxed HTML front-end cards, quick replies, and basic group chats. Heavy unrelated forks features are intentionally absent. The app id is `io.github.delightedmaster.pockettavern`, version 0.1.4, Firebase is optional, and the license is AGPL-3.0. Build with `git submodule update --init`, `./gradlew :app:assembleDebug`.
-
-Prompt order is the system prompt, the character card, this chat's memory lorebook, the visible history, then a dynamic tail (keyword-triggered lore, variables, author's note, time, and the current speaker). Triggered entries are not placed before the character card. Every 40 floors the older messages are summarized and only the latest 10 stay visible. Both numbers are on the prompt page under author's note: "Summarize at floors" and "Floors to keep". The summary is appended to this chat's memory lorebook with a `---` floor-range separator and is never rewritten. When that entry grows past the token threshold (default 2000), the same turn folds the older blocks into a versioned recap. The default summary model is the chat model, so the summary request reuses the chat prefix. A separate connection profile runs without the main preset. There is a manual "summarize now" action and an optional review before the summary is saved. Summarized messages are archived by default (hidden, omitted from the prompt, restored in one tap) or deleted when that setting is on.
-
-HTML cards render after the visual regex in sandboxed WebViews: a message that starts with an HTML tag, or a closed code block tagged `html`, or any closed code block that holds `<body>…</body>` or `<html>…</html>` (the 酒馆助手 rule), and raw HTML on its own line after the story text (a status bar, say) up to its matching end tag. Text and several cards can mix in one message, in place. Network loads only from hosts under "HTML card hosts", which by default lists common script CDNs, web fonts, catbox and imgur; an empty list blocks every request. The card cannot see API keys or app storage. Supported 酒馆助手 calls are `getChatMessages`, `getVariables`, `setVariables` / `replaceVariables` / `insertOrAssignVariables` (merge), `triggerSlash`, and `Mvu.getMvuData` / `Mvu.replaceMvuData` (stored as `mvu.stat_data`). `generateRaw`, `eventEmit`, `SillyTavern.getContext`, iframe messaging, and full STscript are absent. Variables stay in the dynamic tail.
-
-Quick replies import SillyTavern JSON, bind to a character or to the chat, and show as buttons above the input. The slash commands are `/send`, `/trigger`, `/setvar`, `/getvar`, `/gen`, and `/input`.
-
-Group chats use natural, list, pooled, or manual speaker order. Member cards stay in member order in the stable prefix, including muted members. The speaker name is a tail line. One model serves the whole group, and the memory lorebook is the conversation's. Natural order matches a uniquely mentioned name; it does not call the model.
-
-Release signing reads `storeFile`, `storePassword`, `keyAlias`, and `keyPassword` from `local.properties` (paths relative to the app module) or `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. A tag push of `v*` builds the release APK and uses the matching `CHANGELOG.md` section as the GitHub Release body. GitHub secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` sign it when all four are present; otherwise the attached APK is unsigned.
-
-Update checks use this repository's GitHub releases and compare the tag with `versionName`. Notification settings can turn that check off. Chat attachments (images and files) with OCR, AI translation, the favorites page, speech recognition and synthesis, and image/video generation are not included. Importing PNG character cards still works.
-
-## 致谢 / Acknowledgements
-
-- [RikkaHub](https://github.com/rikkahub/rikkahub) 及其维护者 re-ovo 与贡献者。本仓库保留 RikkaHub 3.0.0 的 git 历史与上游版权声明，并在此基础上做选择性修改。
-- [MiaoWuNYA/rikkahub-sillytavern-android](https://github.com/MiaoWuNYA/rikkahub-sillytavern-android)。SillyTavern 兼容层（宏、世界书、角色卡、预设、正则、作者备注）从该项目移植，并改写到 RikkaHub 3.0.0 的 `ChatRequestFactory` 生成管线上。该分支里的情侣空间、生活中心、机器人、插件沙箱、通话、设备工具和 Chaquopy Python 没有带入。
-- [SillyTavern](https://github.com/SillyTavern/SillyTavern)。角色卡、世界书、预设和正则脚本的字段与行为对齐其公开格式。
-- [Summaryception](https://github.com/Lodactio/Extension-Summaryception)（AGPL-3.0）。内置的中英文总结提示词改编自它的 narrative 预设：只写已有摘要里还没有的新情节，输出一行。没有使用 EphemeralAlien/AutoSummarizer 的提示词。
-
-三者均为 AGPL-3.0。分发本项目的修改版本时，请遵守 AGPL-3.0，并保留上述版权声明。
+分发本项目的修改版本时，请遵守 [AGPL-3.0](LICENSE) 许可协议，并保留上述版权与致谢声明。
