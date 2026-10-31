@@ -55,4 +55,10 @@ class UpdateReleaseTest {
     fun `APK extension is case insensitive`() {
         assertTrue(UpdateDownload("PocketTavern.APK", "https://example.com/app.apk", "123").isApk)
     }
+
+    @Test
+    fun `formatted file size displays human readable unit`() {
+        val download = UpdateDownload("PocketTavern.apk", "https://example.com/app.apk", "23932847")
+        assertTrue(download.formattedSize.contains("MB"))
+    }
 }

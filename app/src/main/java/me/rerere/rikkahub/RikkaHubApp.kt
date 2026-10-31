@@ -46,6 +46,7 @@ private const val TAG = "RikkaHubApp"
 const val CHAT_COMPLETED_NOTIFICATION_CHANNEL_ID = "chat_completed"
 const val CHAT_LIVE_UPDATE_NOTIFICATION_CHANNEL_ID = "chat_live_update"
 const val MEMORY_DREAM_NOTIFICATION_CHANNEL_ID = "memory_dream"
+const val APP_UPDATE_NOTIFICATION_CHANNEL_ID = "app_update"
 
 class RikkaHubApp : Application() {
     override fun onCreate() {
@@ -188,6 +189,14 @@ class RikkaHubApp : Application() {
             .setShowBadge(false)
             .build()
         notificationManager.createNotificationChannel(memoryDreamChannel)
+
+        val appUpdateChannel = NotificationChannelCompat
+            .Builder(APP_UPDATE_NOTIFICATION_CHANNEL_ID, NotificationManagerCompat.IMPORTANCE_LOW)
+            .setName(getString(R.string.notification_channel_app_update))
+            .setVibrationEnabled(false)
+            .setShowBadge(false)
+            .build()
+        notificationManager.createNotificationChannel(appUpdateChannel)
     }
 
     override fun onTerminate() {

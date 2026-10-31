@@ -9,15 +9,18 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Text
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,21 +34,24 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import me.rerere.ui.toast.ToastType
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Cancel01
 import me.rerere.hugeicons.stroke.Download01
+import me.rerere.hugeicons.stroke.Tick01
 import me.rerere.rikkahub.BuildConfig
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.ui.components.richtext.MarkdownBlock
 import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.ui.hooks.useThrottle
 import me.rerere.rikkahub.ui.pages.chat.ChatVM
+import me.rerere.rikkahub.utils.DownloadStatus
 import me.rerere.rikkahub.utils.UpdateDownload
 import me.rerere.rikkahub.utils.Version
+import me.rerere.rikkahub.utils.formatFileSize
 import me.rerere.rikkahub.utils.onError
 import me.rerere.rikkahub.utils.onSuccess
 import me.rerere.rikkahub.utils.toLocalDateTime
+import me.rerere.ui.toast.ToastType
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
@@ -54,6 +60,7 @@ import kotlin.time.toJavaInstant
 @Composable
 fun UpdateCard(vm: ChatVM) {
     val state by vm.updateState.collectAsStateWithLifecycle()
+    val downloadStatus by vm.updateChecker.downloadStatus.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val toaster = LocalToaster.current
     state.onError {
@@ -118,6 +125,44 @@ fun UpdateCard(vm: ChatVM) {
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.heightIn(max = 200.dp)
                     )
+
+                    when (val currentDownload = downloadStatus) {
+                        is DownloadStatus.Downloading -> {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "${(currentDownload.progress * 100).toInt()}%",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "${formatFileSize(currentDownload.downloadedBytes)} / ${formatFileSize(currentDownload.totalBytes)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                LinearProgressIndicator(
+                                    progress = { currentDownload.progress.coerceIn(0f, 1f) },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                        is DownloadStatus.Success -> {
+                            Button(
+                                onClick = { vm.updateChecker.installApk(context, currentDownload.file) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(text = stringResource(R.string.update_download_success))
+                            }
+                        }
+                        else -> {}
+                    }
                 }
             }
         }
@@ -163,28 +208,86 @@ fun UpdateCard(vm: ChatVM) {
                             .verticalScroll(rememberScrollState()),
                         style = MaterialTheme.typography.bodyMedium
                     )
-                    info.downloads.fastForEach { downloadItem ->
+
+                    val primaryAbi = remember {
+                        android.os.Build.SUPPORTED_ABIS.firstOrNull().orEmpty().lowercase()
+                    }
+                    val sortedDownloads = remember(info.downloads, primaryAbi) {
+                        info.downloads.sortedWith(compareByDescending { download ->
+                            val name = download.name.lowercase()
+                            when {
+                                primaryAbi.isNotBlank() && name.contains(primaryAbi) -> 3
+                                name.contains("arm64") -> 2
+                                name.contains("universal") -> 1
+                                else -> 0
+                            }
+                        })
+                    }
+
+                    sortedDownloads.fastForEach { downloadItem ->
+                        val isCurrentDownloading = downloadStatus is DownloadStatus.Downloading && (downloadStatus as DownloadStatus.Downloading).download.url == downloadItem.url
+                        val isCurrentSuccess = downloadStatus is DownloadStatus.Success && (downloadStatus as DownloadStatus.Success).download.url == downloadItem.url
+                        val isRecommended = remember(downloadItem.name, primaryAbi) {
+                            primaryAbi.isNotBlank() && downloadItem.name.lowercase().contains(primaryAbi)
+                        }
+
                         OutlinedCard(
                             onClick = {
-                                downloadHandler(downloadItem)
+                                if (isCurrentSuccess) {
+                                    vm.updateChecker.installApk(context, (downloadStatus as DownloadStatus.Success).file)
+                                } else {
+                                    downloadHandler(downloadItem)
+                                }
                             },
                         ) {
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        text = downloadItem.name,
-                                    )
-                                },
-                                supportingContent = if (downloadItem.isApk) {
-                                    { Text(text = downloadItem.size) }
-                                } else null,
-                                leadingContent = {
-                                    Icon(
-                                        imageVector = HugeIcons.Download01,
-                                        contentDescription = null
+                            Column {
+                                ListItem(
+                                    headlineContent = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                text = downloadItem.name,
+                                                modifier = Modifier.weight(1f, fill = false)
+                                            )
+                                            if (isRecommended && downloadItem.isApk) {
+                                                SuggestionChip(
+                                                    onClick = {},
+                                                    label = { Text(stringResource(R.string.update_recommended)) }
+                                                )
+                                            }
+                                        }
+                                    },
+                                    supportingContent = if (isCurrentSuccess) {
+                                        { Text(text = stringResource(R.string.update_download_success), color = MaterialTheme.colorScheme.primary) }
+                                    } else if (isCurrentDownloading) {
+                                        val downloading = downloadStatus as DownloadStatus.Downloading
+                                        { Text(text = "${(downloading.progress * 100).toInt()}% (${formatFileSize(downloading.downloadedBytes)} / ${formatFileSize(downloading.totalBytes)})") }
+                                    } else if (downloadItem.isApk) {
+                                        { Text(text = downloadItem.formattedSize) }
+                                    } else null,
+                                    leadingContent = {
+                                        Icon(
+                                            imageVector = when {
+                                                isCurrentSuccess -> HugeIcons.Tick01
+                                                else -> HugeIcons.Download01
+                                            },
+                                            contentDescription = null,
+                                            tint = if (isCurrentSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                )
+                                if (isCurrentDownloading) {
+                                    val downloading = downloadStatus as DownloadStatus.Downloading
+                                    LinearProgressIndicator(
+                                        progress = { downloading.progress.coerceIn(0f, 1f) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 4.dp)
                                     )
                                 }
-                            )
+                            }
                         }
                     }
                 }
