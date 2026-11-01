@@ -363,8 +363,6 @@
   <string name="extension_selector_quick_messages_empty">No quick messages available</string>
   <string name="extension_selector_skills_empty">No skills available</string>
   <string name="extension_selector_tab_lorebooks">Lorebooks</string>
-  <string name="extension_selector_tab_presets">Presets</string>
-  <string name="extension_selector_presets_empty">No presets available</string>
   <string name="extension_selector_tab_mode_injections">Mode Injections</string>
   <string name="extension_selector_tab_quick_messages">Quick Messages</string>
   <string name="extension_selector_tab_skills">Skills</string>

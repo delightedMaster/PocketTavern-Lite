@@ -18,7 +18,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Book01
-import me.rerere.hugeicons.stroke.Layers01
 import me.rerere.hugeicons.stroke.MagicWand01
 import me.rerere.hugeicons.stroke.Puzzle
 import me.rerere.hugeicons.stroke.Zap
@@ -27,7 +26,6 @@ import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.skills.SkillManager
 import me.rerere.rikkahub.data.skills.SkillMetadata
 import me.rerere.rikkahub.data.model.Assistant
-import me.rerere.rikkahub.data.model.LorebookKind
 import me.rerere.rikkahub.ui.components.ai.ExtensionEmptyState
 import me.rerere.rikkahub.ui.components.ai.LorebooksContent
 import me.rerere.rikkahub.ui.components.ai.ModeInjectionsContent
@@ -42,7 +40,6 @@ internal enum class ExtensionTab(
     QUICK_MESSAGES(HugeIcons.Zap, R.string.extension_selector_tab_quick_messages),
     MODE_INJECTIONS(HugeIcons.MagicWand01, R.string.extension_selector_tab_mode_injections),
     LOREBOOKS(HugeIcons.Book01, R.string.extension_selector_tab_lorebooks),
-    PRESETS(HugeIcons.Layers01, R.string.extension_selector_tab_presets),
     SKILLS(HugeIcons.Puzzle, R.string.extension_selector_tab_skills);
 
     override val label: String
@@ -59,7 +56,6 @@ fun ExtensionSelector(
     onNavigateToQuickMessages: () -> Unit = {},
     onNavigateToPrompts: () -> Unit = {},
     onNavigateToLorebooks: () -> Unit = {},
-    onNavigateToPresets: () -> Unit = {},
     onNavigateToSkills: () -> Unit = {},
 ) {
     val skillManager: SkillManager = koinInject()
@@ -72,10 +68,6 @@ fun ExtensionSelector(
     }
 
     val pagerState = rememberPagerState { ExtensionTab.entries.size }
-
-    // 世界书与预设共用 Lorebook 模型和 assistant.lorebookIds 绑定，按 kind 分到两个标签
-    val worldBooks = settings.lorebooks.filter { it.kind == LorebookKind.WORLD_BOOK }
-    val presets = settings.lorebooks.filter { it.kind == LorebookKind.PRESET }
 
     Column(
         modifier = modifier
@@ -145,9 +137,9 @@ fun ExtensionSelector(
                 }
 
                 ExtensionTab.LOREBOOKS -> {
-                    if (worldBooks.isNotEmpty()) {
+                    if (settings.lorebooks.isNotEmpty()) {
                         LorebooksContent(
-                            lorebooks = worldBooks,
+                            lorebooks = settings.lorebooks,
                             selectedIds = assistant.lorebookIds,
                             onToggle = { id, checked ->
                                 val newIds = if (checked) {
@@ -164,31 +156,6 @@ fun ExtensionSelector(
                             message = stringResource(R.string.extension_selector_lorebooks_empty),
                             buttonText = stringResource(R.string.extension_selector_go_to_extensions),
                             onAction = onNavigateToLorebooks,
-                            icon = tab.icon,
-                        )
-                    }
-                }
-
-                ExtensionTab.PRESETS -> {
-                    if (presets.isNotEmpty()) {
-                        LorebooksContent(
-                            lorebooks = presets,
-                            selectedIds = assistant.lorebookIds,
-                            onToggle = { id, checked ->
-                                val newIds = if (checked) {
-                                    assistant.lorebookIds + id
-                                } else {
-                                    assistant.lorebookIds - id
-                                }
-                                onUpdate(assistant.copy(lorebookIds = newIds))
-                            },
-                            onManage = onNavigateToPresets,
-                        )
-                    } else {
-                        ExtensionEmptyState(
-                            message = stringResource(R.string.extension_selector_presets_empty),
-                            buttonText = stringResource(R.string.extension_selector_go_to_extensions),
-                            onAction = onNavigateToPresets,
                             icon = tab.icon,
                         )
                     }

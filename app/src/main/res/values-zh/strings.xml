@@ -376,8 +376,6 @@
   <string name="extension_selector_quick_messages_empty">暂无快捷消息</string>
   <string name="extension_selector_skills_empty">暂无技能</string>
   <string name="extension_selector_tab_lorebooks">世界书</string>
-  <string name="extension_selector_tab_presets">预设</string>
-  <string name="extension_selector_presets_empty">无可用的预设</string>
   <string name="extension_selector_tab_mode_injections">提示词注入</string>
   <string name="extension_selector_tab_quick_messages">快捷消息</string>
   <string name="extension_selector_tab_skills">技能</string>
