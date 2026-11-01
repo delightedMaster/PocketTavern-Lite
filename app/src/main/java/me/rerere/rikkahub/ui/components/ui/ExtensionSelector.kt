@@ -16,8 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import kotlin.uuid.Uuid
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Book01
+import me.rerere.hugeicons.stroke.Layers01
 import me.rerere.hugeicons.stroke.MagicWand01
 import me.rerere.hugeicons.stroke.Puzzle
 import me.rerere.hugeicons.stroke.Zap
@@ -26,6 +28,10 @@ import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.skills.SkillManager
 import me.rerere.rikkahub.data.skills.SkillMetadata
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.Lorebook
+import me.rerere.rikkahub.data.model.LorebookKind
+import me.rerere.rikkahub.data.model.lorebooksOfKind
+import me.rerere.rikkahub.data.model.toggleLorebookBinding
 import me.rerere.rikkahub.ui.components.ai.ExtensionEmptyState
 import me.rerere.rikkahub.ui.components.ai.LorebooksContent
 import me.rerere.rikkahub.ui.components.ai.ModeInjectionsContent
@@ -40,6 +46,7 @@ internal enum class ExtensionTab(
     QUICK_MESSAGES(HugeIcons.Zap, R.string.extension_selector_tab_quick_messages),
     MODE_INJECTIONS(HugeIcons.MagicWand01, R.string.extension_selector_tab_mode_injections),
     LOREBOOKS(HugeIcons.Book01, R.string.extension_selector_tab_lorebooks),
+    PRESETS(HugeIcons.Layers01, R.string.extension_selector_tab_presets),
     SKILLS(HugeIcons.Puzzle, R.string.extension_selector_tab_skills);
 
     override val label: String
@@ -56,6 +63,7 @@ fun ExtensionSelector(
     onNavigateToQuickMessages: () -> Unit = {},
     onNavigateToPrompts: () -> Unit = {},
     onNavigateToLorebooks: () -> Unit = {},
+    onNavigateToPresets: () -> Unit = {},
     onNavigateToSkills: () -> Unit = {},
 ) {
     val skillManager: SkillManager = koinInject()
@@ -137,28 +145,31 @@ fun ExtensionSelector(
                 }
 
                 ExtensionTab.LOREBOOKS -> {
-                    if (settings.lorebooks.isNotEmpty()) {
-                        LorebooksContent(
-                            lorebooks = settings.lorebooks,
-                            selectedIds = assistant.lorebookIds,
-                            onToggle = { id, checked ->
-                                val newIds = if (checked) {
-                                    assistant.lorebookIds + id
-                                } else {
-                                    assistant.lorebookIds - id
-                                }
-                                onUpdate(assistant.copy(lorebookIds = newIds))
-                            },
-                            onManage = onNavigateToLorebooks,
-                        )
-                    } else {
-                        ExtensionEmptyState(
-                            message = stringResource(R.string.extension_selector_lorebooks_empty),
-                            buttonText = stringResource(R.string.extension_selector_go_to_extensions),
-                            onAction = onNavigateToLorebooks,
-                            icon = tab.icon,
-                        )
-                    }
+                    LorebookBindingTab(
+                        lorebooks = lorebooksOfKind(settings.lorebooks, LorebookKind.WORLD_BOOK),
+                        selectedIds = assistant.lorebookIds,
+                        emptyMessage = stringResource(R.string.extension_selector_lorebooks_empty),
+                        manageLabel = stringResource(R.string.extension_selector_go_to_lorebooks),
+                        icon = tab.icon,
+                        onToggle = { id, checked ->
+                            onUpdate(assistant.withLorebookBinding(id, checked))
+                        },
+                        onManage = onNavigateToLorebooks,
+                    )
+                }
+
+                ExtensionTab.PRESETS -> {
+                    LorebookBindingTab(
+                        lorebooks = lorebooksOfKind(settings.lorebooks, LorebookKind.PRESET),
+                        selectedIds = assistant.lorebookIds,
+                        emptyMessage = stringResource(R.string.extension_selector_presets_empty),
+                        manageLabel = stringResource(R.string.extension_selector_go_to_presets),
+                        icon = tab.icon,
+                        onToggle = { id, checked ->
+                            onUpdate(assistant.withLorebookBinding(id, checked))
+                        },
+                        onManage = onNavigateToPresets,
+                    )
                 }
 
                 ExtensionTab.SKILLS -> {
@@ -187,5 +198,36 @@ fun ExtensionSelector(
                 }
             }
         }
+    }
+}
+
+// 世界书和预设共用 lorebookIds。只增删当前这一条，另一类的绑定保持不变。
+private fun Assistant.withLorebookBinding(id: Uuid, checked: Boolean): Assistant =
+    copy(lorebookIds = toggleLorebookBinding(lorebookIds, id, checked))
+
+@Composable
+private fun LorebookBindingTab(
+    lorebooks: List<Lorebook>,
+    selectedIds: Set<Uuid>,
+    emptyMessage: String,
+    manageLabel: String,
+    icon: ImageVector,
+    onToggle: (Uuid, Boolean) -> Unit,
+    onManage: () -> Unit,
+) {
+    if (lorebooks.isNotEmpty()) {
+        LorebooksContent(
+            lorebooks = lorebooks,
+            selectedIds = selectedIds,
+            onToggle = onToggle,
+            onManage = onManage,
+        )
+    } else {
+        ExtensionEmptyState(
+            message = emptyMessage,
+            buttonText = manageLabel,
+            onAction = onManage,
+            icon = icon,
+        )
     }
 }
