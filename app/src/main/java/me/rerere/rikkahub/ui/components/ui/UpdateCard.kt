@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
@@ -62,6 +63,7 @@ fun UpdateCard(vm: ChatVM) {
     val state by vm.updateState.collectAsStateWithLifecycle()
     val downloadStatus by vm.updateChecker.downloadStatus.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val resources = LocalResources.current
     val toaster = LocalToaster.current
     state.onError {
         Card {
@@ -171,7 +173,7 @@ fun UpdateCard(vm: ChatVM) {
                 vm.updateChecker.downloadUpdate(context, item)
                 showDetail = false
                 if (item.isApk) {
-                    toaster.show(context.getString(R.string.update_card_downloading), type = ToastType.Info)
+                    toaster.show(resources.getString(R.string.update_card_downloading), type = ToastType.Info)
                 }
             }
             ModalBottomSheet(

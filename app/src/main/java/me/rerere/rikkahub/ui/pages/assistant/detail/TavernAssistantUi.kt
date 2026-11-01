@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -268,6 +269,7 @@ internal fun ExportCardDialog(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val toaster = LocalToaster.current
     val exportScope = remember { CoroutineScope(Dispatchers.Main + SupervisorJob()) }
     var downloadingAvatar by remember { mutableStateOf(false) }
@@ -315,9 +317,9 @@ internal fun ExportCardDialog(
                                     val json = CardExporter.buildV3CardJson(assistant)
                                     val fileName = exportFileName(assistant.name, "json")
                                     saveToDownloads(context, fileName, "application/json", json.toByteArray())
-                                    toaster.show(context.getString(R.string.tavern_export_json_success, fileName))
+                                    toaster.show(resources.getString(R.string.tavern_export_json_success, fileName))
                                 } catch (e: Exception) {
-                                    toaster.show(context.getString(R.string.tavern_export_failed, e.message.orEmpty()))
+                                    toaster.show(resources.getString(R.string.tavern_export_failed, e.message.orEmpty()))
                                 }
                             }
                         },
@@ -341,7 +343,7 @@ internal fun ExportCardDialog(
                                         if (downloaded != null) {
                                             exportPng(context, exportScope, toaster, assistant, downloaded)
                                         } else {
-                                            toaster.show(context.getString(R.string.tavern_export_png_download_failed))
+                                            toaster.show(resources.getString(R.string.tavern_export_png_download_failed))
                                             pngImagePicker.launch("image/*")
                                         }
                                     }

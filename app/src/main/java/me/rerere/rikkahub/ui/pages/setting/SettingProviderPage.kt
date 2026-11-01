@@ -54,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -244,6 +245,7 @@ private fun ImportProviderButton(
 ) {
     val toaster = LocalToaster.current
     val context = LocalContext.current
+    val resources = LocalResources.current
     var showImportDialog by remember { mutableStateOf(false) }
 
     val scanQrCodeLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
@@ -296,7 +298,7 @@ private fun ImportProviderButton(
                                 scanQrCodeLauncher.launch(
                                     ScanOptions()
                                         .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                                        .setPrompt(context.getString(R.string.setting_provider_page_scan_qr_code))
+                                        .setPrompt(resources.getString(R.string.setting_provider_page_scan_qr_code))
                                         .setBeepEnabled(false)
                                         .setOrientationLocked(false)
                                 )
