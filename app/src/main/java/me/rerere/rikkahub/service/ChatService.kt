@@ -302,7 +302,8 @@ class ChatService(
     private suspend fun newConversation(conversationId: Uuid): Conversation {
         val settings = settingsStore.awaitLoaded()
         val assistant = settings.getCurrentAssistant()
-        // 开场白直接写入对话、不经过生成管线，在这里替换 {{user}} / {{char}} 等宏
+        // 开场白直接写入对话、不经过生成管线，在这里替换 {{user}} / {{char}} 等宏。
+        // 传入本会话 id，{{setvar}} 等本对话变量落在这个会话上，{{setglobalvar}} 仍写全局。
         val presetMessages = assistant.presetMessages.map { message ->
             message.copy(
                 parts = message.parts.map { part ->
@@ -313,6 +314,7 @@ class ChatService(
                                 settings = settings,
                                 assistant = assistant,
                                 text = part.text,
+                                conversationId = conversationId,
                             )
                         )
                     } else {
