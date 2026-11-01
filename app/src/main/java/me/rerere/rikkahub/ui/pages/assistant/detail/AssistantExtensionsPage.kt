@@ -22,6 +22,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
+import me.rerere.rikkahub.data.model.LorebookKind
+import me.rerere.rikkahub.data.model.lorebooksOfKind
+import me.rerere.rikkahub.data.model.toggleLorebookBinding
 import me.rerere.rikkahub.ui.components.ai.ExtensionEmptyState
 import me.rerere.rikkahub.ui.components.ai.LorebooksContent
 import me.rerere.rikkahub.ui.components.ai.ModeInjectionsContent
@@ -80,14 +83,14 @@ fun AssistantExtensionsPage(id: String) {
                     .fillMaxWidth()
                     .weight(1f),
             ) { page ->
-                when (page) {
-                    0 -> {
+                when (val tab = ExtensionTab.entries[page]) {
+                    ExtensionTab.QUICK_MESSAGES -> {
                         if (settings.quickMessages.isEmpty()) {
                             ExtensionEmptyState(
                                 message = stringResource(R.string.assistant_extensions_page_empty_quick_messages),
                                 buttonText = stringResource(R.string.assistant_extensions_page_goto_extensions),
                                 onAction = { navController.navigate(Screen.QuickMessages) },
-                                icon = ExtensionTab.QUICK_MESSAGES.icon,
+                                icon = tab.icon,
                             )
                         } else {
                             QuickMessagesContent(
@@ -105,13 +108,13 @@ fun AssistantExtensionsPage(id: String) {
                         }
                     }
 
-                    1 -> {
+                    ExtensionTab.MODE_INJECTIONS -> {
                         if (settings.modeInjections.isEmpty()) {
                             ExtensionEmptyState(
                                 message = stringResource(R.string.assistant_extensions_page_empty_mode_injections),
                                 buttonText = stringResource(R.string.assistant_extensions_page_goto_prompts),
                                 onAction = { navController.navigate(Screen.Prompts) },
-                                icon = ExtensionTab.MODE_INJECTIONS.icon,
+                                icon = tab.icon,
                             )
                         } else {
                             ModeInjectionsContent(
@@ -129,37 +132,67 @@ fun AssistantExtensionsPage(id: String) {
                         }
                     }
 
-                    2 -> {
-                        if (settings.lorebooks.isEmpty()) {
+                    ExtensionTab.LOREBOOKS -> {
+                        val worldBooks = lorebooksOfKind(settings.lorebooks, LorebookKind.WORLD_BOOK)
+                        if (worldBooks.isEmpty()) {
                             ExtensionEmptyState(
                                 message = stringResource(R.string.assistant_extensions_page_empty_lorebooks),
-                                buttonText = stringResource(R.string.assistant_extensions_page_goto_prompts),
-                                onAction = { navController.navigate(Screen.Prompts) },
-                                icon = ExtensionTab.LOREBOOKS.icon,
+                                buttonText = stringResource(R.string.assistant_extensions_page_goto_lorebooks),
+                                onAction = { navController.navigate(Screen.Lorebooks) },
+                                icon = tab.icon,
                             )
                         } else {
                             LorebooksContent(
                                 contentPadding = listPadding,
                                 colors = listColors,
-                                lorebooks = settings.lorebooks,
+                                lorebooks = worldBooks,
                                 selectedIds = assistant.lorebookIds,
-                                onToggle = { injId, checked ->
-                                    val newIds = if (checked) assistant.lorebookIds + injId
-                                    else assistant.lorebookIds - injId
-                                    vm.update(assistant.copy(lorebookIds = newIds))
+                                onToggle = { id, checked ->
+                                    vm.update(
+                                        assistant.copy(
+                                            lorebookIds = toggleLorebookBinding(assistant.lorebookIds, id, checked),
+                                        ),
+                                    )
                                 },
-                                onManage = { navController.navigate(Screen.Prompts) },
+                                onManage = { navController.navigate(Screen.Lorebooks) },
                             )
                         }
                     }
 
-                    3 -> {
+                    ExtensionTab.PRESETS -> {
+                        val presets = lorebooksOfKind(settings.lorebooks, LorebookKind.PRESET)
+                        if (presets.isEmpty()) {
+                            ExtensionEmptyState(
+                                message = stringResource(R.string.assistant_extensions_page_empty_presets),
+                                buttonText = stringResource(R.string.assistant_extensions_page_goto_presets),
+                                onAction = { navController.navigate(Screen.Presets) },
+                                icon = tab.icon,
+                            )
+                        } else {
+                            LorebooksContent(
+                                contentPadding = listPadding,
+                                colors = listColors,
+                                lorebooks = presets,
+                                selectedIds = assistant.lorebookIds,
+                                onToggle = { id, checked ->
+                                    vm.update(
+                                        assistant.copy(
+                                            lorebookIds = toggleLorebookBinding(assistant.lorebookIds, id, checked),
+                                        ),
+                                    )
+                                },
+                                onManage = { navController.navigate(Screen.Presets) },
+                            )
+                        }
+                    }
+
+                    ExtensionTab.SKILLS -> {
                         if (skills.isEmpty()) {
                             ExtensionEmptyState(
                                 message = stringResource(R.string.assistant_extensions_page_empty_skills),
                                 buttonText = stringResource(R.string.assistant_extensions_page_goto_extensions),
                                 onAction = { navController.navigate(Screen.Skills) },
-                                icon = ExtensionTab.SKILLS.icon,
+                                icon = tab.icon,
                             )
                         } else {
                             SkillsContent(
