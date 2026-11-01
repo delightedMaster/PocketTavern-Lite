@@ -85,7 +85,10 @@ To build a signed release APK, configure the signing properties in `local.proper
 - **0.1.2**: Implemented import compatibility diagnostic reports; revamped model provider management and connection tests.
 - **0.1.3**: In-chat HTML codeblock rendering, context and max token budget controls, and joint preset/regex importing.
 - **0.1.4**: In-place post-story HTML rendering, full-page codeblock detection, and built-in front-end CDN/font/image whitelists.
-- **0.1.5** (Current):
+- **0.1.6** (Current):
+  - Lorebooks, regex scripts and presets moved to their own settings entries; the Prompts page keeps only prompt injections and author's note.
+  - The release workflow can be triggered manually from Actions and creates the version tag itself.
+- **0.1.5**:
   - In-app update engine overhaul (proxy support, mirror acceleration, notification progress, and auto-install trigger).
   - Interactive in-app Regex Script Editor with live model output replacement preview.
   - CI/CD build artifact naming standardization (version tag + ABI suffix) with SHA-256 checksum generation.

@@ -55,6 +55,7 @@ fun ExtensionSelector(
     onUpdate: (Assistant) -> Unit,
     onNavigateToQuickMessages: () -> Unit = {},
     onNavigateToPrompts: () -> Unit = {},
+    onNavigateToLorebooks: () -> Unit = {},
     onNavigateToSkills: () -> Unit = {},
 ) {
     val skillManager: SkillManager = koinInject()
@@ -148,13 +149,13 @@ fun ExtensionSelector(
                                 }
                                 onUpdate(assistant.copy(lorebookIds = newIds))
                             },
-                            onManage = onNavigateToPrompts,
+                            onManage = onNavigateToLorebooks,
                         )
                     } else {
                         ExtensionEmptyState(
                             message = stringResource(R.string.extension_selector_lorebooks_empty),
                             buttonText = stringResource(R.string.extension_selector_go_to_extensions),
-                            onAction = onNavigateToPrompts,
+                            onAction = onNavigateToLorebooks,
                             icon = tab.icon,
                         )
                     }

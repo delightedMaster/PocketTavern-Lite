@@ -84,7 +84,6 @@ import kotlinx.coroutines.withContext
 import me.rerere.ai.core.MessageRole
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Add01
-import me.rerere.hugeicons.stroke.Code
 import me.rerere.hugeicons.stroke.Idea01
 import me.rerere.hugeicons.stroke.ArrowDown01
 import me.rerere.hugeicons.stroke.Book01
@@ -138,9 +137,7 @@ private enum class PromptTab(
     @param:StringRes private val labelRes: Int,
 ) : PagerTab {
     MODE_INJECTIONS(HugeIcons.MagicWand01, R.string.prompt_page_mode_injection_tab),
-    LOREBOOKS(HugeIcons.Book01, R.string.prompt_page_lorebook_tab),
-    AUTHOR_NOTE(HugeIcons.Idea01, R.string.prompt_page_author_note_tab),
-    REGEX(HugeIcons.Code, R.string.prompt_page_regex_tab);
+    AUTHOR_NOTE(HugeIcons.Idea01, R.string.prompt_page_author_note_tab);
 
     override val label: String
         @Composable get() = stringResource(labelRes)
@@ -188,22 +185,9 @@ fun PromptPage(vm: PromptVM = koinViewModel()) {
                         onUpdate = { vm.updateSettings { latest -> latest.copy(modeInjections = it) } }
                     )
 
-                    PromptTab.LOREBOOKS -> LorebookTab(
-                        lorebooks = settings.lorebooks,
-                        onUpdate = { vm.updateSettings { latest -> latest.copy(lorebooks = it) } },
-                        onImport = vm::importLorebook,
-                    )
-
                     PromptTab.AUTHOR_NOTE -> AuthorNoteTab(
                         settings = settings,
                         onUpdate = { vm.updateSettings(it) },
-                    )
-
-                    PromptTab.REGEX -> RegexScriptsTab(
-                        groups = settings.regexGroups,
-                        onUpdate = { groups ->
-                            vm.updateSettings { latest -> latest.copy(regexGroups = groups) }
-                        },
                     )
                 }
             }
@@ -631,7 +615,8 @@ private fun getRoleLabel(role: MessageRole): String = when (role) {
 // ==================== Lorebook Tab ====================
 
 @Composable
-private fun LorebookTab(
+internal fun LorebookTab(
+    kind: LorebookKind,
     lorebooks: List<Lorebook>,
     onUpdate: (List<Lorebook>) -> Unit,
     onImport: suspend (LorebookImport) -> Unit,
@@ -682,7 +667,9 @@ private fun LorebookTab(
     Box(modifier = Modifier.fillMaxSize()) {
         if (lorebooks.isEmpty()) {
             ExtensionEmptyState(
-                message = stringResource(R.string.prompt_page_lorebook_empty),
+                message = stringResource(
+                    if (kind == LorebookKind.PRESET) R.string.prompt_page_preset_empty else R.string.prompt_page_lorebook_empty
+                ),
                 description = stringResource(R.string.prompt_page_empty_hint),
                 icon = HugeIcons.Book01,
             )
@@ -727,7 +714,7 @@ private fun LorebookTab(
                 }
             },
         ) {
-            Button(onClick = { editState.open(Lorebook()) }) {
+            Button(onClick = { editState.open(Lorebook(kind = kind)) }) {
                 Row(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
@@ -736,7 +723,11 @@ private fun LorebookTab(
                     AnimatedVisibility(expanded) {
                         Row {
                             Spacer(modifier = Modifier.size(8.dp))
-                            Text(stringResource(R.string.prompt_page_add_lorebook))
+                            Text(
+                                stringResource(
+                                    if (kind == LorebookKind.PRESET) R.string.prompt_page_add_preset else R.string.prompt_page_add_lorebook
+                                )
+                            )
                         }
                     }
                 }

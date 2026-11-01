@@ -308,6 +308,10 @@ private fun ExtensionPickerPage(
                 onDismissAll()
                 navController.navigate(Screen.Prompts)
             },
+            onNavigateToLorebooks = {
+                onDismissAll()
+                navController.navigate(Screen.Lorebooks)
+            },
             onNavigateToSkills = {
                 onDismissAll()
                 navController.navigate(Screen.Skills)
