@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without the v prefix, e.g. 0.1.6. Must equal versionName."
+        required: true
 
 permissions:
   contents: write
@@ -11,10 +16,25 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Validate manual release version
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION_NAME=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts | head -n 1)
+          if [ "$VERSION_NAME" != "${{ inputs.version }}" ]; then
+            echo "versionName in app/build.gradle.kts is '$VERSION_NAME', but input version is '${{ inputs.version }}'."
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists on origin."
+            exit 1
+          fi
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -68,7 +88,6 @@ jobs:
 
       - name: Rename and package release assets
         run: |
-          TAG="${GITHUB_REF_NAME}"
           cd app/build/outputs/apk/release
           for file in *.apk; do
             [ -f "$file" ] || continue
@@ -96,7 +115,7 @@ jobs:
           python3 - << 'PY'
           import os
           from pathlib import Path
-          tag = os.environ.get("GITHUB_REF_NAME", "")
+          tag = os.environ.get("TAG", "")
           version = tag[1:] if tag.startswith("v") else tag
           lines = Path("CHANGELOG.md").read_text(encoding="utf-8").splitlines()
           start = next((i for i, line in enumerate(lines) if line.startswith("## ") and version in line), None)
@@ -116,6 +135,8 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
           files: |
             app/build/outputs/apk/release/*.apk
             app/build/outputs/apk/release/sha256sums.txt

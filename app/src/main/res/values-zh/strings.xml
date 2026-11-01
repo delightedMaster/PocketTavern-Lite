@@ -382,7 +382,7 @@
   <string name="extensions_page_agent_skills">技能（Skills）</string>
   <string name="extensions_page_agent_skills_desc">管理可供 AI 按需加载的技能包</string>
   <string name="extensions_page_prompts">提示词</string>
-  <string name="extensions_page_prompts_desc">管理和使用自定义提示词</string>
+  <string name="extensions_page_prompts_desc">提示词注入与作者备注</string>
   <string name="extensions_page_quick_messages_desc">管理共享的快速消息模板</string>
   <string name="extensions_page_section_extensions">扩展</string>
   <string name="extensions_page_title">扩展管理</string>
@@ -519,6 +519,8 @@
   <string name="prompt_page_keywords_format">关键词：%s</string>
   <string name="prompt_page_keywords_label">关键词</string>
   <string name="prompt_page_lorebook_empty">暂无世界书</string>
+  <string name="prompt_page_add_preset">添加预设</string>
+  <string name="prompt_page_preset_empty">还没有预设</string>
   <string name="prompt_page_lorebook_tab">世界书</string>
   <string name="prompt_page_mode_injection_empty">暂无模式注入</string>
   <string name="prompt_page_mode_injection_tab">提示词注入</string>
@@ -818,6 +820,12 @@
   <string name="setting_page_about_desc">关于本APP</string>
   <string name="setting_page_assistant">助手</string>
   <string name="setting_page_assistant_desc">设置个性化助手 (智能体)</string>
+  <string name="setting_page_lorebooks">世界书</string>
+  <string name="setting_page_lorebooks_desc">酒馆世界书与记忆书</string>
+  <string name="setting_page_regex">正则</string>
+  <string name="setting_page_regex_desc">显示与提示词正则脚本</string>
+  <string name="setting_page_presets">预设</string>
+  <string name="setting_page_presets_desc">导入的酒馆预设</string>
   <string name="setting_page_built_in_tools">内置工具</string>
   <string name="setting_page_built_in_tools_desc">选择模型支持的内置工具, 这些工具直接由API内置，无需APP提供，当前这个功能仅支持Gemini官方API。</string>
   <string name="setting_page_built_in_tools_image_generation">图像生成</string>
