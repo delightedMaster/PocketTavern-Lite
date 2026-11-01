@@ -8,6 +8,8 @@ import me.rerere.rikkahub.data.model.AssistantRegex
 import me.rerere.rikkahub.data.model.RegexGroup
 import me.rerere.rikkahub.data.model.RegexGroupSource
 import me.rerere.rikkahub.data.model.LorebookKind
+import me.rerere.rikkahub.data.model.AssistantAffectScope
+import me.rerere.rikkahub.data.model.replaceRegexes
 import me.rerere.rikkahub.utils.JsonInstant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -40,6 +42,19 @@ class PresetRegexImportTest {
         assertEquals(2, regexes.size)
         assertTrue(regexes.any { it.name == "状态栏" && it.visualOnly })
         assertTrue(regexes.any { it.name == "隐藏" && it.promptOnly })
+    }
+
+    @Test
+    fun `markdownOnly and promptOnly both true applies to both layers`() {
+        val regexes = SillyTavernRegexImporter.parse(
+            """[{"scriptName":"美化","findRegex":"/<fox_selc>/g","replaceString":"<b>","placement":[2],"markdownOnly":true,"promptOnly":true}]"""
+        )
+        val regex = regexes.single()
+        assertEquals(false, regex.visualOnly)
+        assertEquals(false, regex.promptOnly)
+        val scope = AssistantAffectScope.ASSISTANT
+        assertEquals("<b>", "<fox_selc>".replaceRegexes(listOf(regex), scope, visual = true))
+        assertEquals("<b>", "<fox_selc>".replaceRegexes(listOf(regex), scope, visual = false))
     }
 
     @Test

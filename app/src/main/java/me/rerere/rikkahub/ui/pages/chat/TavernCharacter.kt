@@ -44,6 +44,9 @@ private fun JsonObject.toAssistantRegex(): AssistantRegex {
         if (2 in placements) add(AssistantAffectScope.ASSISTANT)
     }
     val id = str("id")?.let { runCatching { Uuid.parse(it) }.getOrNull() } ?: Uuid.random()
+    // markdownOnly 与 promptOnly 同时为 true 表示两层都生效
+    val markdownOnly = this["markdownOnly"]?.toString() == "true"
+    val promptOnly = this["promptOnly"]?.toString() == "true"
     return AssistantRegex(
         id = id,
         name = str("scriptName") ?: "",
@@ -51,8 +54,8 @@ private fun JsonObject.toAssistantRegex(): AssistantRegex {
         findRegex = str("findRegex") ?: "",
         replaceString = str("replaceString") ?: "",
         affectingScope = scopes,
-        visualOnly = this["markdownOnly"]?.toString() == "true",
-        promptOnly = this["promptOnly"]?.toString() == "true",
+        visualOnly = markdownOnly && !promptOnly,
+        promptOnly = promptOnly && !markdownOnly,
         minDepth = this["minDepth"]?.toString()?.toIntOrNull() ?: 0,
         maxDepth = this["maxDepth"]?.toString()?.toIntOrNull() ?: 0,
     )

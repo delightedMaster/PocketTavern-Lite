@@ -65,6 +65,7 @@ import me.rerere.rikkahub.data.ai.group.toGroupMember
 import me.rerere.rikkahub.data.ai.prompts.buildCompressPrompt
 import me.rerere.rikkahub.data.ai.tools.InvalidMcpServerNamesException
 import me.rerere.rikkahub.data.ai.tools.shouldUseExternalWebSearch
+import me.rerere.rikkahub.data.ai.transformers.PlaceholderTransformer
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.datastore.findModelById
@@ -299,12 +300,32 @@ class ChatService(
 
     // 新建对话, 并添加预设消息
     private suspend fun newConversation(conversationId: Uuid): Conversation {
-        val assistant = settingsStore.awaitLoaded().getCurrentAssistant()
+        val settings = settingsStore.awaitLoaded()
+        val assistant = settings.getCurrentAssistant()
+        // 开场白直接写入对话、不经过生成管线，在这里替换 {{user}} / {{char}} 等宏
+        val presetMessages = assistant.presetMessages.map { message ->
+            message.copy(
+                parts = message.parts.map { part ->
+                    if (part is UIMessagePart.Text) {
+                        part.copy(
+                            text = PlaceholderTransformer.substituteGreetingMacros(
+                                context = context,
+                                settings = settings,
+                                assistant = assistant,
+                                text = part.text,
+                            )
+                        )
+                    } else {
+                        part
+                    }
+                }
+            )
+        }
         return Conversation.ofId(
             id = conversationId,
             assistantId = assistant.id,
             newConversation = true
-        ).updateCurrentMessages(assistant.presetMessages)
+        ).updateCurrentMessages(presetMessages)
     }
 
     // 引入会话配置之前创建的会话没有固定配置，加载时按助手当前的值补上，之后不再随助手变化。
