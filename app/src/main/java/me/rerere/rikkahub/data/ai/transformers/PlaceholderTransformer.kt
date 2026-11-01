@@ -515,30 +515,57 @@ object PlaceholderTransformer : InputMessageTransformer, KoinComponent {
      * 开场白等直接写入对话的消息不经过生成管线（PlaceholderTransformer.transform），
      * {{user}} / {{char}} / 变量宏等不会被替换，界面上会显示原文。
      * 在插入对话前调用本函数完成宏替换（宏引擎与生成管线完全一致）。
+     *
+     * [conversationId] 是 {{setvar}} / {{getvar}} / {{addvar}} / {{incvar}} 等本对话变量的作用域，
+     * 写入 [Settings.macroChatVariables]，不会漏到别的对话。{{setglobalvar}} 始终写全局。
+     * 新建对话必须传入新会话 id；不传时本对话变量没有会话键，会落到全局。
      */
     suspend fun substituteGreetingMacros(
         context: Context,
         settings: Settings,
         assistant: Assistant,
         text: String,
+        conversationId: Uuid? = null,
     ): String {
         if (!text.contains("{{")) return text
         return try {
-            val settingsStore = get<SettingsStore>()
-            val ctx = PlaceholderCtx(
+            applyGreetingMacros(
                 context = context,
-                settingsStore = settingsStore,
+                settingsStore = get(),
                 settings = settings,
-                model = Model(),
                 assistant = assistant,
+                text = text,
+                conversationId = conversationId,
             )
-            val vars = SettingsMacroVars(settingsStore, settings)
-            val engine = MacroEngine(defaultProvider.placeholders, vars)
-            // 非作用域 {{trim}} 后处理与旧单花括号兼容均由引擎内部完成，与生成管线保持一致
-            engine.substitute(text, ctx).also { vars.flush() }
         } catch (_: Exception) {
             text
         }
+    }
+
+    /**
+     * [substituteGreetingMacros] 的实际替换。单独拆出是为了测试能传入 [SettingsStore]，
+     * 不启动 Koin，也不把异常吞掉。
+     */
+    internal suspend fun applyGreetingMacros(
+        context: Context?,
+        settingsStore: SettingsStore,
+        settings: Settings,
+        assistant: Assistant,
+        text: String,
+        conversationId: Uuid?,
+    ): String {
+        val ctx = PlaceholderCtx(
+            context = context,
+            settingsStore = settingsStore,
+            settings = settings,
+            model = Model(),
+            assistant = assistant,
+            conversationId = conversationId,
+        )
+        val vars = SettingsMacroVars(settingsStore, settings)
+        val engine = MacroEngine(defaultProvider.placeholders, vars)
+        // 非作用域 {{trim}} 后处理与旧单花括号兼容均由引擎内部完成，与生成管线保持一致
+        return engine.substitute(text, ctx).also { vars.flush() }
     }
 
     private fun replacePlaceholders(

@@ -529,9 +529,11 @@ object SillyTavernRegexImporter {
         // 官方语义三态：(F,F)=两层都生效（最常见）；(T,F)=仅显示；(F,T)=仅提示词。
         // promptOnly 必须单独记录：前端卡常在显示脚本之前放一条 promptOnly 的
         // 「对 AI 隐藏状态栏」，若也作用到显示层，占位标签会被提前清掉，卡片不渲染。
+        // 两者都勾选 = 两层都生效，与都不勾选等价；不能映射成 promptOnly，否则显示层被跳过。
         val markdownOnly = obj["markdownOnly"]?.jsonPrimitive?.booleanOrNull ?: false
-        val promptOnly = obj["promptOnly"]?.jsonPrimitive?.booleanOrNull ?: false
-        val visualOnly = markdownOnly && !promptOnly
+        val rawPromptOnly = obj["promptOnly"]?.jsonPrimitive?.booleanOrNull ?: false
+        val visualOnly = markdownOnly && !rawPromptOnly
+        val promptOnly = rawPromptOnly && !markdownOnly
         // 官方深度过滤：minDepth/maxDepth 为 null 时不限制（本地 0 表示不限制）
         val minDepth = obj["minDepth"]?.jsonPrimitive?.intOrNull ?: 0
         val maxDepth = obj["maxDepth"]?.jsonPrimitive?.intOrNull ?: 0
