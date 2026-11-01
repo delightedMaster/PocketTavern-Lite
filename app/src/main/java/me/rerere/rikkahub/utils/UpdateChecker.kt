@@ -1,12 +1,16 @@
 package me.rerere.rikkahub.utils
 
+import android.Manifest
+import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
@@ -240,7 +244,7 @@ class UpdateChecker(
                                         .setProgress(100, if (percent >= 0) percent else 0, percent < 0)
                                         .setOngoing(true)
                                         .setOnlyAlertOnce(true)
-                                    notificationManager.notify(NOTIFICATION_ID_UPDATE, builder.build())
+                                    notifyUpdate(context, notificationManager, builder.build())
                                 }
                             }
                         }
@@ -294,7 +298,7 @@ class UpdateChecker(
                     .setAutoCancel(true)
                     .setOngoing(false)
                     .build()
-                notificationManager.notify(NOTIFICATION_ID_UPDATE, completeNotification)
+                notifyUpdate(context, notificationManager, completeNotification)
             }
 
             withContext(Dispatchers.Main) {
@@ -312,7 +316,7 @@ class UpdateChecker(
                     .setAutoCancel(true)
                     .setOngoing(false)
                     .build()
-                notificationManager.notify(NOTIFICATION_ID_UPDATE, failNotification)
+                notifyUpdate(context, notificationManager, failNotification)
             }
 
             withContext(Dispatchers.Main) {
@@ -323,6 +327,23 @@ class UpdateChecker(
                 ).show()
                 context.openUrl(download.url)
             }
+        }
+    }
+
+    // NotificationManagerCompat.notify is annotated RequiresPermission(POST_NOTIFICATIONS).
+    // The check has to sit in this method so lint can see it; on API 26–32 the permission
+    // is granted automatically and the same check still returns GRANTED.
+    private fun notifyUpdate(
+        context: Context,
+        notificationManager: NotificationManagerCompat,
+        notification: Notification,
+    ) {
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationManager.notify(NOTIFICATION_ID_UPDATE, notification)
         }
     }
 }

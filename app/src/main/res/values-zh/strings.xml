@@ -521,7 +521,6 @@
   <string name="prompt_page_lorebook_empty">暂无世界书</string>
   <string name="prompt_page_add_preset">添加预设</string>
   <string name="prompt_page_preset_empty">还没有预设</string>
-  <string name="prompt_page_lorebook_tab">世界书</string>
   <string name="prompt_page_mode_injection_empty">暂无模式注入</string>
   <string name="prompt_page_mode_injection_tab">提示词注入</string>
   <string name="prompt_page_name">名称</string>
@@ -1584,6 +1583,9 @@ mDNS 地址：使用 .local 主机名，同一网络中的其他设备可通过�
   <string name="chat_page_compress_checkpoint_title">以上内容已压缩为摘要</string>
   <string name="chat_page_compress_checkpoint_hint">分隔线以上的消息不再发送给模型，由这份摘要代替。删除摘要即可恢复发送完整历史。</string>
   <string name="chat_page_compress_blocked_generating">请先停止生成再压缩上下文</string>
+  <string name="chat_page_compress_nothing_to_compress">上次摘要之后没有新的消息可以压缩</string>
+  <string name="chat_page_compress_handle_pending_tools">请先处理未完成的工具调用，再压缩</string>
+  <string name="chat_page_compress_tool_call_response">模型试图调用工具，而不是撰写摘要。请重试。</string>
   <string name="chat_page_compress_conversation_changed">对话在压缩期间发生变化，请重试</string>
   <string name="sketch">草图</string>
   <string name="sketch_draw_on_image">在图片上绘制</string>
@@ -1837,7 +1839,6 @@ mDNS 地址：使用 .local 主机名，同一网络中的其他设备可通过�
   <string name="prompt_page_macro_catalog">变量与宏</string>
   <string name="prompt_page_position_em_bottom">示例对话之后</string>
   <string name="prompt_page_position_em_top">示例对话之前</string>
-  <string name="prompt_page_regex_tab">正则规则</string>
   <string name="prompt_page_scan_depth_hint">留空则使用全局扫描深度</string>
   <string name="tavern_export_png_failed">无法将角色卡写入这张图片</string>
   <string name="tavern_export_png_success">已导出 PNG：%1$s</string>

@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -115,6 +116,7 @@ private fun SillyTavernImporter(
     onImport: (TavernImportResult) -> Unit
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val filesManager: FilesManager = koinInject()
     val scope = rememberCoroutineScope()
     val toaster = LocalToaster.current
@@ -222,7 +224,7 @@ private fun SillyTavernImporter(
                     runImport(scope, { isLoading = it }, { e ->
                         ImportReportState.show(ImportCompatibility.failure(ImportKind.CHARACTER, e.message))
                         e.printStackTrace()
-                        toaster.show(e.message ?: context.getString(R.string.assistant_importer_download_failed, ""))
+                        toaster.show(e.message ?: resources.getString(R.string.assistant_importer_download_failed, ""))
                     }) {
                         importFromUrl(context, url, downloadClient, filesManager, onImport, toaster, mergeGreetings)
                     }

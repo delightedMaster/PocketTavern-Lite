@@ -512,7 +512,6 @@
   <string name="prompt_page_lorebook_empty">No Lorebooks</string>
   <string name="prompt_page_add_preset">Add preset</string>
   <string name="prompt_page_preset_empty">No presets yet</string>
-  <string name="prompt_page_lorebook_tab">Lorebook</string>
   <string name="prompt_page_mode_injection_empty">No mode injections</string>
   <string name="prompt_page_mode_injection_tab">Mode Injection</string>
   <string name="prompt_page_name">Name</string>
@@ -1744,7 +1743,6 @@
   <string name="prompt_page_prevent_recursion_desc">Content does not participate in recursive scanning</string>
   <string name="prompt_page_probability">Probability: %d%%</string>
   <string name="prompt_page_probability_label">Probability</string>
-  <string name="prompt_page_regex_tab">Regex</string>
   <string name="prompt_page_save_changes">Save</string>
   <string name="prompt_page_scan_depth_hint">Blank uses the global scan depth</string>
   <string name="prompt_page_secondary_keys_label">Optional Filter</string>

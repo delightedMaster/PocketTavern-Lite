@@ -3,6 +3,7 @@ package me.rerere.rikkahub.ui.pages.chat
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -48,7 +49,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
@@ -120,7 +120,10 @@ fun ChatPage(id: Uuid, text: String?, files: List<Uri>, nodeId: Uuid? = null) {
     val errors by vm.errors.collectAsStateWithLifecycle()
 
     // 新会话发出第一条消息前，跟随抽屉当前选中的文件夹（#2133）
-    val drawerVm: ChatDrawerVM = koinViewModel(viewModelStoreOwner = LocalContext.current as ComponentActivity)
+    val drawerVm: ChatDrawerVM = koinViewModel(
+        viewModelStoreOwner = LocalActivity.current as? ComponentActivity
+            ?: error("ChatPage must be hosted in a ComponentActivity"),
+    )
     val selectedFolderId by drawerVm.selectedFolderId.collectAsStateWithLifecycle()
     LaunchedEffect(selectedFolderId) {
         vm.updateDraftFolder(selectedFolderId)

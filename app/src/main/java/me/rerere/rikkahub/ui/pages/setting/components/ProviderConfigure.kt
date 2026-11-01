@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -385,6 +386,7 @@ private fun ProviderConfigureGoogle(
     onEdit: (provider: ProviderSetting) -> Unit
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val toaster = LocalToaster.current
     val serviceAccountJsonLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -404,9 +406,9 @@ private fun ProviderConfigureGoogle(
                     useServiceAccount = true,
                 )
             )
-            toaster.show(context.getString(R.string.setting_provider_page_service_account_imported), type = ToastType.Success)
+            toaster.show(resources.getString(R.string.setting_provider_page_service_account_imported), type = ToastType.Success)
         } catch (e: Exception) {
-            toaster.show(context.getString(R.string.setting_provider_page_service_account_import_failed, e.message.orEmpty()), type = ToastType.Error)
+            toaster.show(resources.getString(R.string.setting_provider_page_service_account_import_failed, e.message.orEmpty()), type = ToastType.Error)
         }
     }
     val useServiceAccount = provider.vertexAI && provider.useServiceAccount
