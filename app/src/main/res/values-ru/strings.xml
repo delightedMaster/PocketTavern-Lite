@@ -111,6 +111,8 @@
   <string name="assistant_page_regex_name">Имя</string>
   <string name="assistant_page_regex_replace_string">Заменить строку</string>
   <string name="assistant_page_regex_title">Регулярные выражения для сообщений</string>
+  <string name="assistant_page_regex_delete_all">Удалить все регулярные выражения</string>
+  <string name="assistant_page_regex_delete_all_message">Вы уверены, что хотите удалить все регулярные выражения (%d)? Это действие нельзя отменить.</string>
   <string name="assistant_page_regex_visual_only">Только визуально (влияет только на отображение, не на само сообщение)</string>
   <string name="assistant_page_remove">Удалить</string>
   <string name="assistant_page_remove_background">Убрать фон</string>

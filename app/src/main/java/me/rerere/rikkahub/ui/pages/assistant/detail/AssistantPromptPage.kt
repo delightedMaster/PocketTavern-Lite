@@ -30,10 +30,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LocalTextStyle
@@ -491,11 +493,24 @@ private fun AssistantPromptContent(
             }
         }
 
+        var showDeleteAllRegexDialog by remember { mutableStateOf(false) }
         SectionHeader(
             title = stringResource(R.string.assistant_page_regex_title),
             description = stringResource(R.string.assistant_page_regex_desc),
             action = {
                 Row {
+                    FilledTonalIconButton(
+                        onClick = { showDeleteAllRegexDialog = true },
+                        enabled = assistant.regexes.isNotEmpty(),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = HugeIcons.Delete01,
+                            contentDescription = stringResource(R.string.assistant_page_regex_delete_all),
+                        )
+                    }
                     SectionAddButton(
                         onClick = { regexImporter.launch(arrayOf("application/json", "text/plain", "*/*")) },
                         contentDescription = stringResource(R.string.tavern_regex_import),
@@ -550,6 +565,21 @@ private fun AssistantPromptContent(
                 }
             }
         }
+
+        RikkaConfirmDialog(
+            show = showDeleteAllRegexDialog,
+            title = stringResource(R.string.confirm_delete),
+            confirmText = stringResource(R.string.delete),
+            dismissText = stringResource(R.string.cancel),
+            onConfirm = {
+                showDeleteAllRegexDialog = false
+                onUpdate(assistant.copy(regexes = emptyList()))
+            },
+            onDismiss = { showDeleteAllRegexDialog = false },
+            text = {
+                Text(stringResource(R.string.assistant_page_regex_delete_all_message, assistant.regexes.size))
+            },
+        )
     }
 }
 
