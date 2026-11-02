@@ -35,9 +35,9 @@ Vertex AI 开启时使用 generateContent；Interactions 仅用于 Gemini Develo
 本次使用模拟提供商验证诊断行为，并运行已有协议流回放测试；没有用户 API Key，未对各家的真实账号进行联网生成验证。
 
 
-## 独立 Vertex 与新增订阅接口
+## Vertex 与新增订阅接口
 
-- 默认列表中的 `Gemini` 使用 Gemini Developer API；`Google Vertex AI` 使用 Google Cloud Vertex AI。它与 Vercel AI Gateway 是不同服务。
+- 默认列表中的 `Gemini` 默认使用 Gemini Developer API；打开其中的 Vertex AI 开关即改用 Google Cloud Vertex AI，不再单独提供 `Google Vertex AI` 预设（0.1.7 起）。Vertex AI 与 Vercel AI Gateway 是不同服务。
 - Vertex 明确提供 `Express`（API Key）与 `JSON 登录`（服务账号 JSON）两种方式，沿用原有 Location 与请求逻辑。导入 JSON 会验证类型及必需字段，避免把无效文件与旧凭据混在一起。
 - `OpenCode Go`：`https://opencode.ai/zen/go/v1`。按官方文档为不同模型使用 Chat Completions、Responses 或 Messages；发送真实客户端 `User-Agent: PocketTavern-Lite` 和每段会话稳定的 `x-opencode-session`。连接测试窗口也有自己的会话 ID。官方定位为编程代理服务，适用范围和额度由服务方决定。来源：<https://opencode.ai/docs/go/>。
 - `Command Code GOAT`：`https://api.commandcode.ai/provider/v1`。Claude 使用 Messages，其余模型使用 Chat Completions 或手动开启的 Responses；Messages 请求按其文档发送 Bearer 鉴权。来源：<https://commandcode.ai/docs/plans/goat>、<https://commandcode.ai/docs/provider>。

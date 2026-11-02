@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.1.7
+
+更新内容:
+
+- 消息正则列表新增「删除全部」按钮，确认后一次清空当前助手的所有正则
+- 修复导入的酒馆预设、正则美化在聊天中不生效的问题；新对话的开场白会正确替换 {{user}}、{{char}} 等占位符
+- 聊天里的扩展选择分开显示世界书和预设，预设也能直接绑定到助手
+- 移除重复的「Google Vertex AI」内置服务商；需要 Vertex AI 时在「Gemini」里打开 Vertex AI 开关即可。已填过密钥或模型的旧配置会保留为自定义服务商
+- 补齐多语言文案，修复若干稳定性问题
+
+Updates:
+
+- Added a "Delete all" button to the message regex list that clears all of the assistant's regex rules after confirmation
+- Fixed imported SillyTavern presets and regex beautification not applying in chat; new conversations now fill in {{user}}, {{char}} and similar placeholders in greetings
+- The chat extension picker now shows world books and presets separately, and presets can be attached to the assistant directly
+- Removed the duplicate "Google Vertex AI" built-in provider; turn on the Vertex AI switch in "Gemini" instead. Existing setups with a key or models are kept as a custom provider
+- Filled in missing translations and fixed several stability issues
+
 ## 0.1.6
 
 - 世界书、正则、预设移到设置页（助手与扩展管理之间）单独管理；预设不再和世界书混在一起。提示词页只保留提示词注入和作者备注。

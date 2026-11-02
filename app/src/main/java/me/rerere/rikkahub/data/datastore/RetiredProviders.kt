@@ -12,13 +12,18 @@ private val retiredProviders = mapOf(
     Uuid.parse("da93779f-3956-48cc-82ef-67bb482eaaf7") to RetiredProvider("302.AI", "https://api.302.ai/v1"),
     Uuid.parse("aecf04fd-cb5c-4582-aed2-e8bf393923fd") to RetiredProvider("随想AI网关", "https://sui-xiang.com/v1"),
     Uuid.parse("afbc54ad-807e-4455-9594-7d7a546356ad") to RetiredProvider("MaruCode", "https://api.muteki.site/v1"),
+    // Same as the Gemini preset with its Vertex AI switch on.
+    Uuid.parse("f1311782-66e9-47c7-a52a-d54c2d1e916e") to RetiredProvider(
+        "Google Vertex AI", "https://generativelanguage.googleapis.com/v1beta"
+    ),
 )
 
 internal fun List<ProviderSetting>.withoutRetiredPresets(): List<ProviderSetting> = mapNotNull { provider ->
     val retired = retiredProviders[provider.id] ?: return@mapNotNull provider
     val (key, url) = when (provider) {
         is ProviderSetting.OpenAI -> provider.apiKey to provider.baseUrl
-        is ProviderSetting.Google -> provider.apiKey to provider.baseUrl
+        // Service-account sign-in leaves apiKey blank, so count its credentials too.
+        is ProviderSetting.Google -> (provider.apiKey + provider.privateKey + provider.projectId) to provider.baseUrl
         is ProviderSetting.Claude -> provider.apiKey to provider.baseUrl
     }
     if (key.isBlank() && provider.models.isEmpty() && provider.customHeaders.isEmpty() &&
