@@ -112,6 +112,8 @@
   <string name="assistant_page_regex_name">名称</string>
   <string name="assistant_page_regex_replace_string">替换字符串</string>
   <string name="assistant_page_regex_title">消息正则规则</string>
+  <string name="assistant_page_regex_delete_all">一键删除全部正则</string>
+  <string name="assistant_page_regex_delete_all_message">确定要删除全部 %d 条正则吗？此操作无法撤销。</string>
   <string name="assistant_page_regex_visual_only">仅界面显示（不改变发送给模型的内容）</string>
   <string name="assistant_page_remove">移除</string>
   <string name="assistant_page_remove_background">移除背景</string>
