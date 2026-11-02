@@ -187,15 +187,6 @@ val DEFAULT_PROVIDERS = listOf(
         enabled = false,
         builtIn = true,
     ),
-    ProviderSetting.Google(
-        id = Uuid.parse("f1311782-66e9-47c7-a52a-d54c2d1e916e"),
-        name = "Google Vertex AI",
-        vertexAI = true,
-        apiKey = "",
-        enabled = false,
-        builtIn = true,
-        description = { Text("Google Cloud Vertex AI。使用 API Key 或服务账号；地区设置沿用现有配置。") },
-    ),
     ProviderSetting.OpenAI(
         id = Uuid.parse("bf03fb39-7995-420f-bad4-fd9d2c3d03be"),
         name = "OpenCode Go",

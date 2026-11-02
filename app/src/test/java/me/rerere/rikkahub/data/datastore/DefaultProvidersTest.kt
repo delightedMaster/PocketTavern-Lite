@@ -8,12 +8,12 @@ import org.junit.Test
 
 class DefaultProvidersTest {
     @Test
-    fun `retired sponsors are absent and independent Vertex and coding plans are present`() {
+    fun `retired sponsors and the duplicate Vertex preset are absent and coding plans are present`() {
         val names = DEFAULT_PROVIDERS.map { it.name }.toSet()
         assertTrue(names.intersect(setOf("APIMart", "302.AI", "随想AI网关", "MaruCode", "AiHubMix")).isEmpty())
-        assertEquals(22, DEFAULT_PROVIDERS.size)
-        val vertex = DEFAULT_PROVIDERS.single { it.name == "Google Vertex AI" } as ProviderSetting.Google
-        assertTrue(vertex.vertexAI)
+        assertEquals(21, DEFAULT_PROVIDERS.size)
+        assertFalse("Google Vertex AI" in names)
+        assertEquals(1, DEFAULT_PROVIDERS.count { it is ProviderSetting.Google })
         assertFalse((DEFAULT_PROVIDERS.single { it.name == "Gemini" } as ProviderSetting.Google).vertexAI)
         val go = DEFAULT_PROVIDERS.single { it.name == "OpenCode Go" } as ProviderSetting.OpenAI
         assertEquals("https://opencode.ai/zen/go/v1", go.baseUrl)

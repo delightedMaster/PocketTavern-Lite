@@ -38,4 +38,23 @@ class RetiredProvidersTest {
         assertEquals(listOf(custom), listOf(custom).withoutRetiredPresets())
         assertEquals(changed.baseUrl, (listOf(changed).withoutRetiredPresets().single() as ProviderSetting.OpenAI).baseUrl)
     }
+
+    @Test
+    fun `unused Vertex preset is removed but a configured one is kept as custom`() {
+        val vertex = ProviderSetting.Google(
+            id = Uuid.parse("f1311782-66e9-47c7-a52a-d54c2d1e916e"),
+            name = "Google Vertex AI",
+            vertexAI = true,
+            enabled = false,
+            builtIn = true,
+        )
+        assertTrue(listOf(vertex).withoutRetiredPresets().isEmpty())
+        val configured = vertex.copy(apiKey = "vertex-key")
+        val kept = listOf(configured).withoutRetiredPresets().single() as ProviderSetting.Google
+        assertFalse(kept.builtIn)
+        assertTrue(kept.vertexAI)
+        assertEquals("vertex-key", kept.apiKey)
+        val serviceAccount = vertex.copy(useServiceAccount = true, projectId = "p", privateKey = "k")
+        assertEquals("k", (listOf(serviceAccount).withoutRetiredPresets().single() as ProviderSetting.Google).privateKey)
+    }
 }
