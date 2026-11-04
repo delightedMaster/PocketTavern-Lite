@@ -14,10 +14,10 @@ License: [AGPL-3.0](LICENSE). Upstream copyright notices and licenses are fully 
 
 - 🚀 **Lightweight & Native Architecture**: Crafted with modern Kotlin + Jetpack Compose. Focuses on the core roleplay experience with rapid startup and minimal memory footprint. Can be installed side-by-side with official RikkaHub.
 - 🎭 **Comprehensive SillyTavern Compatibility**:
-  - **Character Cards**: Full support for V1, V2, and V3 specifications (PNG embedded metadata and JSON), including multiple alternate greetings and character-specific settings.
-  - **Presets & Prompt Ordering**: Precise arrangement of `prompts` and `prompt_order`, with granular depth and frequency controls for Author's Notes.
+  - **Character Cards**: Full support for V1, V2, and V3 specifications (PNG embedded metadata and JSON), including multiple alternate greetings and character-specific settings; new conversation greetings automatically substitute `{{user}}`, `{{char}}`, and conversation-scoped variable macros (`{{setvar}}`, `{{getvar}}`, `{{addvar}}`, `{{incvar}}`).
+  - **Presets & Prompt Ordering**: Precise arrangement of `prompts` and `prompt_order`, with granular depth and frequency controls for Author's Notes; standalone preset management in Settings, plus separate tabs for binding world books and presets directly to assistants or chats.
   - **Lorebooks**: Keyword triggers, recursive scanning, insertion depth, token budget control, and dynamic entry insertion.
-  - **Regex Scripts**: Display-layer and prompt-layer regex transformations. Features an **in-app Regex Script Editor** for real-time testing, debugging, and live replacement previews against raw model outputs.
+  - **Regex Scripts**: Display-layer, prompt-layer, and dual-layer regex transformations. Features an **in-app Regex Script Editor** for real-time testing, debugging, and live replacement previews against raw model outputs, plus one-tap bulk clearing of assistant regex rules.
 - 🎨 **In-Place HTML & Front-End Card Rendering**:
   - **In-Place Story Rendering**: Raw HTML appearing on its own line after story text (such as status bars, affinity gauges, or branch choices) renders directly inside the message thread. Adjacent `<style>` and markup blocks merge seamlessly for continuous reading.
   - **Full-Page Codeblock Rendering**: In line with the SillyTavern Assistant (酒馆助手) standard, closed code blocks containing full document markup (`<body>...</body>` or `<html>...</html>`) automatically render as interactive cards, supporting languages like `text`, `xml`, or `html`.
@@ -31,7 +31,7 @@ License: [AGPL-3.0](LICENSE). Upstream copyright notices and licenses are fully 
   - Appends structured summaries with `---` floor-range dividers directly to the conversation's dedicated memory lorebook, preserving historical narrative context. When memory tokens exceed budgets, earlier recaps are consolidated into versioned summaries.
   - Supports manual one-tap summarization and pre-save review. Summarized messages can be archived (hidden without consuming tokens, restorable at any time) or purged.
 - 🌐 **Extensive Model Provider Support & Connection Diagnostics**:
-  - 20+ built-in provider presets plus custom endpoints, supporting OpenAI Chat Completions / Responses, Anthropic Messages, Google Gemini `generateContent` / `Interactions`, and Google Vertex AI (Express mode and Service Account JSON).
+  - 20+ built-in provider presets plus custom endpoints, supporting OpenAI Chat Completions / Responses, Anthropic Messages, Google Gemini `generateContent` / `Interactions`, and Google Vertex AI integrated directly via the Vertex AI toggle in the Gemini preset (supporting Express API Key and Service Account JSON).
   - Integrated provider connectivity tests and real-time message exchange diagnostic tools.
 - 📲 **Seamless In-App Updates & Installation**:
   - Independent download engine powered by OkHttpClient, respecting global app proxy settings with automatic fallback to acceleration mirrors (`gh-proxy.com`).
@@ -74,7 +74,7 @@ To build a signed release APK, configure the signing properties in `local.proper
 | `keyAlias` | `ANDROID_KEY_ALIAS` | Key alias |
 | `keyPassword` | `ANDROID_KEY_PASSWORD` | Key password |
 
-> When all four properties are provided, `./gradlew :app:assembleRelease` outputs a signed Release APK; otherwise, an unsigned APK is produced. Pushing a `v*` tag triggers the GitHub Actions workflow to build and attach signed release assets automatically.
+> When all four properties are provided, `./gradlew :app:assembleRelease` outputs a signed Release APK; otherwise, an unsigned APK is produced. Pushing a `v*` tag or manually triggering the Release workflow in GitHub Actions automatically creates the version tag, builds, and attaches release assets.
 
 ---
 
@@ -85,14 +85,20 @@ To build a signed release APK, configure the signing properties in `local.proper
 - **0.1.2**: Implemented import compatibility diagnostic reports; revamped model provider management and connection tests.
 - **0.1.3**: In-chat HTML codeblock rendering, context and max token budget controls, and joint preset/regex importing.
 - **0.1.4**: In-place post-story HTML rendering, full-page codeblock detection, and built-in front-end CDN/font/image whitelists.
-- **0.1.6** (Current):
-  - Lorebooks, regex scripts and presets moved to their own settings entries; the Prompts page keeps only prompt injections and author's note.
-  - The release workflow can be triggered manually from Actions and creates the version tag itself.
 - **0.1.5**:
   - In-app update engine overhaul (proxy support, mirror acceleration, notification progress, and auto-install trigger).
   - Interactive in-app Regex Script Editor with live model output replacement preview.
   - CI/CD build artifact naming standardization (version tag + ABI suffix) with SHA-256 checksum generation.
   - Bilingual documentation rewrite and modernization.
+- **0.1.6**:
+  - Lorebooks, regex scripts and presets moved to their own settings entries; the Prompts page keeps only prompt injections and author's note.
+  - The release workflow can be triggered manually from Actions and creates the version tag itself.
+- **0.1.7** (Current):
+  - Fixed imported SillyTavern presets and regex beautification not applying in chat; new conversation greetings properly substitute `{{user}}`, `{{char}}` and persist conversation-scoped variable macros.
+  - Split world books and presets in the chat extension picker, allowing presets to be attached directly to assistants.
+  - Added a "Delete all" button with confirmation to clear all assistant message regex rules at once.
+  - Removed the duplicate standalone "Google Vertex AI" built-in provider in favor of the Vertex AI toggle inside the "Gemini" preset (existing configured entries are preserved as custom providers).
+  - Completed missing translations across locales and fixed Android Lint and stability issues.
 
 ---
 

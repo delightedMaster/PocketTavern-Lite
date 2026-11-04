@@ -14,10 +14,10 @@ PocketTavern-Lite 是一款面向 Android 平台的轻量、高效角色扮演�
 
 - 🚀 **轻量专注与纯原生架构**：使用现代 Kotlin + Jetpack Compose 打造，聚焦角色扮演核心交互，启动迅速、内存占用极低，可与官方 RikkaHub 共存运行。
 - 🎭 **全面对齐 SillyTavern 生态**：
-  - **角色卡**：完整支持 V1、V2 及 V3 规范（PNG 嵌入与 JSON），支持多开场白、角色专属配置与备选问候语。
-  - **预设编排**：支持 `prompts` 与 `prompt_order` 精确编排，支持作者备注（Author's Note）深度与频率控制。
+  - **角色卡**：完整支持 V1、V2 及 V3 规范（PNG 嵌入与 JSON），支持多开场白、角色专属配置与备选问候语；新对话开场白自动替换 `{{user}}`、`{{char}}` 等占位符，开场白变量宏（`{{setvar}}`、`{{getvar}}`、`{{addvar}}`、`{{incvar}}`）按会话独立保存。
+  - **预设编排**：支持 `prompts` 与 `prompt_order` 精确编排，支持作者备注（Author's Note）深度与频率控制；支持在设置页独立管理预设，并在聊天扩展选择器与助手配置中将世界书与预设分开展示和直接绑定。
   - **世界书（Lorebook）**：支持关键词匹配、递归扫描、插入深度、Token 预算控制与动态条目追加。
-  - **正则脚本（Regex）**：支持显示层（Display）与提示词层（Prompt）正则处理；内置**在线正则脚本编辑器**，支持直接编写、调试并在模型原文上即时预览替换效果。
+  - **正则脚本（Regex）**：支持显示层（Display）、提示词层（Prompt）及双层同时生效的正则处理；内置**在线正则脚本编辑器**，支持直接编写、调试并在模型原文上即时预览替换效果，支持助手级消息正则一键清空。
 - 🎨 **原位 HTML 与前端卡片渲染**：
   - **正文原位渲染**：正文后另起一行的原始 HTML（状态栏、好感度、属性面板等）直接在消息流中原位渲染为交互卡片，紧邻的 `<style>` 与内容自动合并，阅读自然流畅。
   - **整页代码块渲染**：支持酒馆助手卡片规范，代码块包含完整网页结构（`<body>...</body>` 或 `<html>...</html>`）时直接渲染为卡片，兼容 `text`、`xml`、`html` 等常见标记。
@@ -31,7 +31,7 @@ PocketTavern-Lite 是一款面向 Android 平台的轻量、高效角色扮演�
   - 结构化摘要以 `---` 楼层范围分隔符自动追加沉淀至该会话专属的记忆世界书中，历史旧摘要永久保留。当记忆条目超出预算阈值时，自动归纳为版本化回顾。
   - 支持一键手动即时总结与保存前审阅；已总结的消息默认一键归档（隐藏且不占 Token，可随时完整还原）。
 - 🌐 **广泛的模型提供商支持与独立诊断**：
-  - 内置 20+ 提供商预设及灵活的自定义端点，支持 OpenAI Chat Completions / Responses 协议、Anthropic Messages 协议、Google Gemini `generateContent` / `Interactions` 以及 Google Vertex AI（支持 Express 及服务账号 JSON 认证）。
+  - 内置 20+ 提供商预设及灵活的自定义端点，支持 OpenAI Chat Completions / Responses 协议、Anthropic Messages 协议、Google Gemini `generateContent` / `Interactions`，并支持在 Gemini 预设内一键开启 Google Vertex AI（支持 Express API Key 及服务账号 JSON 认证）。
   - 内置提供商连通性测试与消息收发实时诊断工具。
 - 📲 **应用内无缝自动更新与安装**：
   - 内置基于 OkHttpClient 的独立下载器，支持应用全局网络代理设置与国内加速镜像兜底（`gh-proxy.com`）。
@@ -74,7 +74,7 @@ git submodule update --init
 | `keyAlias` | `ANDROID_KEY_ALIAS` | 密钥别名 |
 | `keyPassword` | `ANDROID_KEY_PASSWORD` | 密钥密码 |
 
-> 当上述 4 项完整配置时，`./gradlew :app:assembleRelease` 将生成已签名的 Release APK；若未提供则生成未签名安装包。推送 `v*` 语义化标签至 GitHub 时，自动化流水线将自动编译并发布 GitHub Release 资产。
+> 当上述 4 项完整配置时，`./gradlew :app:assembleRelease` 将生成已签名的 Release APK；若未提供则生成未签名安装包。推送 `v*` 语义化标签至 GitHub 或在 GitHub Actions 中手动触发 Release 工作流时，自动化流水线将自动创建版本标签、编译并发布 GitHub Release 资产。
 
 ---
 
@@ -85,14 +85,20 @@ git submodule update --init
 - **0.1.2**：实现导入兼容性诊断报告，重构模型提供商管理与连通性测试工具。
 - **0.1.3**：支持聊天内 HTML 代码块渲染，引入上下文与输出 Token 精确预算管理，支持预设与正则一并导入。
 - **0.1.4**：实现正文后原始 HTML 原位渲染及整页代码块识别，放行常用前端 CDN、字体与图床安全白名单。
-- **0.1.6**（当前版本）：
-  - 世界书、正则、预设移到设置页单独管理；提示词页只保留提示词注入和作者备注。
-  - 发布工作流支持在 Actions 里手动触发，自动创建版本 tag。
 - **0.1.5**：
   - 升级应用内自动更新引擎（支持代理、加速镜像、状态栏进度通知及下载后自动唤起安装）。
   - 新增酒馆正则脚本在线编辑与即时预览调试弹窗（RegexScriptEditor）。
   - 优化 CI/CD 构建流水线，自动规范构建产物命名（版本号 + ABI 标识）并生成 SHA-256 校验文件。
   - 全面重写中英文双语技术文档。
+- **0.1.6**：
+  - 世界书、正则、预设移到设置页单独管理；提示词页只保留提示词注入和作者备注。
+  - 发布工作流支持在 Actions 里手动触发，自动创建版本 tag。
+- **0.1.7**（当前版本）：
+  - 修复导入的酒馆预设、正则美化在聊天中不生效的问题；新对话的开场白正确替换 `{{user}}`、`{{char}}` 等占位符，开场白变量宏按对话独立保存。
+  - 聊天扩展选择器分开显示世界书和预设，支持将预设直接绑定到助手。
+  - 助手消息正则列表新增「删除全部」按钮，确认后一键清空当前助手的所有正则。
+  - 移除重复的独立「Google Vertex AI」内置服务商，统一通过「Gemini」预设中的 Vertex AI 开关启用（已填密钥或模型的旧配置自动保留为自定义服务商）。
+  - 补齐多语言文案，修复 Lint 与若干稳定性问题。
 
 ---
 
