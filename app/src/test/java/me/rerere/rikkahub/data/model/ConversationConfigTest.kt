@@ -165,7 +165,7 @@ class ConversationConfigTest {
         val updated = assistant.copy(reasoningLevel = ReasoningLevel.LOW)
 
         assertSame(conversation, conversation.withAssistantUpdate(updated, settings()))
-        assertSame(updated, updated.withoutConversationFields(conversation, assistant))
+        assertSame(updated, updated.withoutConversationFields(conversation, assistant, settings()))
     }
 
     @Test
@@ -179,7 +179,7 @@ class ConversationConfigTest {
         )
 
         val conversation = bound.withAssistantUpdate(updated, settings())
-        val stored = updated.withoutConversationFields(bound, assistant)
+        val stored = updated.withoutConversationFields(bound, assistant, settings())
 
         assertEquals(ReasoningLevel.LOW, conversation.config?.reasoningLevel)
         assertEquals(setOf(newInjection), conversation.modeInjectionIds)
@@ -221,6 +221,63 @@ class ConversationConfigTest {
         assertEquals(setOf(conversationInjection), bound.modeInjectionIds)
         assertEquals(setOf(lorebook), bound.lorebookIds)
     }
+
+    @Test
+    fun `preset bound to the assistant later reaches a started conversation`() {
+        val preset = Uuid.random()
+        val laterWorldBook = Uuid.random()
+        val bound = conversation().bindConfig(settings())
+        val later = assistant.copy(lorebookIds = setOf(lorebook, preset, laterWorldBook))
+        val settings = settings(later).copy(
+            lorebooks = listOf(
+                Lorebook(id = lorebook),
+                Lorebook(id = preset, kind = LorebookKind.PRESET),
+                Lorebook(id = laterWorldBook),
+            ),
+        )
+
+        val view = settings.getAssistantOf(bound)
+
+        assertTrue(preset in view.lorebookIds)
+        assertTrue(lorebook in view.lorebookIds)
+        // 世界书仍固定在会话上，之后绑定到助手的世界书不进入已开始的会话
+        assertFalse(laterWorldBook in view.lorebookIds)
+    }
+
+    @Test
+    fun `ticking a preset in a started chat writes it to the assistant and keeps world books`() {
+        val preset = Uuid.random()
+        val settings = settings().copy(
+            lorebooks = listOf(Lorebook(id = lorebook), Lorebook(id = preset, kind = LorebookKind.PRESET)),
+        )
+        val bound = conversation().bindConfig(settings)
+        val view = settings.getAssistantOf(bound)
+        val updated = view.copy(lorebookIds = view.lorebookIds + preset)
+
+        val stored = updated.withoutConversationFields(bound, assistant, settings)
+        val conversation = bound.withAssistantUpdate(updated, settings)
+
+        assertEquals(setOf(lorebook, preset), stored.lorebookIds)
+        assertFalse(preset in conversation.lorebookIds)
+        assertEquals(setOf(lorebook), conversation.lorebookIds)
+    }
+
+    @Test
+    fun `unticking a preset in a started chat removes it from the assistant`() {
+        val preset = Uuid.random()
+        val withPreset = assistant.copy(lorebookIds = setOf(lorebook, preset))
+        val settings = settings(withPreset).copy(
+            lorebooks = listOf(Lorebook(id = lorebook), Lorebook(id = preset, kind = LorebookKind.PRESET)),
+        )
+        val bound = conversation(withPreset).bindConfig(settings)
+        val view = settings.getAssistantOf(bound)
+        val updated = view.copy(lorebookIds = view.lorebookIds - preset)
+
+        val stored = updated.withoutConversationFields(bound, withPreset, settings)
+
+        assertEquals(setOf(lorebook), stored.lorebookIds)
+    }
+
     @Test
     fun `generation lengths are isolated to the current conversation and can be cleared`() {
         val configured = assistant.copy(contextTokenLimit = 131072, maxTokens = 16384)
@@ -231,7 +288,7 @@ class ConversationConfigTest {
         val changed = bound.withAssistantUpdate(view.copy(contextTokenLimit = null, maxTokens = null), settings(stored))
         assertNull(settings(stored).getAssistantOf(changed).contextTokenLimit)
         assertNull(settings(stored).getAssistantOf(changed).maxTokens)
-        assertEquals(stored, view.copy(contextTokenLimit = null, maxTokens = null).withoutConversationFields(bound, stored))
+        assertEquals(stored, view.copy(contextTokenLimit = null, maxTokens = null).withoutConversationFields(bound, stored, settings(stored)))
     }
 
     @Test
