@@ -21,6 +21,7 @@ import me.rerere.rikkahub.data.model.Persona
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.QuickMessage
 import me.rerere.rikkahub.data.model.RegexGroup
+import me.rerere.rikkahub.data.model.RegexGroupSource
 import me.rerere.rikkahub.data.model.Tag
 import me.rerere.rikkahub.data.sync.s3.S3Config
 import me.rerere.rikkahub.ui.theme.CustomTheme
@@ -105,8 +106,13 @@ data class Settings(
     val groupChats: List<GroupChat> = emptyList(),
     val backupReminderConfig: BackupReminderConfig = BackupReminderConfig(),
 ) {
+    /** 预设分组只在对应预设仍存在且启用时生效；无 presetId 的旧分组保持原行为。 */
     val globalRegexes: List<AssistantRegex>
-        get() = regexGroups.flatMap { it.regexes }
+        get() = regexGroups.filter { group ->
+            val presetId = group.presetId
+            group.source != RegexGroupSource.PRESET || presetId == null ||
+                lorebooks.any { it.id == presetId && it.enabled }
+        }.flatMap { it.regexes }
 
     companion object {
         // 构造一个用于初始化的settings, 但它不能用于保存，防止使用初始值存储

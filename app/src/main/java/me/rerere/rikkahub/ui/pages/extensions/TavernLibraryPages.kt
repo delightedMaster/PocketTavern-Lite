@@ -16,6 +16,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.model.Lorebook
 import me.rerere.rikkahub.data.model.LorebookKind
+import me.rerere.rikkahub.data.model.RegexGroupSource
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.theme.CustomColors
 import org.koin.androidx.compose.koinViewModel
@@ -56,7 +57,7 @@ fun PresetsPage(vm: PromptVM = koinViewModel()) {
         LorebookTab(
             kind = LorebookKind.PRESET,
             lorebooks = settings.lorebooks.filter { it.kind == LorebookKind.PRESET },
-            onUpdate = { updated -> vm.updateLorebooksOfKind(LorebookKind.PRESET, updated) },
+            onUpdate = { updated -> vm.updatePresets(updated) },
             onImport = vm::importLorebook,
         )
     }
@@ -66,6 +67,24 @@ fun PresetsPage(vm: PromptVM = koinViewModel()) {
 private fun PromptVM.updateLorebooksOfKind(kind: LorebookKind, updated: List<Lorebook>) {
     updateSettings { latest ->
         latest.copy(lorebooks = mergeLorebooksOfKind(latest.lorebooks, kind, updated))
+    }
+}
+
+// 预设被删除时，同一次设置写入里一并移除它附带的正则分组，避免孤儿分组残留
+private fun PromptVM.updatePresets(updated: List<Lorebook>) {
+    updateSettings { latest ->
+        val keptIds = updated.map { it.id }.toSet()
+        val removedIds = latest.lorebooks
+            .filter { it.kind == LorebookKind.PRESET && it.id !in keptIds }
+            .map { it.id }
+            .toSet()
+        latest.copy(
+            lorebooks = mergeLorebooksOfKind(latest.lorebooks, LorebookKind.PRESET, updated),
+            regexGroups = latest.regexGroups.filterNot { group ->
+                val presetId = group.presetId
+                group.source == RegexGroupSource.PRESET && presetId != null && presetId in removedIds
+            },
+        )
     }
 }
 
