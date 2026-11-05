@@ -378,7 +378,7 @@
   <string name="extension_selector_go_to_lorebooks">管理世界书</string>
   <string name="extension_selector_go_to_presets">管理预设</string>
   <string name="extension_selector_go_to_skills">管理技能</string>
-  <string name="extension_selector_lorebooks_empty">无可用的lorebooks</string>
+  <string name="extension_selector_lorebooks_empty">暂无世界书</string>
   <string name="extension_selector_mode_injections_empty">无可用的模式注入</string>
   <string name="extension_selector_presets_empty">暂无预设</string>
   <string name="extension_selector_quick_messages_empty">暂无快捷消息</string>

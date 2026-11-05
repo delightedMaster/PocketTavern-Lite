@@ -59,6 +59,7 @@ import me.rerere.rikkahub.data.model.AssistantRegex
 import me.rerere.rikkahub.data.model.replaceRegexes
 import me.rerere.rikkahub.data.model.AuthorNoteEntry
 import me.rerere.rikkahub.data.model.AuthorNotePosition
+import me.rerere.rikkahub.data.model.parseTavernRegex
 import me.rerere.rikkahub.data.model.RegexGroup
 import me.rerere.rikkahub.data.model.RegexGroupSource
 import me.rerere.rikkahub.ui.components.ui.CardGroup
@@ -482,11 +483,8 @@ private fun RegexScriptEditor(
     var draft by remember(initial.id) { mutableStateOf(initial) }
     var sample by remember(initial.id) { mutableStateOf("") }
     val compileError = remember(draft.findRegex) {
-        if (draft.findRegex.isBlank()) null else runCatching {
-            // 与 compileRegexCached 一致：支持 /pattern/flags 写法
-            val slash = Regex("""^/(.*)/([a-z]*)$""", RegexOption.DOT_MATCHES_ALL).matchEntire(draft.findRegex)
-            Regex(slash?.groupValues?.get(1) ?: draft.findRegex)
-        }.exceptionOrNull()?.message
+        // 与运行时一致：复用 parseTavernRegex，连 /pattern/flags 的修饰符也一并校验
+        if (draft.findRegex.isBlank()) null else parseTavernRegex(draft.findRegex).exceptionOrNull()?.message
     }
     AlertDialog(
         onDismissRequest = onDismiss,
