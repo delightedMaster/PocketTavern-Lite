@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+## 0.1.8
+
+更新内容:
+
+- **助手消息正则接入 RegexScriptEditor**：助手详情页「消息正则规则」接入公共正则编辑弹窗，支持即时样本替换预览与实时语法校验；列表采用紧凑单行等宽展示。
+- **正则修饰符校验与语法错误提示**：解析器统一支持 `/pattern/flags` 格式，遇到未知修饰符给出即时明确报错（如 `无效的正则修饰符: z`），杜绝因底层异常被吞导致的静默失效。
+- **正则分组删除与自动清理**：设置页「正则」分组支持手动删除并带二次确认；「设置 → 预设」删除预设时，自动联动清理其附带的正则分组。
+- **已有对话预设跟随助手双向同步**：已有对话中的预设始终跟随助手自身的绑定实时生效，解决了已有对话修改不同步的割裂问题；在聊天扩展选择器中勾选预设直接持久化同步至助手。
+- **酒馆预设导入与元数据支持**：导入酒馆预设时优先读取 JSON 根节点内置的 `name` 和 `description` 属性，缺失时优雅回退。
+- **应用内检查更新镜像兜底**：在检测 GitHub 最新版本元数据阶段增加 `gh-proxy.com` 镜像兜底，确保国内直连网络环境下也能稳定检查更新。
+- **扩展选择器空状态布局自适应**：空状态加入自适应滚动与最小高度约束，小屏及横屏模式下「管理预设 / 世界书」按钮始终完整可见且可点击；规范繁简中文文案。
+
+> ⚠️ **关于 0.1.6 存量双标志正则的说明**：由于 0.1.6 历史版本在本地持久化时将双标志抹除并覆盖保存，无法通过数据迁移无损还原，受影响的历史双标志规则请重新导入预设或角色卡。
+
+Updates:
+
+- **Assistant Message Regex via RegexScriptEditor**: Assistant prompt page now uses the unified RegexScriptEditor dialog for message regex rules, offering instant sample replacement previews and compile validation, with a compact monospace single-line list row.
+- **Regex Flag Validation**: Unified `/pattern/flags` parser with explicit compile errors for unknown flags (e.g. `Invalid regex flag: z`), eliminating silent regex failures.
+- **Regex Group Deletion & Synchronized Cleanup**: Preset regex groups in Settings can now be deleted manually with confirmation; deleting a preset in Settings automatically cleans up its associated regex group.
+- **Preset Synchronization in Started Conversations**: Presets in existing conversations now consistently follow assistant bindings upon next send; toggling presets in the chat extension picker persists back to the assistant.
+- **Preset Import Name & Description Priority**: Importing SillyTavern presets now prioritizes top-level `name` and `description` fields from the JSON before falling back to file names.
+- **Update Check Mirror Fallback**: Added `gh-proxy.com` mirror fallback during release metadata check to prevent connection failures under restricted networks.
+- **Scrollable Extension Empty State**: Refactored extension empty states with vertical scrolling and bounded height constraints, ensuring action buttons remain reachable on compact or landscape layouts; polished Chinese translations.
+
 ## 0.1.7
 
 更新内容:

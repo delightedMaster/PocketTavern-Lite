@@ -37,8 +37,8 @@ android {
         applicationId = "io.github.delightedmaster.pockettavern"
         minSdk = 26
         targetSdk = 37
-        versionCode = 200
-        versionName = "0.1.7"
+        versionCode = 201
+        versionName = "0.1.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

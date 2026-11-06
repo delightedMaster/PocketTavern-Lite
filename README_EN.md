@@ -93,12 +93,18 @@ To build a signed release APK, configure the signing properties in `local.proper
 - **0.1.6**:
   - Lorebooks, regex scripts and presets moved to their own settings entries; the Prompts page keeps only prompt injections and author's note.
   - The release workflow can be triggered manually from Actions and creates the version tag itself.
-- **0.1.7** (Current):
+- **0.1.7**:
   - Fixed imported SillyTavern presets and regex beautification not applying in chat; new conversation greetings properly substitute `{{user}}`, `{{char}}` and persist conversation-scoped variable macros.
   - Split world books and presets in the chat extension picker, allowing presets to be attached directly to assistants.
   - Added a "Delete all" button with confirmation to clear all assistant message regex rules at once.
   - Removed the duplicate standalone "Google Vertex AI" built-in provider in favor of the Vertex AI toggle inside the "Gemini" preset (existing configured entries are preserved as custom providers).
   - Completed missing translations across locales and fixed Android Lint and stability issues.
+- **0.1.8** (Current):
+  - Shared Regex Editor in Assistant Prompt Page: Integrated `RegexScriptEditor` with live sample replacement preview and syntax validation into assistant-level regex rules; refined list view into compact monospace rows.
+  - Robust Regex Flag Validation: Unified `/pattern/flags` parser with explicit compile errors for unknown flags, preventing silent failures.
+  - Regex Group Deletion & Synchronized Cleanup: Added manual deletion with confirmation for preset regex groups in Settings; deleting a preset now automatically cleans up its associated regex rules.
+  - Two-Way Preset Synchronization in Started Chats: Presets in existing conversations now consistently follow assistant bindings upon next send; toggling presets in the chat extension picker persists back to the assistant.
+  - Preset Import & Update Enhancements: SillyTavern preset import prioritizes embedded JSON name and description metadata; release metadata checks fall back to `gh-proxy.com` mirror under restricted networks; scrollable extension empty states prevent button clipping.
 
 ---
 
