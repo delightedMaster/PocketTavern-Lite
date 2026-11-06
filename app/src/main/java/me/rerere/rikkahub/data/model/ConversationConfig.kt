@@ -63,6 +63,10 @@ private fun Assistant.withConversationConfig(config: ConversationConfig) = copy(
     enabledSkills = config.enabledSkills,
 )
 
+/** 预设（[LorebookKind.PRESET]）的 id，预设始终跟随助手绑定；不在 [Settings.lorebooks] 里的 id 不算预设。 */
+private fun Settings.presetIds(): Set<Uuid> =
+    lorebooks.filter { it.kind == LorebookKind.PRESET }.mapTo(mutableSetOf()) { it.id }
+
 /** 会话视角下的助手：会话开始后，会话持有的字段覆盖助手自身的值。 */
 fun Assistant.withConversation(conversation: Conversation): Assistant {
     val config = conversation.config ?: return this
@@ -75,6 +79,7 @@ fun Assistant.withConversation(conversation: Conversation): Assistant {
 /** 聊天页改动助手后留在会话上的部分，[updated] 是会话视角下改动后的助手。 */
 fun Conversation.withAssistantUpdate(updated: Assistant, settings: Settings): Conversation {
     val previous = settings.getAssistantOf(this)
+    val presets = settings.presetIds()
     val config = config
     val conversation = if (config == null) {
         this
@@ -92,21 +97,27 @@ fun Conversation.withAssistantUpdate(updated: Assistant, settings: Settings): Co
                 quickReplyIds = config.quickReplyIds,
             ),
             modeInjectionIds = updated.modeInjectionIds,
-            lorebookIds = updated.lorebookIds,
+            // 预设不固定在会话上，继续读取助手自身的绑定
+            lorebookIds = updated.lorebookIds.filterTo(mutableSetOf()) { it !in presets },
         )
     }
     // 工作目录属于原来的工作区，换工作区后失效
     return if (updated.workspaceId != previous.workspaceId) conversation.copy(workspaceCwd = null) else conversation
 }
 
-/** 聊天页改动助手后写回助手设置的部分：会话持有的字段保持 [stored] 的原值。 */
-fun Assistant.withoutConversationFields(conversation: Conversation, stored: Assistant): Assistant =
+/**
+ * 聊天页改动助手后写回助手设置的部分：会话持有的字段保持 [stored] 的原值。
+ * 预设不随会话固定，会话里勾选的预设写回助手；世界书仍只改当前会话，这里保持 [stored] 的原值。
+ */
+fun Assistant.withoutConversationFields(conversation: Conversation, stored: Assistant, settings: Settings): Assistant =
     if (conversation.config == null) {
         this
     } else {
+        val presets = settings.presetIds()
         withConversationConfig(stored.toConversationConfig()).copy(
             modeInjectionIds = stored.modeInjectionIds,
-            lorebookIds = stored.lorebookIds,
+            lorebookIds = stored.lorebookIds.filterTo(mutableSetOf()) { it !in presets } +
+                lorebookIds.filterTo(mutableSetOf()) { it in presets },
         )
     }
 
@@ -119,11 +130,16 @@ fun Settings.getAssistantOf(conversation: Conversation): Assistant {
     val assistant = getStoredAssistantOf(conversation).withConversation(conversation)
     if (conversation.config == null) return assistant
     // 助手自身的失效引用在读取设置时已清理，会话上固定的这份在这里滤掉
+    // 预设不固定在会话上：取助手自身的预设，会话上残留的预设忽略
+    val presets = presetIds()
+    val worldBooks = assistant.lorebookIds
+        .filterTo(mutableSetOf()) { id -> id !in presets && lorebooks.any { it.id == id } }
+    val storedPresets = getStoredAssistantOf(conversation).lorebookIds.filterTo(mutableSetOf()) { it in presets }
     return assistant.copy(
         mcpServers = assistant.mcpServers.filterTo(mutableSetOf()) { id -> mcpServers.any { it.id == id } },
         modeInjectionIds = assistant.modeInjectionIds
             .filterTo(mutableSetOf()) { id -> modeInjections.any { it.id == id } },
-        lorebookIds = assistant.lorebookIds.filterTo(mutableSetOf()) { id -> lorebooks.any { it.id == id } },
+        lorebookIds = worldBooks + storedPresets,
     )
 }
 
@@ -151,10 +167,12 @@ fun Conversation.bindConfig(settings: Settings): Conversation {
         return copy(config = config.copy(chatModelId = model.id, builtInSearch = builtInSearch))
     }
     val assistant = settings.getAssistantOf(this)
+    val presets = settings.presetIds()
     return copy(
         config = assistant.toConversationConfig().copy(chatModelId = model?.id, builtInSearch = builtInSearch),
         // 旧版本允许会话单独绑定注入，这类会话保留自己的绑定
         modeInjectionIds = modeInjectionIds.ifEmpty { assistant.modeInjectionIds },
-        lorebookIds = lorebookIds.ifEmpty { assistant.lorebookIds },
+        // 世界书固定在会话上，预设不固定，始终跟随助手
+        lorebookIds = lorebookIds.ifEmpty { assistant.lorebookIds }.filterTo(mutableSetOf()) { it !in presets },
     )
 }

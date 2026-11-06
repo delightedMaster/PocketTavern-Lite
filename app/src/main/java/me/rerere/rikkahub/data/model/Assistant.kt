@@ -55,7 +55,6 @@ data class Assistant(
     val enableTimeReminder: Boolean = false,            // 时间间隔提醒注入
     val timeReminderIntervalMinutes: Int = 60,          // 时间提醒间隔（分钟，至少 1 分钟）
     val allowConversationSystemPrompt: Boolean = false, // 允许对话单独重写 system prompt
-    val allowConversationPromptInjection: Boolean = false, // 允许对话单独绑定提示词注入
     val tavernData: TavernCharacterData? = null, // 酒馆角色卡结构化数据
     val contextTemplate: String = "", // 空 = 使用内置 Story String
     val cacheFriendlyTimeMacros: Boolean = true, // {{time}} 等按 5 分钟粒度取值，避免每步改写前缀
@@ -120,6 +119,8 @@ data class RegexGroup(
     val name: String = "",
     val source: RegexGroupSource = RegexGroupSource.CUSTOM,
     val regexes: List<AssistantRegex> = emptyList(),
+    /** 来源预设（[LorebookKind.PRESET] 的 Lorebook.id）；仅 PRESET 分组使用，null 表示旧数据无法关联。 */
+    val presetId: Uuid? = null,
 )
 
 // 流式输出时每个chunk都会调用replaceRegexes

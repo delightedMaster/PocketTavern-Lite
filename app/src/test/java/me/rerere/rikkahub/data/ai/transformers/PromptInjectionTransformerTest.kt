@@ -25,12 +25,10 @@ class PromptInjectionTransformerTest {
     private fun createAssistant(
         modeInjectionIds: Set<Uuid> = emptySet(),
         lorebookIds: Set<Uuid> = emptySet(),
-        allowConversationPromptInjection: Boolean = false,
         tavernData: TavernCharacterData? = null,
     ) = Assistant(
         modeInjectionIds = modeInjectionIds,
         lorebookIds = lorebookIds,
-        allowConversationPromptInjection = allowConversationPromptInjection,
         tavernData = tavernData,
     )
 
@@ -224,7 +222,8 @@ class PromptInjectionTransformerTest {
     }
 
     @Test
-    fun `conversation mode injection should apply only when assistant allows it`() {
+    fun `conversation mode injection ids are not applied by the transformer`() {
+        // 传入的 assistant 已是会话视角，会话上的 id 不再单独生效
         val injectionId = Uuid.random()
         val injection = createModeInjection(
             id = injectionId,
@@ -235,27 +234,19 @@ class PromptInjectionTransformerTest {
             UIMessage.user("Hello")
         )
 
-        val disabledResult = transformMessages(
+        val result = transformMessages(
             messages = messages,
-            assistant = createAssistant(allowConversationPromptInjection = false),
-            modeInjections = listOf(injection),
-            lorebooks = emptyList(),
-            conversationModeInjectionIds = setOf(injectionId)
-        )
-        val enabledResult = transformMessages(
-            messages = messages,
-            assistant = createAssistant(allowConversationPromptInjection = true),
+            assistant = createAssistant(),
             modeInjections = listOf(injection),
             lorebooks = emptyList(),
             conversationModeInjectionIds = setOf(injectionId)
         )
 
-        assertEquals(messages, disabledResult)
-        assertTrue(getMessageText(enabledResult.first()).contains("Conversation content"))
+        assertEquals(messages, result)
     }
 
     @Test
-    fun `assistant mode injection should be ignored when conversation injection is allowed`() {
+    fun `assistant mode injection applies and conversation-only ids are ignored`() {
         val assistantInjectionId = Uuid.random()
         val conversationInjectionId = Uuid.random()
         val assistantInjection = createModeInjection(
@@ -273,22 +264,20 @@ class PromptInjectionTransformerTest {
 
         val result = transformMessages(
             messages = messages,
-            assistant = createAssistant(
-                modeInjectionIds = setOf(assistantInjectionId),
-                allowConversationPromptInjection = true
-            ),
+            assistant = createAssistant(modeInjectionIds = setOf(assistantInjectionId)),
             modeInjections = listOf(assistantInjection, conversationInjection),
             lorebooks = emptyList(),
             conversationModeInjectionIds = setOf(conversationInjectionId)
         )
         val systemText = getMessageText(result.first())
 
-        assertFalse(systemText.contains("Assistant content"))
-        assertTrue(systemText.contains("Conversation content"))
+        assertTrue(systemText.contains("Assistant content"))
+        assertFalse(systemText.contains("Conversation content"))
     }
 
     @Test
-    fun `conversation lorebook should apply only when assistant allows it`() {
+    fun `conversation lorebook ids are not applied by the transformer`() {
+        // 传入的 assistant 已是会话视角，会话上的世界书 id 不再单独生效
         val lorebookId = Uuid.random()
         val entry = createRegexInjection(
             keywords = listOf("Hello"),
@@ -303,27 +292,19 @@ class PromptInjectionTransformerTest {
             UIMessage.user("Hello")
         )
 
-        val disabledResult = transformMessages(
+        val result = transformMessages(
             messages = messages,
-            assistant = createAssistant(allowConversationPromptInjection = false),
-            modeInjections = emptyList(),
-            lorebooks = listOf(lorebook),
-            conversationLorebookIds = setOf(lorebookId)
-        )
-        val enabledResult = transformMessages(
-            messages = messages,
-            assistant = createAssistant(allowConversationPromptInjection = true),
+            assistant = createAssistant(),
             modeInjections = emptyList(),
             lorebooks = listOf(lorebook),
             conversationLorebookIds = setOf(lorebookId)
         )
 
-        assertEquals(messages, disabledResult)
-        assertTrue(getMessageText(enabledResult.first()).contains("Conversation lorebook content"))
+        assertEquals(messages, result)
     }
 
     @Test
-    fun `assistant lorebook should be ignored when conversation injection is allowed`() {
+    fun `assistant lorebook applies and conversation-only ids are ignored`() {
         val assistantLorebookId = Uuid.random()
         val conversationLorebookId = Uuid.random()
         val assistantLorebook = createLorebook(
@@ -351,18 +332,15 @@ class PromptInjectionTransformerTest {
 
         val result = transformMessages(
             messages = messages,
-            assistant = createAssistant(
-                lorebookIds = setOf(assistantLorebookId),
-                allowConversationPromptInjection = true
-            ),
+            assistant = createAssistant(lorebookIds = setOf(assistantLorebookId)),
             modeInjections = emptyList(),
             lorebooks = listOf(assistantLorebook, conversationLorebook),
             conversationLorebookIds = setOf(conversationLorebookId)
         )
         val systemText = getMessageText(result.first())
 
-        assertFalse(systemText.contains("Assistant lorebook content"))
-        assertTrue(systemText.contains("Conversation lorebook content"))
+        assertTrue(systemText.contains("Assistant lorebook content"))
+        assertFalse(systemText.contains("Conversation lorebook content"))
     }
     // endregion
 
