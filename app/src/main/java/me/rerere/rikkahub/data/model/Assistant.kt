@@ -128,32 +128,38 @@ private val regexCache = SimpleCache.builder<String, Result<Regex>>()
     .expireAfterWrite(10, TimeUnit.MINUTES)
     .build()
 
+/**
+ * 解析酒馆正则写法：纯 pattern，或 `/pattern/flags` 内联形式。
+ * 不识别的修饰符返回失败（message 说明是哪个修饰符），调用方据此给出提示。
+ */
+fun parseTavernRegex(pattern: String): Result<Regex> = runCatching {
+    // 官方酒馆脚本支持 /pattern/flags 内联形式（如 /(?<=x)y/
+    val slashForm = Regex("""^/(.*)/([a-z]*)$""", RegexOption.DOT_MATCHES_ALL).matchEntire(pattern)
+    if (slashForm != null) {
+        val body = slashForm.groupValues[1]
+        val flagChars = slashForm.groupValues[2]
+        var options = 0
+        for (c in flagChars) {
+            options = when (c) {
+                'i' -> options or RegexOption.IGNORE_CASE.value
+                'm' -> options or RegexOption.MULTILINE.value
+                's' -> options or RegexOption.DOT_MATCHES_ALL.value
+                'x' -> options or RegexOption.COMMENTS.value
+                'u', 'y', 'g', 'd' -> options // JS 独有/默认标志，忽略
+                else -> throw IllegalArgumentException("无效的正则修饰符: $c")
+            }
+        }
+        // options 是 Pattern 位标志（Int）
+        val optionSet = RegexOption.entries.filter { options and it.value != 0 }.toSet()
+        Regex(body, optionSet)
+    } else {
+        Regex(pattern)
+    }
+}
+
 private fun compileRegexCached(pattern: String): Regex? {
     regexCache.getIfPresent(pattern)?.let { return it.getOrNull() }
-    val result = runCatching {
-        // 官方酒馆脚本支持 /pattern/flags 内联形式（如 /(?<=x)y/
-        val slashForm = Regex("""^/(.*)/([a-z]*)$""", RegexOption.DOT_MATCHES_ALL).matchEntire(pattern)
-        if (slashForm != null) {
-            val body = slashForm.groupValues[1]
-            val flagChars = slashForm.groupValues[2]
-            var options = 0
-            for (c in flagChars) {
-                options = when (c) {
-                    'i' -> options or RegexOption.IGNORE_CASE.value
-                    'm' -> options or RegexOption.MULTILINE.value
-                    's' -> options or RegexOption.DOT_MATCHES_ALL.value
-                    'x' -> options or RegexOption.COMMENTS.value
-                    'u', 'y', 'g', 'd' -> options // JS 独有/默认标志，忽略
-                    else -> throw IllegalArgumentException("Unknown regex flag: $c")
-                }
-            }
-            // options 是 Pattern 位标志（Int）
-            val optionSet = RegexOption.entries.filter { options and it.value != 0 }.toSet()
-            Regex(body, optionSet)
-        } else {
-            Regex(pattern)
-        }
-    }.onFailure { it.printStackTrace() }
+    val result = parseTavernRegex(pattern).onFailure { it.printStackTrace() }
     regexCache.put(pattern, result)
     return result.getOrNull()
 }

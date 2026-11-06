@@ -47,6 +47,11 @@ private const val NOTIFICATION_ID_UPDATE = 10086
 private const val RELEASES_URL =
     "https://api.github.com/repos/delightedMaster/PocketTavern-Lite/releases/latest"
 
+private val RELEASES_URLS = listOf(
+    RELEASES_URL,
+    "https://gh-proxy.com/$RELEASES_URL",
+)
+
 sealed interface DownloadStatus {
     data object Idle : DownloadStatus
     data class Downloading(
@@ -76,30 +81,45 @@ class UpdateChecker(
 
     private fun checkUpdate(): Flow<UiState<UpdateInfo>> = flow {
         emit(UiState.Loading)
-        val state = client.newCall(
-            Request.Builder()
-                .url(RELEASES_URL)
-                .get()
-                .addHeader("Accept", "application/vnd.github+json")
-                .addHeader(
-                    "User-Agent",
-                    "PocketTavern-Lite ${BuildConfig.VERSION_NAME} #${BuildConfig.VERSION_CODE}"
-                )
-                .build()
-        ).await().use { response ->
-            when {
-                // GitHub returns 404 when this repository has no published stable release yet.
-                response.code == 404 -> UiState.Idle
-                response.isSuccessful -> UiState.Success(
-                    json.decodeFromString<GitHubRelease>(response.body.string()).toUpdateInfo()
-                )
-                else -> error("PocketTavern-Lite update check failed (HTTP ${response.code})")
-            }
-        }
+        val state = fetchReleaseState()
         emit(state)
     }.catch {
         emit(UiState.Error(it))
     }.flowOn(Dispatchers.IO)
+
+    /**
+     * 依次尝试 GitHub API 与镜像。网络错误或非 404 的 HTTP 错误回退到下一个地址；
+     * 404 表示仓库还没有正式发布，视为 [UiState.Idle]。全部失败时抛出最后一个错误。
+     */
+    private suspend fun fetchReleaseState(): UiState<UpdateInfo> {
+        var lastError: IOException? = null
+        for (url in RELEASES_URLS) {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .get()
+                    .addHeader("Accept", "application/vnd.github+json")
+                    .addHeader(
+                        "User-Agent",
+                        "PocketTavern-Lite ${BuildConfig.VERSION_NAME} #${BuildConfig.VERSION_CODE}"
+                    )
+                    .build()
+                return client.newCall(request).await().use { response ->
+                    when {
+                        // GitHub returns 404 when this repository has no published stable release yet.
+                        response.code == 404 -> UiState.Idle
+                        response.isSuccessful -> UiState.Success(
+                            json.decodeFromString<GitHubRelease>(response.body.string()).toUpdateInfo()
+                        )
+                        else -> throw IOException("PocketTavern-Lite update check failed (HTTP ${response.code})")
+                    }
+                }
+            } catch (e: IOException) {
+                lastError = e
+            }
+        }
+        throw lastError ?: IOException("PocketTavern-Lite update check failed")
+    }
 
     fun downloadUpdate(context: Context, download: UpdateDownload) {
         if (!download.isApk) {

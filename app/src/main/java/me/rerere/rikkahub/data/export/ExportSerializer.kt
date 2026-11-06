@@ -9,6 +9,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -247,16 +248,24 @@ object LorebookSerializer : ExportSerializer<Lorebook> {
         return runCatching {
             val entries = tryImportPresetOrdered(json) ?: tryImportPresetFlat(json)
             if (entries == null || entries.isEmpty()) return null
+            // 预设 JSON 自带的 name/description 优先；缺失或空白时回退到文件名/默认文案
+            val root = runCatching { ExportSerializer.DefaultJson.parseToJsonElement(json) }.getOrNull() as? JsonObject
+            val jsonName = root?.stringField("name")
+            val jsonDescription = root?.stringField("description")
             Lorebook(
                 id = Uuid.random(),
-                name = fileName ?: LocalDateTime.now().toLocalString(),
-                description = "SillyTavern 预设导入",
+                name = jsonName ?: fileName ?: LocalDateTime.now().toLocalString(),
+                description = jsonDescription ?: "SillyTavern 预设导入",
                 kind = LorebookKind.PRESET,
                 enabled = true,
                 entries = entries,
             )
         }.getOrNull()
     }
+
+    /** 取顶层字符串字段，去掉首尾空白；缺失、非字符串或空白返回 null */
+    private fun JsonObject.stringField(key: String): String? =
+        (this[key] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
 
     /** 新版预设（prompts + prompt_order）解析 */
     /**
