@@ -27,7 +27,7 @@ data class LorebookImport(
             val scripts = (root?.get("extensions") as? JsonObject)?.get("regex_scripts")
             val regexes = SillyTavernRegexImporter.parseFromPreset(json)
             val group = regexes.takeIf { it.isNotEmpty() }?.let {
-                RegexGroup(name = book.name, source = RegexGroupSource.PRESET, regexes = it)
+                RegexGroup(name = book.name, source = RegexGroupSource.PRESET, regexes = it, presetId = book.id)
             }
             val baseReport = ImportCompatibility.inspect(ImportKind.LOREBOOK, json, book.entries.size)
             val findings = when (scripts) {

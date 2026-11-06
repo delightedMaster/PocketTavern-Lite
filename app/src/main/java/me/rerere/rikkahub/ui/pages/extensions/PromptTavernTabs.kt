@@ -22,6 +22,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -50,6 +52,8 @@ import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.ai.prompts.SUMMARY_PROMPT_EN
 import me.rerere.rikkahub.data.ai.prompts.SUMMARY_PROMPT_ZH
 import me.rerere.rikkahub.data.ai.transformers.MacroEngine
+import me.rerere.hugeicons.HugeIcons
+import me.rerere.hugeicons.stroke.Delete01
 import me.rerere.rikkahub.ui.components.ai.ModelSelector
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.authorNoteEntriesOrLegacy
@@ -372,9 +376,22 @@ internal fun RegexScriptsTab(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(groups, key = { it.id }) { group ->
-                    RegexGroupCard(group = group, onChange = { updated ->
-                        onUpdate(groups.map { if (it.id == updated.id) updated else it })
-                    })
+                    RegexGroupCard(
+                        group = group,
+                        onChange = { updated ->
+                            onUpdate(
+                                groups.mapNotNull { existing ->
+                                    when {
+                                        existing.id != updated.id -> existing
+                                        // 预设分组删空后自动移除；自定义分组即使为空也保留
+                                        updated.source == RegexGroupSource.PRESET && updated.regexes.isEmpty() -> null
+                                        else -> updated
+                                    }
+                                }
+                            )
+                        },
+                        onDelete = { onUpdate(groups.filterNot { it.id == group.id }) },
+                    )
                 }
             }
         }
@@ -385,7 +402,9 @@ internal fun RegexScriptsTab(
 private fun RegexGroupCard(
     group: RegexGroup,
     onChange: (RegexGroup) -> Unit,
+    onDelete: () -> Unit,
 ) {
+    var confirmingDelete by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = CustomColors.listItemColors.containerColor),
@@ -394,12 +413,29 @@ private fun RegexGroupCard(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(group.name.ifBlank { stringResource(R.string.tavern_regex_unnamed_group) })
-            Text(
-                stringResource(R.string.tavern_regex_group_count, group.regexes.size),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(group.name.ifBlank { stringResource(R.string.tavern_regex_unnamed_group) })
+                    Text(
+                        stringResource(R.string.tavern_regex_group_count, group.regexes.size),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                // 自定义分组始终存在，不提供删除入口
+                if (group.source != RegexGroupSource.CUSTOM) {
+                    IconButton(onClick = { confirmingDelete = true }) {
+                        Icon(
+                            imageVector = HugeIcons.Delete01,
+                            contentDescription = "删除分组",
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
             group.regexes.forEach { regex ->
                 RegexScriptRow(
                     regex = regex,
@@ -410,6 +446,26 @@ private fun RegexGroupCard(
                 )
             }
         }
+    }
+    if (confirmingDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmingDelete = false },
+            title = { Text("删除分组") },
+            text = { Text("将删除该分组及其中 ${group.regexes.size} 条正则，此操作无法撤销") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmingDelete = false
+                    onDelete()
+                }) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingDelete = false }) {
+                    Text("取消")
+                }
+            },
+        )
     }
 }
 

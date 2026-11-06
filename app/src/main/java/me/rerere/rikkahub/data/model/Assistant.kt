@@ -120,6 +120,8 @@ data class RegexGroup(
     val name: String = "",
     val source: RegexGroupSource = RegexGroupSource.CUSTOM,
     val regexes: List<AssistantRegex> = emptyList(),
+    /** 来源预设（[LorebookKind.PRESET] 的 Lorebook.id）；仅 PRESET 分组使用，null 表示旧数据无法关联。 */
+    val presetId: Uuid? = null,
 )
 
 // 流式输出时每个chunk都会调用replaceRegexes
