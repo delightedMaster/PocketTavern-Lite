@@ -405,18 +405,10 @@ internal fun collectInjections(
     vectorActivatedIds: Set<Uuid> = emptySet(),
 ): List<PromptInjection> {
     val injections = mutableListOf<PromptInjection>()
-    // 会话覆盖只在助手允许时生效；否则仍用助手自己绑定的模式注入和世界书。
+    // 传入的 assistant 已是会话视角（会话固定的世界书 + 助手的预设），直接使用它的绑定。
     // 角色卡内嵌书不走这组 id，下面始终单独扫描。
-    val effectiveModeInjectionIds = if (assistant.allowConversationPromptInjection) {
-        conversationModeInjectionIds
-    } else {
-        assistant.modeInjectionIds
-    }
-    val effectiveLorebookIds = if (assistant.allowConversationPromptInjection) {
-        conversationLorebookIds
-    } else {
-        assistant.lorebookIds
-    }
+    val effectiveModeInjectionIds = assistant.modeInjectionIds
+    val effectiveLorebookIds = assistant.lorebookIds
 
     // 1. 获取关联的 ModeInjection
     modeInjections
@@ -438,7 +430,7 @@ internal fun collectInjections(
     val characterEntries = buildCharacterBookEntries(assistant.tavernData)
     worldInfoLog(
         "WorldInfo",
-        "assistant=${assistant.name}(${assistant.id}) allowConv=${assistant.allowConversationPromptInjection} " +
+        "assistant=${assistant.name}(${assistant.id}) " +
             "assistantBooks=${assistant.lorebookIds.size} convBooks=${conversationLorebookIds.size} " +
             "effective=${effectiveLorebookIds.size} allBooks=${lorebooks.size} " +
             "boundBooks=${boundLorebooks.map { it.name to it.entries.size }} " +

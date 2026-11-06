@@ -1167,7 +1167,7 @@ class ChatService(
             val conversation = session.state.value
             val stored = settings.getStoredAssistantOf(conversation)
             val updated = update(settings.getAssistantOf(conversation))
-            val assistant = updated.withoutConversationFields(conversation, stored)
+            val assistant = updated.withoutConversationFields(conversation, stored, settings)
             session.updateMetadata(
                 transform = { it.withAssistantUpdate(updated, settings) },
                 persist = conversationRepo::updateConversationConfig,
