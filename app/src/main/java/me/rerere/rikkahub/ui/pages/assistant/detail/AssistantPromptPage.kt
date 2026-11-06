@@ -4,14 +4,11 @@ import me.rerere.rikkahub.data.export.ImportCompatibility
 import me.rerere.rikkahub.data.export.ImportKind
 import me.rerere.rikkahub.ui.components.ui.ImportReportState
 import me.rerere.hugeicons.HugeIcons
-import me.rerere.hugeicons.stroke.ArrowDown01
 import me.rerere.hugeicons.stroke.FileImport
 import me.rerere.hugeicons.stroke.Delete01
+import me.rerere.hugeicons.stroke.Edit01
 import me.rerere.hugeicons.stroke.Cancel01
 import me.rerere.hugeicons.stroke.Refresh03
-import me.rerere.hugeicons.stroke.Tick01
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,15 +21,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -60,12 +53,10 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -90,7 +81,6 @@ import me.rerere.rikkahub.data.ai.transformers.TemplateTransformer
 import me.rerere.rikkahub.data.ai.transformers.TransformerContext
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.model.Assistant
-import me.rerere.rikkahub.data.model.AssistantAffectScope
 import me.rerere.rikkahub.data.export.SillyTavernRegexImporter
 import me.rerere.rikkahub.data.model.AssistantRegex
 import me.rerere.rikkahub.ui.context.LocalToaster
@@ -101,6 +91,7 @@ import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.components.ui.ItemAction
 import me.rerere.rikkahub.ui.components.ui.ItemActionMenu
+import me.rerere.rikkahub.ui.components.ai.RegexScriptEditor
 import me.rerere.rikkahub.ui.components.ui.Tag
 import me.rerere.rikkahub.ui.components.ui.TextArea
 import me.rerere.rikkahub.ui.components.ui.cardGroupItemShape
@@ -530,7 +521,6 @@ private fun AssistantPromptContent(
                 }
             },
         )
-        var expandedIds by remember { mutableStateOf(emptySet<Uuid>()) }
         ReorderableColumn(
             list = assistant.regexes,
             onSettle = { fromIndex, toIndex ->
@@ -545,21 +535,14 @@ private fun AssistantPromptContent(
                 ReorderableItem(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    val expanded = regex.id in expandedIds
                     AssistantRegexCard(
                         regex = regex,
                         onUpdate = onUpdate,
                         assistant = assistant,
-                        index = index,
                         shape = cardGroupItemShape(index, assistant.regexes.size),
-                        expanded = expanded,
-                        onExpandedChange = {
-                            expandedIds = if (it) expandedIds + regex.id else expandedIds - regex.id
-                        },
-                        // 展开后内部是输入框，长按拖拽会与文本选择冲突
                         modifier = longPressReorder(
                             isDragging = isDragging,
-                            enabled = !expanded && assistant.regexes.size > 1,
+                            enabled = assistant.regexes.size > 1,
                         ),
                     )
                 }
@@ -588,19 +571,15 @@ private fun AssistantRegexCard(
     regex: AssistantRegex,
     onUpdate: (Assistant) -> Unit,
     assistant: Assistant,
-    index: Int,
     shape: Shape,
-    expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var editing by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    fun updateRegex(transform: (AssistantRegex) -> AssistantRegex) {
+    fun replaceRegex(updated: AssistantRegex) {
         onUpdate(
             assistant.copy(
-                regexes = assistant.regexes.mapIndexed { i, reg ->
-                    if (i == index) transform(reg) else reg
-                }
+                regexes = assistant.regexes.map { if (it.id == updated.id) updated else it }
             )
         )
     }
@@ -609,233 +588,65 @@ private fun AssistantRegexCard(
         shape = shape,
         color = CustomColors.listItemColors.containerColor,
     ) {
-        Column(
+        Row(
             modifier = Modifier
-                .padding(horizontal = 8.dp, vertical = 8.dp)
-                .animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .clickable { editing = true }
+                .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier
-                    .clip(MaterialTheme.shapes.large)
-                    .clickable { onExpandedChange(!expanded) }
-                    .padding(start = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val arrowRotation by animateFloatAsState(
-                    targetValue = if (expanded) 180f else 0f,
-                    animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-                )
-                Icon(
-                    imageVector = HugeIcons.ArrowDown01,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .padding(end = 12.dp)
-                        .rotate(arrowRotation)
-                )
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = regex.name.ifBlank { stringResource(R.string.extension_content_unnamed) },
+                    style = MaterialTheme.typography.titleSmallEmphasized,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
                 )
-                Switch(
-                    checked = regex.enabled,
-                    onCheckedChange = { enabled ->
-                        onUpdate(
-                            assistant.copy(
-                                regexes = assistant.regexes.mapIndexed { i, reg ->
-                                    if (i == index) {
-                                        reg.copy(enabled = enabled)
-                                    } else {
-                                        reg
-                                    }
-                                }
-                            )
-                        )
-                    },
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-                ItemActionMenu(
-                    actions = listOf(
-                        ItemAction(
-                            text = stringResource(R.string.delete),
-                            icon = HugeIcons.Delete01,
-                            destructive = true,
-                            onClick = { showDeleteDialog = true },
-                        ),
-                    )
+                Text(
+                    text = regex.findRegex,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = JetbrainsMono,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-
-            if (expanded) {
-                Column(
-                    modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = regex.name,
-                        onValueChange = { name ->
-                            onUpdate(
-                                assistant.copy(
-                                    regexes = assistant.regexes.mapIndexed { i, reg ->
-                                        if (i == index) {
-                                            reg.copy(name = name)
-                                        } else {
-                                            reg
-                                        }
-                                    }
-                                )
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(stringResource(R.string.assistant_page_regex_name)) }
-                    )
-
-                    OutlinedTextField(
-                        value = regex.findRegex,
-                        onValueChange = { findRegex ->
-                            onUpdate(
-                                assistant.copy(
-                                    regexes = assistant.regexes.mapIndexed { i, reg ->
-                                        if (i == index) {
-                                            reg.copy(findRegex = findRegex.trim())
-                                        } else {
-                                            reg
-                                        }
-                                    }
-                                )
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(stringResource(R.string.assistant_page_regex_find_regex)) },
-                        placeholder = { Text(stringResource(R.string.assistant_page_regex_find_example)) },
-                    )
-
-                    OutlinedTextField(
-                        value = regex.replaceString,
-                        onValueChange = { replaceString ->
-                            onUpdate(
-                                assistant.copy(
-                                    regexes = assistant.regexes.mapIndexed { i, reg ->
-                                        if (i == index) {
-                                            reg.copy(replaceString = replaceString)
-                                        } else {
-                                            reg
-                                        }
-                                    }
-                                )
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(stringResource(R.string.assistant_page_regex_replace_string)) },
-                        placeholder = { Text(stringResource(R.string.assistant_page_regex_replace_example)) }
-                    )
-
-                    Text(
-                        text = stringResource(R.string.assistant_page_regex_affecting_scopes),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        AssistantAffectScope.entries.forEach { scope ->
-                            val selected = scope in regex.affectingScope
-                            FilterChip(
-                                selected = selected,
-                                onClick = {
-                                    val newScopes = if (selected) {
-                                        regex.affectingScope - scope
-                                    } else {
-                                        regex.affectingScope + scope
-                                    }
-                                    onUpdate(
-                                        assistant.copy(
-                                            regexes = assistant.regexes.mapIndexed { i, reg ->
-                                                if (i == index) {
-                                                    reg.copy(affectingScope = newScopes)
-                                                } else {
-                                                    reg
-                                                }
-                                            }
-                                        )
-                                    )
-                                },
-                                label = {
-                                    Text(scope.name.lowercase().replaceFirstChar { it.uppercase() })
-                                },
-                                leadingIcon = if (selected) {
-                                    {
-                                        Icon(
-                                            imageVector = HugeIcons.Tick01,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(FilterChipDefaults.IconSize),
-                                        )
-                                    }
-                                } else null,
-                            )
-                        }
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.assistant_page_regex_visual_only),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Switch(
-                            checked = regex.visualOnly,
-                            onCheckedChange = { visualOnly ->
-                                updateRegex { it.copy(visualOnly = visualOnly, promptOnly = if (visualOnly) false else it.promptOnly) }
-                            }
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.assistant_page_regex_prompt_only),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Switch(
-                            checked = regex.promptOnly,
-                            onCheckedChange = { promptOnly ->
-                                updateRegex { it.copy(promptOnly = promptOnly, visualOnly = if (promptOnly) false else it.visualOnly) }
-                            }
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = if (regex.minDepth > 0) regex.minDepth.toString() else "",
-                            onValueChange = { value ->
-                                updateRegex { it.copy(minDepth = value.toIntOrNull()?.coerceAtLeast(0) ?: 0) }
-                            },
-                            label = { Text(stringResource(R.string.assistant_page_regex_min_depth)) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                        )
-                        OutlinedTextField(
-                            value = if (regex.maxDepth > 0) regex.maxDepth.toString() else "",
-                            onValueChange = { value ->
-                                updateRegex { it.copy(maxDepth = value.toIntOrNull()?.coerceAtLeast(0) ?: 0) }
-                            },
-                            label = { Text(stringResource(R.string.assistant_page_regex_max_depth)) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-            }
+            Switch(
+                checked = regex.enabled,
+                onCheckedChange = { replaceRegex(regex.copy(enabled = it)) },
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
+            ItemActionMenu(
+                actions = listOf(
+                    ItemAction(
+                        text = stringResource(R.string.edit),
+                        icon = HugeIcons.Edit01,
+                        onClick = { editing = true },
+                    ),
+                    ItemAction(
+                        text = stringResource(R.string.delete),
+                        icon = HugeIcons.Delete01,
+                        destructive = true,
+                        onClick = { showDeleteDialog = true },
+                    ),
+                ),
+            )
         }
+    }
+
+    if (editing) {
+        RegexScriptEditor(
+            initial = regex,
+            onDismiss = { editing = false },
+            onSave = { saved ->
+                // 与原内联编辑一致：查找正则去掉首尾空白
+                replaceRegex(saved.copy(findRegex = saved.findRegex.trim()))
+                editing = false
+            },
+            onDelete = {
+                editing = false
+                showDeleteDialog = true
+            },
+        )
     }
 
     RikkaConfirmDialog(
