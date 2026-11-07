@@ -1,11 +1,13 @@
 package me.rerere.highlight
 
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -17,7 +19,7 @@ import androidx.compose.ui.unit.sp
 import me.rerere.highlight.core.HighlightEngine
 import me.rerere.highlight.languages.builtinLanguages
 
-private const val MAX_CODE_LENGTH = 4096
+private const val MAX_CODE_LENGTH = HIGHLIGHT_CHAR_LIMIT
 
 val LocalCodeHighlighter = staticCompositionLocalOf { CodeHighlighter() }
 
@@ -57,6 +59,7 @@ fun CodeHighlightText(
     minLines: Int = 1,
 ) {
     val highlighter = LocalCodeHighlighter.current
+    val contentColor = LocalTextStyle.current.color.takeOrElse { LocalContentColor.current }
     val annotatedString = remember(code, language, colors, highlighter) {
         if (code.length > MAX_CODE_LENGTH) {
             AnnotatedString(code)
@@ -72,6 +75,8 @@ fun CodeHighlightText(
     Text(
         modifier = modifier,
         text = annotatedString,
+        // 没有语法着色的字符跟随主题。着色 span 仍用调色板里的语义色，不把整段压成单色。
+        color = contentColor,
         style = LocalTextStyle.current.copy(fontFeatureSettings = "'calt' 0, 'liga' 0, 'clig' 0"),
         fontSize = fontSize,
         fontFamily = fontFamily,

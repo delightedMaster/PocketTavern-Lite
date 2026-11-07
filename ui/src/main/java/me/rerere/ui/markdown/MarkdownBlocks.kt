@@ -39,6 +39,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.heading
@@ -173,7 +174,9 @@ private fun HeadingBlock(block: MarkdownBlock.Heading, first: Boolean) {
 private fun QuoteBlock(block: MarkdownBlock.Quote) {
     val barColor = LocalMarkdownContext.current.theme.quoteColor
     val textColor = LocalTextStyle.current.color.takeOrElse { LocalContentColor.current }
-    ProvideTextStyle(TextStyle(color = textColor.copy(alpha = textColor.alpha * 0.75f))) {
+    // Unspecified.copy 会变成不透明的黑，引用在深色主题里就和正文对不上
+    val faded = if (textColor.isSpecified) textColor.copy(alpha = textColor.alpha * 0.75f) else textColor
+    ProvideTextStyle(TextStyle(color = faded)) {
         MarkdownBlocks(
             blocks = block.children,
             modifier = Modifier

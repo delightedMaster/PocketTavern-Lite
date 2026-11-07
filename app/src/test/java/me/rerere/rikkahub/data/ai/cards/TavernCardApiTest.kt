@@ -112,6 +112,50 @@ class TavernCardApiTest {
     }
 
     @Test
+    fun themeColorIsTheDefaultAndExplicitCardColorsStay() {
+        val source = """
+            <style>body{color:#ffffff}.name{color:#e53935}</style>
+            <div class="name">甲</div><p>乙</p>
+        """.trimIndent()
+        val doc = cardDocument(source, textColor = "#112233", dark = true)
+        assertTrue(doc.contains("color-scheme:dark"))
+        assertTrue(doc.contains("color:#112233"))
+        assertTrue(doc.contains("color:#ffffff"))
+        assertTrue(doc.contains("color:#e53935"))
+        assertTrue(doc.indexOf("pockettavern-theme") < doc.indexOf("color:#ffffff"))
+        assertTrue(doc.indexOf("pockettavern-theme") < doc.indexOf("color:#e53935"))
+    }
+
+    @Test
+    fun fullDocumentKeepsAuthorStylesAfterTheThemeDefault() {
+        val source = """<html><head><style>p{color:#000000}</style></head><body><p>字</p></body></html>"""
+        val doc = cardDocument(source, textColor = "#EEEEEE", dark = false)
+        assertTrue(doc.contains("color-scheme:light"))
+        assertTrue(doc.contains("color:#EEEEEE"))
+        assertTrue(doc.contains("p{color:#000000}"))
+        assertTrue(doc.indexOf("pockettavern-theme") < doc.indexOf("p{color:#000000}"))
+    }
+
+    @Test
+    fun cardHeightFollowsContentUntilTheDevicePixelCeiling() {
+        assertEquals(HtmlCardLayout(200, false), htmlCardLayoutHeight(200, density = 3f))
+        assertEquals(HtmlCardLayout(32, false), htmlCardLayoutHeight(0, density = 2f))
+        // 旧实现把高度钳在 720dp，2000 像素的正文后半段不在布局里
+        assertEquals(HtmlCardLayout(2000, false), htmlCardLayoutHeight(2000, density = 3f))
+        val capped = htmlCardLayoutHeight(20_000, density = 2.5f)
+        assertTrue(capped.scrolls)
+        assertEquals((HTML_CARD_MAX_DEVICE_PX / 2.5f).toInt(), capped.heightCssPx)
+        assertTrue(capped.heightCssPx > 720)
+    }
+
+    @Test
+    fun `an overflowing card only keeps the drag while it can still scroll`() {
+        assertFalse(htmlCardCapturesParentScroll(overflows = false, canScrollInDragDirection = true))
+        assertFalse(htmlCardCapturesParentScroll(overflows = true, canScrollInDragDirection = false))
+        assertTrue(htmlCardCapturesParentScroll(overflows = true, canScrollInDragDirection = true))
+    }
+
+    @Test
     fun shimProvidesSendTextareaAndSendButton() {
         assertTrue(TAVERN_CARD_SHIM.contains("send_textarea"))
         assertTrue(TAVERN_CARD_SHIM.contains("send_but"))

@@ -17,10 +17,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -47,6 +49,7 @@ import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantAffectScope
 import me.rerere.rikkahub.data.model.replaceRegexes
 import me.rerere.rikkahub.ui.components.richtext.MarkdownBlock
+import me.rerere.ui.text.resolveMessageTextColor
 import me.rerere.rikkahub.ui.components.ui.ChainOfThoughtScope
 import me.rerere.rikkahub.ui.context.LocalSettings
 import me.rerere.rikkahub.ui.modifier.shimmer
@@ -181,13 +184,19 @@ private fun ReasoningContent(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        // 流式生成期间不启用 SelectionContainer，避免 selectable 列表并发修改导致的
-        // ConcurrentModificationException（详见 ChatMessage.kt 文本块同样处理）。
-        if (loading) {
-            reasoningContent()
-        } else {
-            SelectionContainer {
+        // 流式结束只打开选择，不改颜色。LocalContentColor 缺省是纯黑，选择容器包进来之前先钉住主题色。
+        val textColor = resolveMessageTextColor(
+            styleColor = LocalTextStyle.current.color,
+            contentColor = LocalContentColor.current,
+            themeColor = MaterialTheme.colorScheme.onSurface,
+        )
+        CompositionLocalProvider(LocalContentColor provides textColor) {
+            if (loading) {
                 reasoningContent()
+            } else {
+                SelectionContainer {
+                    reasoningContent()
+                }
             }
         }
     }

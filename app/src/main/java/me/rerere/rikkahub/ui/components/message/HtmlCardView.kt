@@ -2,6 +2,8 @@ package me.rerere.rikkahub.ui.components.message
 
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.os.Build
+import android.view.MotionEvent
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -10,6 +12,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -20,11 +23,15 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.launch
 import me.rerere.rikkahub.data.ai.cards.cardDocument
 import me.rerere.rikkahub.data.ai.cards.cardRequestAllowed
+import me.rerere.rikkahub.data.ai.cards.htmlCardCapturesParentScroll
+import me.rerere.rikkahub.data.ai.cards.htmlCardLayoutHeight
+import me.rerere.rikkahub.ui.theme.LocalDarkMode
 import java.io.ByteArrayInputStream
 
 fun interface TavernCardBridge {
@@ -39,6 +46,7 @@ val LocalHtmlCardAllowlist = compositionLocalOf { emptyList<String>() }
  * Network is blocked unless the host is on the allowlist. DOM storage stays off,
  * so a card cannot keep its own copy of app data.
  */
+@Suppress("DEPRECATION")
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun HtmlCardView(
@@ -50,17 +58,60 @@ fun HtmlCardView(
     val allowlist = LocalHtmlCardAllowlist.current
     val bridgeState = rememberUpdatedState(bridge)
     val allowlistState = rememberUpdatedState(allowlist)
-    val document = remember(html) { cardDocument(html) }
+    val dark = LocalDarkMode.current
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val textCss = remember(textColor) {
+        "#%02X%02X%02X".format(
+            (textColor.red * 255).toInt().coerceIn(0, 255),
+            (textColor.green * 255).toInt().coerceIn(0, 255),
+            (textColor.blue * 255).toInt().coerceIn(0, 255),
+        )
+    }
+    val document = remember(html, textCss, dark) { cardDocument(html, textColor = textCss, dark = dark) }
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current.density
     var heightPx by remember(messageId) { mutableIntStateOf(48) }
-    val height = heightPx.coerceIn(32, 720).dp
+    val layout = htmlCardLayoutHeight(heightPx, density)
+    val height = layout.heightCssPx.dp
+    val overflows = rememberUpdatedState(layout.scrolls)
     if (bridge == null) return
     AndroidView(
         modifier = modifier.fillMaxWidth().height(height),
         factory = { context ->
             WebView(context).apply {
                 setBackgroundColor(Color.TRANSPARENT)
+                isVerticalScrollBarEnabled = true
                 settings.javaScriptEnabled = true
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    settings.forceDark = WebSettings.FORCE_DARK_OFF
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    settings.isAlgorithmicDarkeningAllowed = false
+                }
+                var lastY = 0f
+                setOnTouchListener { view, event ->
+                    when (event.actionMasked) {
+                        MotionEvent.ACTION_DOWN -> lastY = event.y
+                        MotionEvent.ACTION_MOVE -> {
+                            val dy = event.y - lastY
+                            lastY = event.y
+                            val direction = when {
+                                dy > 0f -> -1
+                                dy < 0f -> 1
+                                else -> 0
+                            }
+                            val capture = htmlCardCapturesParentScroll(
+                                overflows = overflows.value,
+                                canScrollInDragDirection = direction != 0 && view.canScrollVertically(direction),
+                            )
+                            view.parent?.requestDisallowInterceptTouchEvent(capture)
+                        }
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                            view.parent?.requestDisallowInterceptTouchEvent(false)
+                        }
+                    }
+                    false
+                }
                 settings.domStorageEnabled = false
                 settings.allowFileAccess = false
                 settings.allowContentAccess = false
