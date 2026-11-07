@@ -44,4 +44,9 @@ class SlashCommandTest {
         val actions = compileSlashScript("/trigger loop", SlashContext(replies = replies))
         assertTrue(actions.isEmpty())
     }
+
+    @Test
+    fun setInputFillsTheComposerWithoutSending() {
+        assertEquals(listOf(SlashAction.FillInput("去破庙")), compileSlashScript("/setinput 去破庙"))
+    }
 }
