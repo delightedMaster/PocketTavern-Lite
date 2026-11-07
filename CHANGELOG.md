@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.1.10
+
+更新内容:
+
+- **修复 0.1.9 使用酒馆预设时 Vertex AI / Gemini、DeepSeek 思考模式报错**：预设末尾的 assistant 条目（如 Izumi 的「卡思维链」）在 0.1.9 中作为预填充发送，推理模型会拒绝请求（Vertex：`requests ending with a model turn are not supported`；DeepSeek：`reasoning_content in the thinking mode must be passed back to the API`）。现在只有 Claude 未开启思考时保留预填充，其余情况按 user 发送，指令内容不变；聊天历史不受影响。
+- **兼容 Izumi 1029 新版选项卡片**：酒馆助手接口新增 `getCurrentMessageId()` / `getLastMessageId()`，`getChatMessages` 返回的 `message_id` 改为楼层号（与酒馆助手一致）。新版卡片在运行时读取所在消息原文解析选项，0.1.9 会提示「需要酒馆助手的前端渲染与当前消息接口」。
+- **导入报告点名不会运行的酒馆助手脚本**：预设内嵌的酒馆助手脚本（如「泉此方悬浮窗」）不会执行，导入时明确列出。
+
+Updates:
+
+- **Fixed Vertex AI / Gemini and DeepSeek thinking-mode errors with SillyTavern presets in 0.1.9**: a preset's trailing assistant entry (e.g. Izumi's 卡思维链) went out as a prefill, which reasoning models reject (Vertex: `requests ending with a model turn are not supported`; DeepSeek: `reasoning_content in the thinking mode must be passed back to the API`). The prefill is now kept only for Claude without extended thinking and is otherwise sent as a user turn with the same text; chat history is unchanged.
+- **Izumi 1029 option panel**: added `getCurrentMessageId()` / `getLastMessageId()` to the 酒馆助手 bridge; `message_id` from `getChatMessages` is now the floor index, as in 酒馆助手. The new panel reads its own message at runtime; 0.1.9 showed "需要酒馆助手的前端渲染与当前消息接口".
+- **Import report names tavern_helper scripts that will not run** (e.g. 「泉此方悬浮窗」).
+
 ## 0.1.9
 
 更新内容:

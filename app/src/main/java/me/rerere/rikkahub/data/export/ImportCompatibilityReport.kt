@@ -93,9 +93,15 @@ object ImportCompatibility {
                         "预设采样参数未应用，沿用当前模型设置：${sampler.sorted().joinToString()}")
                 }
                 inspectRegex(values((root?.get("extensions") as? JsonObject)?.get("regex_scripts")), issues)
-                val otherExtensions = (root?.get("extensions") as? JsonObject)?.keys.orEmpty() - "regex_scripts"
+                val presetExtensions = root?.get("extensions") as? JsonObject
+                val otherExtensions = presetExtensions?.keys.orEmpty() - "regex_scripts"
                 if (otherExtensions.isNotEmpty()) note(ImportFindingLevel.SKIPPED,
                     "预设第三方扩展未导入：${otherExtensions.sorted().joinToString()}")
+                // 酒馆助手脚本在酒馆前端运行（悬浮窗、记忆、渲染器等），这里不执行，点名告诉用户少了什么
+                val helperScripts = values((presetExtensions?.get("tavern_helper") as? JsonObject)?.get("scripts"))
+                    .mapNotNull { (it as? JsonObject)?.text("name") }
+                if (helperScripts.isNotEmpty()) note(ImportFindingLevel.UNSUPPORTED,
+                    "酒馆助手脚本不会运行，依赖它们的功能不可用：${helperScripts.joinToString("、")}")
             }
             ImportKind.REGEX -> {
                 val entries = if (element is JsonArray) element.toList() else listOf(element)

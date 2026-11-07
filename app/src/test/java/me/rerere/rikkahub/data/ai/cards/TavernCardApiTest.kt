@@ -117,4 +117,17 @@ class TavernCardApiTest {
         assertTrue(TAVERN_CARD_SHIM.contains("send_but"))
         assertTrue(cardDocument("<div>x</div>").contains("installComposer"))
     }
+
+    @Test
+    fun `current message id is the floor index and round-trips through getChatMessages`() {
+        // Izumi 1029 option panel: getChatMessages(getCurrentMessageId())[0].message
+        val current = handleCardRequest(world(), """{"op":"getCurrentMessageId","payload":{}}""")
+        assertEquals("""{"result":1}""", current.responseJson)
+        val last = handleCardRequest(world(), """{"op":"getLastMessageId","payload":{}}""")
+        assertEquals("""{"result":2}""", last.responseJson)
+        val read = handleCardRequest(world(), """{"op":"getChatMessages","payload":{"range":1}}""")
+        assertTrue(read.responseJson.contains(""""message_id":1"""))
+        assertTrue(read.responseJson.contains(""""message":"second""""))
+        assertTrue(TAVERN_CARD_SHIM.contains("getCurrentMessageId"))
+    }
 }

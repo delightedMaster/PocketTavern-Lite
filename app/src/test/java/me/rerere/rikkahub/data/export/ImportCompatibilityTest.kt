@@ -64,4 +64,12 @@ class ImportCompatibilityTest {
         assertTrue(report.findings.single().level == ImportFindingLevel.ERROR)
         assertTrue(report.toPlainText().contains("JSON 格式无效"))
     }
+
+    @Test
+    fun `preset tavern helper scripts are named as not running`() {
+        val json = """{"prompts":[{"identifier":"main","name":"main","content":"story"}],"prompt_order":[{"character_id":100001,"order":[{"identifier":"main","enabled":true}]}],"extensions":{"tavern_helper":{"scripts":[{"type":"script","name":"泉此方悬浮窗","content":"x"}]}}}"""
+        val book = LorebookSerializer.importFromJson(json, "preset")
+        val report = ImportCompatibility.inspect(ImportKind.LOREBOOK, json, book.importedEntryCount())
+        assertTrue(report.findings.any { it.level == ImportFindingLevel.UNSUPPORTED && "泉此方悬浮窗" in it.description })
+    }
 }

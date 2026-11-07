@@ -44,6 +44,27 @@ class InteractionsApiTest {
     private val api = InteractionsAPI(OkHttpClient())
 
     @Test
+    fun `preset prefill at the end is sent as a user turn`() {
+        // Newer Gemini models reject "requests ending with a model turn".
+        val prefill = UIMessage.assistant("<thinking>").copy(isSynthetic = true)
+        val input = api.buildInput(listOf(UIMessage.system("sys"), UIMessage.user("hi"), prefill))
+        assertEquals(listOf("user_input", "user_input"), input.map { it.jsonObject["type"]!!.jsonPrimitive.content })
+
+        val inline = nonLeadingAsUser(listOf(UIMessage.user("hi"), prefill))
+        assertEquals(MessageRole.USER, inline.last().role)
+        assertEquals("<thinking>", inline.last().toText())
+    }
+
+    @Test
+    fun `a real trailing assistant message keeps the model role`() {
+        val real = UIMessage.assistant("partial reply")
+        assertEquals(MessageRole.ASSISTANT, nonLeadingAsUser(listOf(UIMessage.user("hi"), real)).last().role)
+        val synthetic = UIMessage.assistant("mid").copy(isSynthetic = true)
+        val roles = nonLeadingAsUser(listOf(UIMessage.user("a"), synthetic, UIMessage.user("b"))).map { it.role }
+        assertEquals(listOf(MessageRole.USER, MessageRole.ASSISTANT, MessageRole.USER), roles)
+    }
+
+    @Test
     fun `request body uses stateless interactions schema`() {
         val body = api.buildRequestBody(
             messages = listOf(
