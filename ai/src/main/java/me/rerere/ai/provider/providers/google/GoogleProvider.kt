@@ -924,8 +924,21 @@ internal fun leadingSystemText(messages: List<UIMessage>): String = messages
  * Gemini has no system role inside `contents`. System messages after the leading block
  * (preset entries, lore at depth) are sent as user turns instead of being dropped,
  * the same as the Claude provider and SillyTavern's Gemini conversion.
+ *
+ * A trailing model turn is a prefill. Newer Gemini models reject it with
+ * "requests ending with a model turn are not supported"
+ * (ai.google.dev/gemini-api/docs/latest-model#prefilled-model-turn-validation).
+ * SillyTavern sends it as a user turn for those models; it matches model names, which
+ * breaks with every new release, so here a trailing assistant message that a preset
+ * added (isSynthetic) is always sent as user. A real assistant message at the end
+ * (continuing a reply) keeps its role.
  */
-internal fun nonLeadingAsUser(messages: List<UIMessage>): List<UIMessage> = messages
-    .filter { it.isValidToUpload() }
-    .dropWhile { it.role == MessageRole.SYSTEM }
-    .map { if (it.role == MessageRole.SYSTEM) it.copy(role = MessageRole.USER) else it }
+internal fun nonLeadingAsUser(messages: List<UIMessage>): List<UIMessage> {
+    val converted = messages
+        .filter { it.isValidToUpload() }
+        .dropWhile { it.role == MessageRole.SYSTEM }
+        .map { if (it.role == MessageRole.SYSTEM) it.copy(role = MessageRole.USER) else it }
+    val last = converted.lastOrNull() ?: return converted
+    if (last.role != MessageRole.ASSISTANT || !last.isSynthetic) return converted
+    return converted.dropLast(1) + last.copy(role = MessageRole.USER)
+}
