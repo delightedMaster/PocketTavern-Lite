@@ -4,6 +4,14 @@
   <a href="README.md">简体中文</a> | <b>English</b>
 </p>
 
+<p align="center">
+  <a href="https://github.com/delightedMaster/PocketTavern-Lite/releases/latest"><img src="https://img.shields.io/github/v/release/delightedMaster/PocketTavern-Lite?label=Latest%20release&sort=semver" alt="Latest release"></a>
+  <br>
+  <a href="https://github.com/delightedMaster/PocketTavern-Lite/releases/latest"><b>⬇️ Download the latest APK from Releases</b></a>
+</p>
+
+> Which APK: most phones need `arm64-v8a`; PC emulators such as LDPlayer or MuMu need `x86_64`; if unsure, take `universal` (larger, runs everywhere).
+
 PocketTavern-Lite is a lightweight, high-performance Android roleplay (RP) chat client. Built on top of [RikkaHub](https://github.com/rikkahub/rikkahub) 3.0.0, it deeply aligns with the [SillyTavern](https://github.com/SillyTavern/SillyTavern) ecosystem, assets, and user workflows, providing a pure, responsive, and immersive mobile conversational experience.
 
 License: [AGPL-3.0](LICENSE). Upstream copyright notices and licenses are fully preserved.
@@ -15,7 +23,7 @@ License: [AGPL-3.0](LICENSE). Upstream copyright notices and licenses are fully 
 - 🚀 **Lightweight & Native Architecture**: Crafted with modern Kotlin + Jetpack Compose. Focuses on the core roleplay experience with rapid startup and minimal memory footprint. Can be installed side-by-side with official RikkaHub.
 - 🎭 **Comprehensive SillyTavern Compatibility**:
   - **Character Cards**: Full support for V1, V2, and V3 specifications (PNG embedded metadata and JSON), including multiple alternate greetings and character-specific settings; new conversation greetings automatically substitute `{{user}}`, `{{char}}`, and conversation-scoped variable macros (`{{setvar}}`, `{{getvar}}`, `{{addvar}}`, `{{incvar}}`).
-  - **Presets & Prompt Ordering**: Precise arrangement of `prompts` and `prompt_order`, with granular depth and frequency controls for Author's Notes; standalone preset management in Settings, plus separate tabs for binding world books and presets directly to assistants or chats.
+  - **Presets & Prompt Ordering**: Prompts are assembled the way SillyTavern's Prompt Manager does it — entry toggles, `prompt_order`, marker slots (character description, world info, chat history…), relative vs. absolute (in-chat depth) positions, a trailing assistant prefill and `squash_system_messages` all behave as in SillyTavern, with granular depth and frequency controls for Author's Notes; standalone preset management in Settings, plus separate tabs for binding world books and presets directly to assistants or chats.
   - **Lorebooks**: Keyword triggers, recursive scanning, insertion depth, token budget control, and dynamic entry insertion.
   - **Regex Scripts**: Display-layer, prompt-layer, and dual-layer regex transformations. Features an **in-app Regex Script Editor** for real-time testing, debugging, and live replacement previews against raw model outputs, plus one-tap bulk clearing of assistant regex rules.
 - 🎨 **In-Place HTML & Front-End Card Rendering**:
@@ -99,12 +107,19 @@ To build a signed release APK, configure the signing properties in `local.proper
   - Added a "Delete all" button with confirmation to clear all assistant message regex rules at once.
   - Removed the duplicate standalone "Google Vertex AI" built-in provider in favor of the Vertex AI toggle inside the "Gemini" preset (existing configured entries are preserved as custom providers).
   - Completed missing translations across locales and fixed Android Lint and stability issues.
-- **0.1.8** (Current):
+- **0.1.8**:
   - Shared Regex Editor in Assistant Prompt Page: Integrated `RegexScriptEditor` with live sample replacement preview and syntax validation into assistant-level regex rules; refined list view into compact monospace rows.
   - Robust Regex Flag Validation: Unified `/pattern/flags` parser with explicit compile errors for unknown flags, preventing silent failures.
   - Regex Group Deletion & Synchronized Cleanup: Added manual deletion with confirmation for preset regex groups in Settings; deleting a preset now automatically cleans up its associated regex rules.
   - Two-Way Preset Synchronization in Started Chats: Presets in existing conversations now consistently follow assistant bindings upon next send; toggling presets in the chat extension picker persists back to the assistant.
   - Preset Import & Update Enhancements: SillyTavern preset import prioritizes embedded JSON name and description metadata; release metadata checks fall back to `gh-proxy.com` mirror under restricted networks; scrollable extension empty states prevent button clipping.
+
+- **0.1.9** (Current):
+  - SillyTavern presets are assembled exactly like the Prompt Manager: toggles come from `prompt_order` only, relative/absolute positions fixed, marker entries expand in place, entries after chat history and an assistant prefill work. Complex presets such as Izumi now reach the model intact, so option cards and other beautification regexes match without edits. **Re-import existing presets once.**
+  - Regex depth matches SillyTavern (0 = newest message); fixed variable-length lookbehind regexes duplicating text.
+  - Option buttons in front-end cards fill the input box (SillyTavern `#send_textarea` / `#send_but` compatible); added `/setinput`.
+  - Assistant details now have separate Lorebooks / Regex / Presets entries matching global Settings; Extensions keeps quick messages, prompt injections and skills.
+  - Gemini no longer drops system messages after the first one.
 
 ---
 
