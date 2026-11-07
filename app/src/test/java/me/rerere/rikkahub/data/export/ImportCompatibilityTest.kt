@@ -29,7 +29,7 @@ class ImportCompatibilityTest {
     fun `preset markers do not inflate skipped count and sampling settings are explicitly ignored`() {
         val json = """{"temperature":0.5,"prompts":[{"identifier":"main","name":"main","content":"story"},{"identifier":"chatHistory","marker":true},{"identifier":"empty","content":""}],"prompt_order":[{"character_id":100001,"order":[{"identifier":"main","enabled":true},{"identifier":"chatHistory","enabled":true},{"identifier":"empty","enabled":true}]}]}"""
         val book = LorebookSerializer.importFromJson(json, "preset")
-        val report = ImportCompatibility.inspect(ImportKind.LOREBOOK, json, book.entries.size)
+        val report = ImportCompatibility.inspect(ImportKind.LOREBOOK, json, book.importedEntryCount())
         assertEquals(1, report.imported)
         assertEquals(1, report.skipped)
         assertTrue(report.findings.any { "temperature" in it.description && it.level == ImportFindingLevel.SKIPPED })

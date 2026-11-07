@@ -29,7 +29,7 @@ data class LorebookImport(
             val group = regexes.takeIf { it.isNotEmpty() }?.let {
                 RegexGroup(name = book.name, source = RegexGroupSource.PRESET, regexes = it, presetId = book.id)
             }
-            val baseReport = ImportCompatibility.inspect(ImportKind.LOREBOOK, json, book.entries.size)
+            val baseReport = ImportCompatibility.inspect(ImportKind.LOREBOOK, json, book.importedEntryCount())
             val findings = when (scripts) {
                 null -> emptyList()
                 is JsonArray -> buildList {
@@ -44,3 +44,7 @@ data class LorebookImport(
         }
     }
 }
+
+/** 导入报告里的条目数：酒馆预设的 marker（chatHistory 等）只是占位，不算导入的条目 */
+internal fun me.rerere.rikkahub.data.model.Lorebook.importedEntryCount(): Int =
+    entries.count { it.stPrompt?.marker != true }
