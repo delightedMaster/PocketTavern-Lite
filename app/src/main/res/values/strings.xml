@@ -12,11 +12,11 @@
   <string name="asr_button_content_description">Speech Recognition</string>
   <string name="asr_button_stop">Stop</string>
   <string name="assistant_detail_basic_desc">Configure name, avatar, model, and parameters</string>
-  <string name="assistant_detail_extensions_desc">Manage quick messages, prompt injections, lorebooks and skills</string>
+  <string name="assistant_detail_extensions_desc">Manage quick messages, prompt injections and skills</string>
   <string name="assistant_detail_local_tools_desc">Enable local tools like JavaScript engine</string>
   <string name="assistant_detail_mcp_desc">Configure MCP server tools for the assistant</string>
   <string name="assistant_detail_memory_desc">Manage assistant memory and recent chat references</string>
-  <string name="assistant_detail_prompt_desc">Set system prompts, message templates, and regex rules</string>
+  <string name="assistant_detail_prompt_desc">Set system prompts and message templates</string>
   <string name="assistant_detail_request_desc">Configure custom request headers and body parameters</string>
   <string name="assistant_extensions_page_empty_lorebooks">No lorebooks available, create one in Lorebooks</string>
   <string name="assistant_extensions_page_empty_mode_injections">No mode injections available, create one in Prompts</string>

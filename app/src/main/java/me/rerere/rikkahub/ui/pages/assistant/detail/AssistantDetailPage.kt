@@ -46,8 +46,10 @@ import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.ai.ui.UIMessage
 import me.rerere.hugeicons.HugeIcons
+import me.rerere.hugeicons.stroke.Book01
 import me.rerere.hugeicons.stroke.Brain02
 import me.rerere.hugeicons.stroke.Code
+import me.rerere.hugeicons.stroke.Layers01
 import me.rerere.hugeicons.stroke.McpServer
 import me.rerere.hugeicons.stroke.Message02
 import me.rerere.hugeicons.stroke.Puzzle
@@ -56,6 +58,8 @@ import me.rerere.hugeicons.stroke.Wrench01
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.LorebookKind
+import me.rerere.rikkahub.data.model.lorebooksOfKind
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.components.ui.CardGroupIcon
@@ -181,6 +185,43 @@ fun AssistantDetailPage(id: String) {
                         leadingContent = { CardGroupIcon(HugeIcons.Message02, containerColor = containerColor, contentColor = contentColor) },
                         supportingContent = { Text(stringResource(R.string.assistant_detail_prompt_desc)) },
                         headlineContent = { Text(stringResource(R.string.assistant_page_tab_prompt)) },
+                    )
+                }
+            }
+
+            item {
+                // 与全局设置的「世界书 / 正则 / 预设」入口一一对应：这里选择本助手用哪些，内容在全局管理
+                val containerColor = MaterialTheme.colorScheme.secondaryContainer
+                val contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                fun boundNames(kind: LorebookKind): String {
+                    val names = lorebooksOfKind(settings.lorebooks, kind)
+                        .filter { it.id in assistant.lorebookIds }
+                        .map { it.name.ifBlank { "未命名" } }
+                    return if (names.isEmpty()) "未绑定" else names.joinToString("、")
+                }
+                CardGroup {
+                    item(
+                        onClick = { navController.navigate(Screen.AssistantLorebooks(id)) },
+                        leadingContent = { CardGroupIcon(HugeIcons.Book01, containerColor = containerColor, contentColor = contentColor) },
+                        supportingContent = { Text(boundNames(LorebookKind.WORLD_BOOK), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        headlineContent = { Text(stringResource(R.string.setting_page_lorebooks)) },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.AssistantRegex(id)) },
+                        leadingContent = { CardGroupIcon(HugeIcons.Code, containerColor = containerColor, contentColor = contentColor) },
+                        supportingContent = {
+                            Text(
+                                if (assistant.regexes.isEmpty()) "本助手专属正则：无（全局正则仍然生效）"
+                                else "本助手专属正则 ${assistant.regexes.size} 条，先于全局正则执行"
+                            )
+                        },
+                        headlineContent = { Text(stringResource(R.string.setting_page_regex)) },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.AssistantPresets(id)) },
+                        leadingContent = { CardGroupIcon(HugeIcons.Layers01, containerColor = containerColor, contentColor = contentColor) },
+                        supportingContent = { Text(boundNames(LorebookKind.PRESET), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        headlineContent = { Text(stringResource(R.string.setting_page_presets)) },
                     )
                 }
             }

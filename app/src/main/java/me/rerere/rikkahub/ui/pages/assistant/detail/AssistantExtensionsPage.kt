@@ -22,11 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
-import me.rerere.rikkahub.data.model.LorebookKind
-import me.rerere.rikkahub.data.model.lorebooksOfKind
-import me.rerere.rikkahub.data.model.toggleLorebookBinding
 import me.rerere.rikkahub.ui.components.ai.ExtensionEmptyState
-import me.rerere.rikkahub.ui.components.ai.LorebooksContent
 import me.rerere.rikkahub.ui.components.ai.ModeInjectionsContent
 import me.rerere.rikkahub.ui.components.ai.QuickMessagesContent
 import me.rerere.rikkahub.ui.components.ai.SkillsContent
@@ -46,7 +42,9 @@ fun AssistantExtensionsPage(id: String) {
     val skills by vm.skills.collectAsStateWithLifecycle()
     val navController = LocalNavController.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val pagerState = rememberPagerState { ExtensionTab.entries.size }
+    // 世界书、预设、正则在助手详情页有独立入口（与全局设置对齐），这里只留其余扩展
+    val tabs = ASSISTANT_EXTENSION_TABS
+    val pagerState = rememberPagerState { tabs.size }
     val listPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
     // 页面背景比 sheet 深，列表项用更亮的容器色才分得开
     val listColors = ListItemDefaults.segmentedColors(
@@ -72,7 +70,7 @@ fun AssistantExtensionsPage(id: String) {
         ) {
             PagerTabs(
                 pagerState = pagerState,
-                tabs = ExtensionTab.entries,
+                tabs = tabs,
                 modifier = Modifier.padding(bottom = 4.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp),
             )
@@ -83,7 +81,7 @@ fun AssistantExtensionsPage(id: String) {
                     .fillMaxWidth()
                     .weight(1f),
             ) { page ->
-                when (val tab = ExtensionTab.entries[page]) {
+                when (val tab = tabs[page]) {
                     ExtensionTab.QUICK_MESSAGES -> {
                         if (settings.quickMessages.isEmpty()) {
                             ExtensionEmptyState(
@@ -132,59 +130,7 @@ fun AssistantExtensionsPage(id: String) {
                         }
                     }
 
-                    ExtensionTab.LOREBOOKS -> {
-                        val worldBooks = lorebooksOfKind(settings.lorebooks, LorebookKind.WORLD_BOOK)
-                        if (worldBooks.isEmpty()) {
-                            ExtensionEmptyState(
-                                message = stringResource(R.string.assistant_extensions_page_empty_lorebooks),
-                                buttonText = stringResource(R.string.assistant_extensions_page_goto_lorebooks),
-                                onAction = { navController.navigate(Screen.Lorebooks) },
-                                icon = tab.icon,
-                            )
-                        } else {
-                            LorebooksContent(
-                                contentPadding = listPadding,
-                                colors = listColors,
-                                lorebooks = worldBooks,
-                                selectedIds = assistant.lorebookIds,
-                                onToggle = { id, checked ->
-                                    vm.update(
-                                        assistant.copy(
-                                            lorebookIds = toggleLorebookBinding(assistant.lorebookIds, id, checked),
-                                        ),
-                                    )
-                                },
-                                onManage = { navController.navigate(Screen.Lorebooks) },
-                            )
-                        }
-                    }
-
-                    ExtensionTab.PRESETS -> {
-                        val presets = lorebooksOfKind(settings.lorebooks, LorebookKind.PRESET)
-                        if (presets.isEmpty()) {
-                            ExtensionEmptyState(
-                                message = stringResource(R.string.assistant_extensions_page_empty_presets),
-                                buttonText = stringResource(R.string.assistant_extensions_page_goto_presets),
-                                onAction = { navController.navigate(Screen.Presets) },
-                                icon = tab.icon,
-                            )
-                        } else {
-                            LorebooksContent(
-                                contentPadding = listPadding,
-                                colors = listColors,
-                                lorebooks = presets,
-                                selectedIds = assistant.lorebookIds,
-                                onToggle = { id, checked ->
-                                    vm.update(
-                                        assistant.copy(
-                                            lorebookIds = toggleLorebookBinding(assistant.lorebookIds, id, checked),
-                                        ),
-                                    )
-                                },
-                                onManage = { navController.navigate(Screen.Presets) },
-                            )
-                        }
-                    }
+                    ExtensionTab.LOREBOOKS, ExtensionTab.PRESETS -> Unit
 
                     ExtensionTab.SKILLS -> {
                         if (skills.isEmpty()) {
@@ -214,3 +160,9 @@ fun AssistantExtensionsPage(id: String) {
         }
     }
 }
+
+private val ASSISTANT_EXTENSION_TABS = listOf(
+    ExtensionTab.QUICK_MESSAGES,
+    ExtensionTab.MODE_INJECTIONS,
+    ExtensionTab.SKILLS,
+)
