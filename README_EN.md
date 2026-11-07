@@ -113,13 +113,16 @@ To build a signed release APK, configure the signing properties in `local.proper
   - Regex Group Deletion & Synchronized Cleanup: Added manual deletion with confirmation for preset regex groups in Settings; deleting a preset now automatically cleans up its associated regex rules.
   - Two-Way Preset Synchronization in Started Chats: Presets in existing conversations now consistently follow assistant bindings upon next send; toggling presets in the chat extension picker persists back to the assistant.
   - Preset Import & Update Enhancements: SillyTavern preset import prioritizes embedded JSON name and description metadata; release metadata checks fall back to `gh-proxy.com` mirror under restricted networks; scrollable extension empty states prevent button clipping.
-
-- **0.1.9** (Current):
+- **0.1.9**:
   - SillyTavern presets are assembled exactly like the Prompt Manager: toggles come from `prompt_order` only, relative/absolute positions fixed, marker entries expand in place, entries after chat history and an assistant prefill work. Complex presets such as Izumi now reach the model intact, so option cards and other beautification regexes match without edits. **Re-import existing presets once.**
   - Regex depth matches SillyTavern (0 = newest message); fixed variable-length lookbehind regexes duplicating text.
   - Option buttons in front-end cards fill the input box (SillyTavern `#send_textarea` / `#send_but` compatible); added `/setinput`.
   - Assistant details now have separate Lorebooks / Regex / Presets entries matching global Settings; Extensions keeps quick messages, prompt injections and skills.
   - Gemini no longer drops system messages after the first one.
+- **0.1.10** (Current):
+  - Fixed Vertex AI / Gemini and DeepSeek thinking-mode errors with SillyTavern presets in 0.1.9: a preset's trailing assistant prefill is kept only for Claude without extended thinking and is otherwise sent as a user turn.
+  - Izumi 1029 option panel works: added `getCurrentMessageId()` / `getLastMessageId()` to the 酒馆助手 bridge; `message_id` is now the floor index.
+  - The preset import report names 酒馆助手 scripts that will not run.
 
 ---
 
