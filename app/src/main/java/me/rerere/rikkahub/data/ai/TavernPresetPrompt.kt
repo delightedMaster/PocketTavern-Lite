@@ -1,6 +1,8 @@
 package me.rerere.rikkahub.data.ai
 
 import me.rerere.ai.core.MessageRole
+import me.rerere.ai.provider.ModelAbility
+import me.rerere.ai.provider.ProviderSetting
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.ai.assembly.ANCHOR_START
@@ -195,7 +197,8 @@ internal fun ChatTurnContext.tavernPresetPrompt(
         }
     }
 
-    val ordered = if (settingsOf.squashSystemMessages) squashSystemMessages(out) else out
+    val squashed = if (settingsOf.squashSystemMessages) squashSystemMessages(out) else out
+    val ordered = squashed.withPrefillPolicy(keepPrefill = prefillSupported())
     promptState = state.copy(
         frozenInjectionsTurnId = turnId,
         frozenInjections = lore,
@@ -276,4 +279,25 @@ private fun ChatTurnContext.authorNoteInjections(userTurns: Int): List<InChatInj
             }
             InChatInjection(depth, 100, note.role, note.content)
         }
+}
+
+/**
+ * Whether a trailing assistant entry can go out as a real prefill.
+ *
+ * Only Claude without extended thinking accepts it, which is also where SillyTavern's prefill
+ * matters. Reasoning models reject a trailing assistant turn: DeepSeek in thinking mode asks
+ * for its reasoning_content ("must be passed back to the API"), Claude with thinking refuses a
+ * prefill, and newer Gemini models refuse "requests ending with a model turn". SillyTavern works
+ * around each of these per provider (DeepSeek `prefix`, Gemini by model name); sending the entry
+ * as a user turn keeps its instruction and works everywhere.
+ */
+internal fun ChatTurnContext.prefillSupported(): Boolean =
+    providerSetting is ProviderSetting.Claude &&
+        !(model.abilities.contains(ModelAbility.REASONING) && assistant.reasoningLevel.isEnabled)
+
+/** Sends a trailing synthetic assistant message as a user turn unless [keepPrefill]. History is untouched. */
+internal fun List<UIMessage>.withPrefillPolicy(keepPrefill: Boolean): List<UIMessage> {
+    val last = lastOrNull() ?: return this
+    if (keepPrefill || last.role != MessageRole.ASSISTANT || !last.isSynthetic) return this
+    return dropLast(1) + last.copy(role = MessageRole.USER)
 }

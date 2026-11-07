@@ -68,13 +68,17 @@ class TavernPresetPromptTest {
         )
     }
 
-    private fun context(book: Lorebook): ChatTurnContext {
+    private fun context(
+        book: Lorebook,
+        provider: ProviderSetting = ProviderSetting.Claude(),
+        model: Model = Model(modelId = "test"),
+    ): ChatTurnContext {
         val assistant = Assistant(systemPrompt = "CHAR", lorebookIds = setOf(book.id))
         return ChatTurnContext(
             settings = Settings(lorebooks = listOf(book)),
             assistant = assistant,
-            model = Model(modelId = "test"),
-            providerSetting = ProviderSetting.OpenAI(),
+            model = model,
+            providerSetting = provider,
             conversationId = Uuid.random(),
             conversationSystemPrompt = null,
             conversationModeInjectionIds = emptySet(),
@@ -174,5 +178,22 @@ class TavernPresetPromptTest {
         val book = preset(squash = false).copy(stPreset = null)
         val ctx = context(book)
         assertEquals(null, ctx.activeTavernPreset())
+    }
+
+    @Test
+    fun `trailing prefill becomes a user turn where providers reject it`() {
+        val book = preset(squash = false)
+        // OpenAI-compatible (DeepSeek thinking mode asks for reasoning_content otherwise)
+        val openAi = context(book, provider = ProviderSetting.OpenAI()).layeredPrompt(chat).messages
+        assertEquals(MessageRole.USER to "<thinking>", openAi.last().role to openAi.last().toText())
+        // Gemini / Vertex: "requests ending with a model turn are not supported"
+        val gemini = context(book, provider = ProviderSetting.Google()).layeredPrompt(chat).messages
+        assertEquals(MessageRole.USER, gemini.last().role)
+        // Claude with thinking refuses a prefill
+        val thinking = Model(modelId = "claude", abilities = listOf(me.rerere.ai.provider.ModelAbility.REASONING))
+        val claudeThinking = context(book, model = thinking).layeredPrompt(chat).messages
+        assertEquals(MessageRole.USER, claudeThinking.last().role)
+        // Real assistant messages in history keep their role
+        assertTrue(openAi.any { it.role == MessageRole.ASSISTANT && it.toText() == "hello" })
     }
 }
