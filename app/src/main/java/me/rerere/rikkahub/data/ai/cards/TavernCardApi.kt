@@ -20,7 +20,10 @@ import java.net.URI
  * Supported 酒馆助手 (JS-Slash-Runner) calls, injected by [TAVERN_CARD_SHIM]:
  * - `getChatMessages(range)` — stored message text. `range` may be omitted,
  *   `"all"`, a number (`-1` is the last message, `0` is the first), `"start-end"`,
- *   or `{start, end}`.
+ *   or `{start, end}`. Each item is `{message_id, role, message}`; `message_id` is the
+ *   floor index, as in 酒馆助手, so it round-trips with the two calls below.
+ * - `getCurrentMessageId()` — floor index of the message this card belongs to;
+ *   `getLastMessageId()` — floor index of the newest message.
  * - `getVariables({type})` — `chat` (default), `global`, or `message` (this card's message).
  * - `setVariables(vars, {type})`, `replaceVariables`, and `insertOrAssignVariables`
  *   merge keys. They do not wipe the rest of the table.
@@ -53,6 +56,8 @@ const val TAVERN_CARD_SHIM = """
   window.replaceVariables = window.setVariables;
   window.insertOrAssignVariables = window.setVariables;
   window.triggerSlash = function (command) { return call('triggerSlash', { command: String(command || '') }); };
+  window.getCurrentMessageId = function () { return call('getCurrentMessageId'); };
+  window.getLastMessageId = function () { return call('getLastMessageId'); };
   window.Mvu = {
     getMvuData: function (options) { return call('mvuGet', options || { type: 'chat' }); },
     replaceMvuData: function (data, options) { return call('mvuReplace', { data: data, type: (options && options.type) || 'message' }); }
@@ -215,7 +220,12 @@ fun handleCardRequest(world: CardWorld, requestJson: String): CardEffect {
     val op = root["op"]?.jsonPrimitive?.contentOrNull ?: return CardEffect(errorJson("missing op"))
     val payload = root["payload"] as? JsonObject ?: JsonObject(emptyMap())
     return when (op) {
-        "getChatMessages" -> CardEffect(okJson(messagesJson(selectMessages(world.messages, payload["range"]))))
+        "getChatMessages" -> CardEffect(okJson(messagesJson(world.messages, selectMessages(world.messages, payload["range"]))))
+        "getCurrentMessageId" -> CardEffect(
+            okJson(world.messages.indexOfFirst { it.id == world.currentMessageId }.takeIf { it >= 0 }
+                ?.let(::JsonPrimitive) ?: JsonNull),
+        )
+        "getLastMessageId" -> CardEffect(okJson(JsonPrimitive(world.messages.lastIndex)))
         "getVariables" -> CardEffect(okJson(variablesJson(variablesOf(world, scopeOf(payload)))))
         "setVariables", "replaceVariables" -> assignVariables(world, payload)
         "triggerSlash" -> CardEffect(
@@ -316,10 +326,11 @@ private fun slice(messages: List<CardMessage>, start: Int, end: Int): List<CardM
     return messages.subList(from, to)
 }
 
-private fun messagesJson(messages: List<CardMessage>): JsonArray = buildJsonArray {
+private fun messagesJson(all: List<CardMessage>, messages: List<CardMessage>): JsonArray = buildJsonArray {
     messages.forEach { message ->
         add(buildJsonObject {
-            put("message_id", message.id)
+            // 酒馆助手的 message_id 是楼层号（从 0 开始），卡片会拿 getCurrentMessageId() 的结果去查
+            put("message_id", all.indexOf(message))
             put("role", message.role)
             put("message", message.text)
         })
