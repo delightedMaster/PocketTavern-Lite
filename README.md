@@ -4,6 +4,14 @@
   <b>简体中文</b> | <a href="README_EN.md">English</a>
 </p>
 
+<p align="center">
+  <a href="https://github.com/delightedMaster/PocketTavern-Lite/releases/latest"><img src="https://img.shields.io/github/v/release/delightedMaster/PocketTavern-Lite?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC&sort=semver" alt="最新版本"></a>
+  <br>
+  <a href="https://github.com/delightedMaster/PocketTavern-Lite/releases/latest"><b>⬇️ 前往 Releases 下载最新 APK</b></a>
+</p>
+
+> 安装包怎么选：大多数手机下载 `arm64-v8a`；雷电、MuMu 等电脑模拟器下载 `x86_64`；不确定就下载 `universal`（体积较大，但通用）。
+
 PocketTavern-Lite 是一款面向 Android 平台的轻量、高效角色扮演（RP）聊天客户端。项目基于 [RikkaHub](https://github.com/rikkahub/rikkahub) 3.0.0 构建，深度对齐 [SillyTavern](https://github.com/SillyTavern/SillyTavern)（酒馆）核心生态资产与交互习惯，专注于纯粹、流畅的移动端沉浸式对话体验。
 
 开源协议：[AGPL-3.0](LICENSE)。保留所有上游版权声明与开源授权。
@@ -15,7 +23,7 @@ PocketTavern-Lite 是一款面向 Android 平台的轻量、高效角色扮演�
 - 🚀 **轻量专注与纯原生架构**：使用现代 Kotlin + Jetpack Compose 打造，聚焦角色扮演核心交互，启动迅速、内存占用极低，可与官方 RikkaHub 共存运行。
 - 🎭 **全面对齐 SillyTavern 生态**：
   - **角色卡**：完整支持 V1、V2 及 V3 规范（PNG 嵌入与 JSON），支持多开场白、角色专属配置与备选问候语；新对话开场白自动替换 `{{user}}`、`{{char}}` 等占位符，开场白变量宏（`{{setvar}}`、`{{getvar}}`、`{{addvar}}`、`{{incvar}}`）按会话独立保存。
-  - **预设编排**：支持 `prompts` 与 `prompt_order` 精确编排，支持作者备注（Author's Note）深度与频率控制；支持在设置页独立管理预设，并在聊天扩展选择器与助手配置中将世界书与预设分开展示和直接绑定。
+  - **预设编排**：按酒馆 Prompt Manager 的方式组装提示词——条目开关、`prompt_order` 顺序、角色描述 / 世界书 / 聊天记录等占位位置、相对与绝对（按深度插入）位置、末尾 assistant 预填充和 `squash_system_messages` 均与酒馆一致，支持作者备注（Author's Note）深度与频率控制；支持在设置页独立管理预设，并在聊天扩展选择器与助手配置中将世界书与预设分开展示和直接绑定。
   - **世界书（Lorebook）**：支持关键词匹配、递归扫描、插入深度、Token 预算控制与动态条目追加。
   - **正则脚本（Regex）**：支持显示层（Display）、提示词层（Prompt）及双层同时生效的正则处理；内置**在线正则脚本编辑器**，支持直接编写、调试并在模型原文上即时预览替换效果，支持助手级消息正则一键清空。
 - 🎨 **原位 HTML 与前端卡片渲染**：
@@ -99,12 +107,19 @@ git submodule update --init
   - 助手消息正则列表新增「删除全部」按钮，确认后一键清空当前助手的所有正则。
   - 移除重复的独立「Google Vertex AI」内置服务商，统一通过「Gemini」预设中的 Vertex AI 开关启用（已填密钥或模型的旧配置自动保留为自定义服务商）。
   - 补齐多语言文案，修复 Lint 与若干稳定性问题。
-- **0.1.8**（当前版本）：
+- **0.1.8**：
   - 助手详情页「消息正则规则」接入公共 `RegexScriptEditor` 弹窗，支持即时样本替换预览与语法校验，列表优化为紧凑单行等宽展示。
   - 正则修饰符语法校验增强：统一运行时与编辑器的 `/pattern/flags` 解析，非法修饰符给出即时明确报错，避免静默失效。
   - 正则管理与联动清理：设置页正则分组支持手动删除并带二次确认；删除预设时自动同步清理其附带的正则分组。
   - 对话与预设双向同步：已有对话预设始终跟随助手自身的绑定实时生效，在聊天扩展选择器中勾选预设直接持久化同步至助手。
   - 导入与更新体验优化：酒馆预设导入优先使用 JSON 内部元数据名称与描述；应用内检查更新阶段增加国内镜像源兜底；扩展选择器空状态自适应滚动防截断。
+
+- **0.1.9**（当前版本）：
+  - 酒馆预设按 Prompt Manager 原样组装：条目开关只看 `prompt_order`、相对 / 绝对位置语义修正、占位条目原位展开、聊天记录之后的条目与 assistant 预填充可用。Izumi 等复杂预设的格式要求能完整送达模型，选项卡片等美化正则无需改写即可命中。**已导入的预设需要重新导入一次。**
+  - 正则深度与酒馆一致（0 = 最新一条）；修复变长 lookbehind 正则输出重复内容的问题。
+  - 前端卡片中的选项按钮可将文字填入输入框（兼容酒馆 `#send_textarea` / `#send_but`），新增 `/setinput`。
+  - 助手详情页新增「世界书 / 正则 / 预设」独立入口，与全局设置对齐；扩展管理只保留快捷消息、提示词注入和技能。
+  - Gemini 不再丢弃第一条之后的 system 消息。
 
 ---
 

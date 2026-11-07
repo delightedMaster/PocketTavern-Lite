@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.1.9
+
+更新内容:
+
+- **酒馆预设按 Prompt Manager 原样组装**：导入时保留 `prompt_order` 顺序、占位条目（chatHistory、charDescription 等）和条目语义；条目开关只看 `prompt_order`（以前 `prompts[].enabled` 也参与判断，Izumi 47 条启用条目中有 19 条被误关）；`injection_position` 0 按顺序原地排列、1 才按深度插入聊天记录（以前语义相反）；聊天记录之后的条目跟在完整历史后面，末尾 assistant 预填充生效；支持 `squash_system_messages`。复杂预设的格式要求能完整送达模型，选项卡片等美化正则无需改写即可命中。**已导入的预设需要重新导入一次才会使用新的组装方式。**
+- **正则深度与酒馆一致**：0 = 最新一条消息，未设置 = 不限制（以前 `maxDepth: 0` 被当成不限制，且整体偏移一层）；修复变长 lookbehind 正则把整段原文重复输出的问题。
+- **前端卡片选项可填入输入框**：卡片运行环境提供酒馆的 `#send_textarea` / `#send_but`，点击选项后文字进入输入框；新增 `/setinput` 命令。
+- **助手设置与全局设置对齐**：助手详情页新增「世界书 / 正则 / 预设」独立入口（显示当前绑定），助手消息正则移到「正则」页；扩展管理只保留快捷消息、提示词注入和技能。
+- **其它**：`{{lastUserMessage}}` / `{{lastCharMessage}}` 不再把预设条目当成聊天消息；Gemini 不再丢弃第一条之后的 system 消息；同位置世界书条目保持原有顺序；README 顶部新增 Release 下载入口。
+
+Updates:
+
+- **SillyTavern presets assembled like the Prompt Manager**: import keeps `prompt_order`, marker entries and entry semantics; toggles come from `prompt_order` only (previously `prompts[].enabled` also counted, turning off 19 of Izumi's 47 active entries); `injection_position` 0 stays in order and 1 is inserted into chat history by depth (previously reversed); entries after chat history follow the whole history so an assistant prefill works; `squash_system_messages` is supported. **Re-import existing presets once to use the new assembly.**
+- **Regex depth matches SillyTavern**: 0 = newest message, unset = unbounded (previously `maxDepth: 0` meant unbounded and every depth was off by one); fixed variable-length lookbehind regexes duplicating the input.
+- **Card options fill the input box**: cards get SillyTavern's `#send_textarea` / `#send_but`; added `/setinput`.
+- **Assistant settings match global settings**: separate Lorebooks / Regex / Presets entries on the assistant page (showing what is bound); assistant message regexes moved to the Regex page; Extensions keeps quick messages, prompt injections and skills.
+- **Other**: `{{lastUserMessage}}` / `{{lastCharMessage}}` ignore preset entries; Gemini keeps system messages after the first; lorebook entries in one slot keep their order; README now links to the latest release at the top.
+
 ## 0.1.8
 
 更新内容:
