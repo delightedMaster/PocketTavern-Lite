@@ -389,6 +389,7 @@ class ChatVM(
                 globalVariables = globalVarOverlay ?: prefs.macroGlobalVariables,
                 messageVariables = messageVarOverlay ?: current.promptState.messageVariables,
                 currentMessageId = messageId,
+                input = inputState.textContent.text.toString(),
             )
             handleCardRequest(world, requestJson).also { result ->
                 if (result.chatVariables != null) chatVarOverlay = result.chatVariables
@@ -419,6 +420,20 @@ class ChatVM(
         }
         effect.slash?.let { command ->
             viewModelScope.launch { runQuickReply(command) }
+        }
+        effect.fillInput?.let { text ->
+            viewModelScope.launch { inputState.setMessageText(text) }
+        }
+        if (effect.sendInput) {
+            viewModelScope.launch {
+                if (!inputState.isEditing()) {
+                    val contents = inputState.getContents()
+                    if (contents.isNotEmpty()) {
+                        handleMessageSend(contents)
+                        inputState.clearInput()
+                    }
+                }
+            }
         }
         return effect.responseJson
     }

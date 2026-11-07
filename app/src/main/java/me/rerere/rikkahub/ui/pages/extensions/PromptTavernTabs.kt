@@ -500,11 +500,13 @@ private fun RegexScriptRow(
         Text(
             buildString {
                 append(regex.affectingScope.joinToString { it.name })
-                if (regex.minDepth > 0 || regex.maxDepth > 0) {
+                val min = regex.effectiveMinDepth
+                val max = regex.effectiveMaxDepth
+                if (min != null || max != null) {
                     append("  ")
-                    append(regex.minDepth)
+                    append(min ?: 0)
                     append("–")
-                    append(if (regex.maxDepth > 0) regex.maxDepth.toString() else "∞")
+                    append(max?.toString() ?: "∞")
                 }
             },
             style = MaterialTheme.typography.labelSmall,

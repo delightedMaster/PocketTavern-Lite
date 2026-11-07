@@ -95,4 +95,26 @@ class TavernCardApiTest {
         assertTrue(effect.responseJson.contains("first"))
         assertTrue(effect.responseJson.contains("third"))
     }
+
+    @Test
+    fun composerOpsMapSendTextareaToTheAppInput() {
+        val current = world().copy(input = "draft")
+        val read = handleCardRequest(current, """{"op":"getInput","payload":{}}""")
+        assertEquals("""{"result":"draft"}""", read.responseJson)
+
+        val write = handleCardRequest(current, """{"op":"setInput","payload":{"text":"draft\n纯发癫"}}""")
+        assertEquals("draft\n纯发癫", write.fillInput)
+        assertFalse(write.sendInput)
+
+        val send = handleCardRequest(current, """{"op":"sendInput","payload":{}}""")
+        assertTrue(send.sendInput)
+        assertEquals(null, send.fillInput)
+    }
+
+    @Test
+    fun shimProvidesSendTextareaAndSendButton() {
+        assertTrue(TAVERN_CARD_SHIM.contains("send_textarea"))
+        assertTrue(TAVERN_CARD_SHIM.contains("send_but"))
+        assertTrue(cardDocument("<div>x</div>").contains("installComposer"))
+    }
 }

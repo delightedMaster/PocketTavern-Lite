@@ -46,11 +46,13 @@ class PresetImportDisabledContentTest {
     }
 
     @Test
-    fun `enabled flag on prompts array also disables import`() {
+    fun `prompts array enabled flag is ignored when prompt_order enables the entry`() {
+        // 酒馆 PromptManager 只读 prompt_order 项的 enabled，prompts[].enabled 不参与。
+        // 以前两处取与，Izumi 这类预设里 19 条在酒馆里开着的条目被导入成关闭。
         val entries = LorebookSerializer.tryImportPresetOrdered(presetJson)!!
-        val off = entries.first { it.name == "ArrayOff" }
-        assertFalse(off.enabled)
-        assertEquals("array disabled", off.content)
+        val on = entries.first { it.name == "ArrayOff" }
+        assertTrue(on.enabled)
+        assertEquals("array disabled", on.content)
     }
 
     @Test
@@ -79,7 +81,8 @@ class PresetImportDisabledContentTest {
         // 不在顺序里的条目（酒馆"未加入顺序"区）必须保留，否则二创预设的大批备选条目整批消失
         assertEquals(4, entries.size)
         assertFalse(entries.first { it.name == "OrphanOff" }.enabled)
-        assertTrue(entries.first { it.name == "OrphanOn" }.enabled)
+        // 酒馆不会发送 prompt_order 之外的条目，保留但默认关闭
+        assertFalse(entries.first { it.name == "OrphanOn" }.enabled)
         assertFalse(entries.first { it.name == "OrphanBlank" }.enabled)
     }
 }

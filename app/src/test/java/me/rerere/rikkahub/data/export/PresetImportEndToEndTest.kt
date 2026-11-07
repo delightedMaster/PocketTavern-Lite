@@ -59,8 +59,15 @@ class PresetImportEndToEndTest {
         )
         assertTrue("★ issue #5：被关掉的其它条目被丢弃了", names.any { it == "附加设定" })
 
-        val enabledNames = list.filter { it.enabled }.map { it.name }
-        val disabledNames = list.filter { !it.enabled }.map { it.name }
+        // marker（世界书-前、聊天历史）作为占位条目保留，用于按 prompt_order 组装，这里只看普通条目
+        val prompts = list.filter { it.stPrompt?.marker != true }
+        val enabledNames = prompts.filter { it.enabled }.map { it.name }
+        val disabledNames = prompts.filter { !it.enabled }.map { it.name }
+        assertEquals(
+            "marker 按原顺序保留",
+            listOf("worldInfoBefore", "chatHistory"),
+            list.mapNotNull { it.stPrompt?.takeIf { meta -> meta.marker }?.identifier },
+        )
 
         assertEquals("启用的应恰好是这几条", setOf("主要提示", "风格-正式版", "深度注入"), enabledNames.toSet())
         assertEquals(

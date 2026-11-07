@@ -345,16 +345,13 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
         messages: List<UIMessage>,
         params: TextGenerationParams
     ): JsonObject = buildJsonObject {
-        // System message if available
-        val systemMessage = messages.firstOrNull { it.role == MessageRole.SYSTEM }
-        if (systemMessage != null && !params.model.outputModalities.contains(Modality.IMAGE)) {
+        // 开头连续的 system 消息合并成 systemInstruction（以前只取第一条，其余被静默丢弃）
+        val systemText = leadingSystemText(messages)
+        if (systemText.isNotBlank() && !params.model.outputModalities.contains(Modality.IMAGE)) {
             put("systemInstruction", buildJsonObject {
                 putJsonArray("parts") {
                     add(buildJsonObject {
-                        put(
-                            "text",
-                            systemMessage.parts.filterIsInstance<UIMessagePart.Text>()
-                                .joinToString { it.text })
+                        put("text", systemText)
                     })
                 }
             })
@@ -674,8 +671,7 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
 
     private fun buildContents(messages: List<UIMessage>): JsonArray {
         return buildJsonArray {
-            messages
-                .filter { it.role != MessageRole.SYSTEM && it.isValidToUpload() }
+            nonLeadingAsUser(messages)
                 .forEach { message ->
                     if (message.role == MessageRole.ASSISTANT) {
                         addModelMessage(message)
@@ -914,3 +910,22 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
         )
     }
 }
+
+/** Text of the system messages at the start of the request, one block per message. */
+internal fun leadingSystemText(messages: List<UIMessage>): String = messages
+    .filter { it.isValidToUpload() }
+    .takeWhile { it.role == MessageRole.SYSTEM }
+    .joinToString("\n\n") { message ->
+        message.parts.filterIsInstance<UIMessagePart.Text>().joinToString("\n") { it.text }
+    }
+    .trim()
+
+/**
+ * Gemini has no system role inside `contents`. System messages after the leading block
+ * (preset entries, lore at depth) are sent as user turns instead of being dropped,
+ * the same as the Claude provider and SillyTavern's Gemini conversion.
+ */
+internal fun nonLeadingAsUser(messages: List<UIMessage>): List<UIMessage> = messages
+    .filter { it.isValidToUpload() }
+    .dropWhile { it.role == MessageRole.SYSTEM }
+    .map { if (it.role == MessageRole.SYSTEM) it.copy(role = MessageRole.USER) else it }
