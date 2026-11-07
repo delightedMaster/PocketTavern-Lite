@@ -33,8 +33,8 @@ private fun AssistantRegex.toRegexScriptJson(): JsonObject = buildJsonObject {
     put("promptOnly", JsonPrimitive(promptOnly))
     put("runOnEdit", JsonPrimitive(false))
     put("substituteRegex", JsonPrimitive(0))
-    put("minDepth", JsonPrimitive(minDepth))
-    put("maxDepth", JsonPrimitive(maxDepth))
+    put("minDepth", effectiveMinDepth?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull)
+    put("maxDepth", effectiveMaxDepth?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull)
 }
 
 private fun JsonObject.toAssistantRegex(): AssistantRegex {
@@ -56,8 +56,8 @@ private fun JsonObject.toAssistantRegex(): AssistantRegex {
         affectingScope = scopes,
         visualOnly = markdownOnly && !promptOnly,
         promptOnly = promptOnly && !markdownOnly,
-        minDepth = this["minDepth"]?.toString()?.toIntOrNull() ?: 0,
-        maxDepth = this["maxDepth"]?.toString()?.toIntOrNull() ?: 0,
+        minDepth = this["minDepth"]?.toString()?.toIntOrNull(),
+        maxDepth = this["maxDepth"]?.toString()?.toIntOrNull(),
     )
 }
 

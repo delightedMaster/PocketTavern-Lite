@@ -196,12 +196,9 @@ internal class InteractionsAPI(
 
         val outputsImage = params.model.outputModalities.contains(Modality.IMAGE)
 
-        val systemMessage = messages.firstOrNull { it.role == MessageRole.SYSTEM }
-        if (systemMessage != null && !outputsImage) {
-            put(
-                "system_instruction",
-                systemMessage.parts.filterIsInstance<UIMessagePart.Text>().joinToString("\n") { it.text }
-            )
+        val systemText = leadingSystemText(messages)
+        if (systemText.isNotBlank() && !outputsImage) {
+            put("system_instruction", systemText)
         }
 
         put("input", buildInput(messages))
@@ -269,8 +266,7 @@ internal class InteractionsAPI(
     }
 
     internal fun buildInput(messages: List<UIMessage>): JsonArray = buildJsonArray {
-        messages
-            .filter { it.role != MessageRole.SYSTEM && it.isValidToUpload() }
+        nonLeadingAsUser(messages)
             .forEach { message ->
                 if (message.role == MessageRole.ASSISTANT) {
                     addModelSteps(message)

@@ -128,7 +128,7 @@ private fun ReasoningContent(
     scrollState: ScrollState,
     fadeHeight: Float,
     loading: Boolean,
-    depth: Int,
+    depth: Int?,
     regexes: List<me.rerere.rikkahub.data.model.AssistantRegex>,
 ) {
     val isPreview = expandState == ReasoningCardState.Preview
@@ -200,7 +200,7 @@ fun ChainOfThoughtScope.ChatMessageReasoningStep(
     assistant: Assistant?,
     fadeHeight: Float = 64f,
     collapsedAdaptiveWidth: Boolean = false,
-    depth: Int = 0,
+    depth: Int? = null,
     regexes: List<me.rerere.rikkahub.data.model.AssistantRegex> = assistant?.regexes.orEmpty(),
 ) {
     val (state, loading) = rememberReasoningState(reasoning)

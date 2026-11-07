@@ -92,10 +92,24 @@ data class AssistantRegex(
     // 按数组顺序先清掉占位标签，后续注入 HTML 的显示脚本再也匹配不到，
     // 卡片整体不渲染。默认 false：老数据行为不变。
     val promptOnly: Boolean = false,
-    // 官方酒馆深度过滤：1 = 最新一条消息
-    val minDepth: Int = 0,
-    val maxDepth: Int = 0,
-)
+    /**
+     * 酒馆深度过滤（regex/engine.js）：0 = 最新一条消息，null = 不限制。
+     * minDepth 允许 -1（continue 时的前缀消息），maxDepth = 0 表示只作用于最新一条。
+     */
+    @SerialName("depthMin") val minDepth: Int? = null,
+    @SerialName("depthMax") val maxDepth: Int? = null,
+    // 旧版字段（0 = 不限制，其余值本来就是酒馆原值，只是旧版求深度时多算了一层）。
+    // 只读兼容：新字段为 null 时回退到这里，编辑后写入新字段并清零。
+    @SerialName("minDepth") val legacyMinDepth: Int = 0,
+    @SerialName("maxDepth") val legacyMaxDepth: Int = 0,
+) {
+    val effectiveMinDepth: Int? get() = minDepth ?: legacyMinDepth.takeIf { it > 0 }
+    val effectiveMaxDepth: Int? get() = maxDepth ?: legacyMaxDepth.takeIf { it > 0 }
+
+    /** 写入新的深度值并清掉旧字段 */
+    fun withDepth(min: Int?, max: Int?): AssistantRegex =
+        copy(minDepth = min, maxDepth = max, legacyMinDepth = 0, legacyMaxDepth = 0)
+}
 
 /** 全局正则分组的来源，决定分组在页面上的归类与是否可删除。 */
 @Serializable
@@ -169,7 +183,7 @@ fun String.replaceRegexes(
     assistant: Assistant?,
     scope: AssistantAffectScope,
     visual: Boolean = false,
-    depth: Int = 0, // 官方酒馆深度语义：1 = 最新一条消息；0/未知 = 不按深度过滤
+    depth: Int? = null, // 酒馆深度语义：0 = 最新一条消息；null = 不按深度过滤
 ): String = replaceRegexes(assistant?.regexes.orEmpty(), scope, visual, depth)
 
 /** 对一组正则依次应用（角色卡正则 + 全局正则合并后走这里） */
@@ -177,12 +191,11 @@ fun String.replaceRegexes(
     regexes: List<AssistantRegex>,
     scope: AssistantAffectScope,
     visual: Boolean = false,
-    depth: Int = 0,
+    depth: Int? = null,
 ): String {
     if (regexes.isEmpty()) return this
     return regexes.fold(this) { acc, regex ->
-        val depthOk = depth <= 0 || ((regex.minDepth <= 0 || depth >= regex.minDepth) &&
-            (regex.maxDepth <= 0 || depth <= regex.maxDepth))
+        val depthOk = regexDepthAllows(regex, depth)
         // 层级语义（对齐官方酒馆 markdownOnly/promptOnly 三态）：
         //   markdownOnly=true         → 仅显示层
         // promptOnly=true           → 仅提示词层（显示层必须放
@@ -201,14 +214,27 @@ fun String.replaceRegexes(
 }
 
 /**
+ * 酒馆 getRegexedString 的深度门控：depth 未知时不过滤；
+ * minDepth >= -1 且 depth < minDepth 跳过；maxDepth >= 0 且 depth > maxDepth 跳过。
+ */
+internal fun regexDepthAllows(regex: AssistantRegex, depth: Int?): Boolean {
+    if (depth == null) return true
+    val min = regex.effectiveMinDepth
+    val max = regex.effectiveMaxDepth
+    if (min != null && min >= -1 && depth < min) return false
+    if (max != null && max >= 0 && depth > max) return false
+    return true
+}
+
+/**
  * Prompt-layer regex for a user message before it is stored.
  * visual=false keeps display-only scripts off the saved text.
- * Depth 1 is the newest message, matching SillyTavern.
+ * Depth 0 is the newest message, matching SillyTavern.
  */
 fun List<UIMessagePart>.replaceUserRegexes(
     assistant: Assistant,
     globalRegexes: List<AssistantRegex> = emptyList(),
-    depth: Int = 1,
+    depth: Int? = 0,
 ): List<UIMessagePart> {
     val regexes = assistant.regexes + globalRegexes
     if (regexes.isEmpty()) return this
@@ -324,7 +350,8 @@ private object VariableLookbehind {
             out.append(applyReplacement(m, replacement))
             last = m.range.last + 1
         }
-        out.append(input, last)
+        // 不能写 out.append(input, last)：会解析成 append(vararg Any?)，把整段原文和偏移量追加进去
+        out.append(input.substring(last))
         return out.toString()
     }
 
@@ -608,8 +635,39 @@ sealed class PromptInjection {
         val matchScenario: Boolean = false,              // 酒馆 extensions.match_scenario
         val matchCreatorNotes: Boolean = false,          // 酒馆 extensions.match_creator_notes
         val ignoreBudget: Boolean = false,               // 酒馆 extensions.ignore_budget
+        /**
+         * 来自酒馆 Chat Completion 预设（prompts + prompt_order）的条目。
+         * 非 null 时，所属预设按酒馆 Prompt Manager 的顺序组装，见 [Lorebook.stPreset]。
+         */
+        val stPrompt: StPromptMeta? = null,
     ) : PromptInjection()
 }
+
+/**
+ * 酒馆预设条目的原始语义。
+ *
+ * - [identifier]：酒馆 prompt identifier（main、chatHistory、自定义 uuid…）
+ * - [marker]：占位条目（chatHistory、charDescription、worldInfoBefore…），内容由本地数据填充
+ * - [absolute]：injection_position=1，按 injection_depth 插进聊天记录；
+ *   false（injection_position=0）= 相对位置，按 prompt_order 顺序原地排列
+ * - [injectionOrder]：同一深度内的先后（酒馆 injection_order，默认 100）
+ */
+@Serializable
+data class StPromptMeta(
+    val identifier: String,
+    val marker: Boolean = false,
+    val absolute: Boolean = false,
+    val injectionOrder: Int = 100,
+)
+
+/** 酒馆 Chat Completion 预设的组装设置（只保留影响提示词结构的部分）。 */
+@Serializable
+data class StPresetSettings(
+    val squashSystemMessages: Boolean = false,
+    val scenarioFormat: String = "{{scenario}}",
+    val personalityFormat: String = "{{personality}}",
+    val wiFormat: String = "{0}",
+)
 
 /**
  * selectiveLogic 触发逻辑
@@ -668,7 +726,17 @@ data class Lorebook(
     val kind: LorebookKind = LorebookKind.WORLD_BOOK,
     // 是否来自角色卡内嵌世界书（官方 world_info_character_str
     val isCharacterBook: Boolean = false,
+    /**
+     * 非 null：这是保留了 prompt_order 的酒馆预设。[entries] 的顺序就是 prompt_order，
+     * 生成时走 [me.rerere.rikkahub.data.ai.assembly.assembleTavernPreset]，
+     * 而不是拆成世界书注入。
+     */
+    val stPreset: StPresetSettings? = null,
 )
+
+/** 有序酒馆预设：kind=PRESET 且导入时保留了 prompt_order。 */
+val Lorebook.isOrderedTavernPreset: Boolean
+    get() = kind == LorebookKind.PRESET && stPreset != null
 
 /**
  * 检查 RegexInjection 是否被触发

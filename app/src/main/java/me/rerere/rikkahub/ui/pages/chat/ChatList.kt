@@ -417,7 +417,8 @@ private fun ChatListNormal(
                     ) {
                         ChatMessage(
                             node = node,
-                            depth = conversation.messageNodes.size - index,
+                            // 酒馆深度：0 = 最新一条消息
+                            depth = conversation.messageNodes.size - index - 1,
                             model = node.currentMessage.modelId?.let(modelById::get)
                                 ?: node.currentMessage.snapshotModel(),
                             assistant = assistant,

@@ -56,10 +56,12 @@ internal data class LayeredPrompt(
 internal fun ChatTurnContext.layeredPrompt(
     messages: List<UIMessage>,
 ): LayeredPrompt {
+    // 酒馆有序预设：按 prompt_order 组装，不走分层缓存结构
+    activeTavernPreset()?.let { return tavernPresetPrompt(messages, it) }
     val assistant = this.assistant
     val userName = settings.displaySetting.userNickname.ifBlank { "User" }
     val promptMessages = messages.mapIndexed { index, message ->
-        message.withPromptRegex(assistant, settings.globalRegexes, messages.size - index)
+        message.withPromptRegex(assistant, settings.globalRegexes, messages.size - index - 1)
     }
     val turnId = promptMessages.lastOrNull { it.role == MessageRole.USER }?.id?.toString().orEmpty()
     val (constant, triggered) = if (turnId.isNotEmpty() && promptState.frozenTurnId == turnId) {
@@ -145,9 +147,14 @@ internal fun captureFrozenMacros(
     return frozen
 }
 
-private fun ChatTurnContext.resolveInjections(
+/**
+ * Activates lore and mode injections for this turn and advances sticky/cooldown in [promptState].
+ * [excludeLorebookId] leaves out a preset that is assembled separately.
+ */
+internal fun ChatTurnContext.resolveInjectionList(
     messages: List<UIMessage>,
-): Pair<List<String>, List<LoreTrigger>> {
+    excludeLorebookId: Uuid? = null,
+): List<PromptInjection> {
     val sticky = promptState.sticky.mapNotNull { (key, turns) ->
         runCatching { Uuid.parse(key) }.getOrNull()?.let { it to turns }
     }.toMap(mutableMapOf())
@@ -156,7 +163,8 @@ private fun ChatTurnContext.resolveInjections(
     }.toMap(mutableMapOf())
     val injections = collectInjections(
         messages = messages.filter { !it.isSynthetic },
-        assistant = assistant,
+        assistant = if (excludeLorebookId == null) assistant
+        else assistant.copy(lorebookIds = assistant.lorebookIds - excludeLorebookId),
         modeInjections = settings.modeInjections,
         lorebooks = settings.lorebooks,
         conversationModeInjectionIds = conversationModeInjectionIds,
@@ -181,6 +189,13 @@ private fun ChatTurnContext.resolveInjections(
         sticky = sticky.mapKeys { it.key.toString() },
         cooldown = cooldown.mapKeys { it.key.toString() },
     )
+    return injections
+}
+
+private fun ChatTurnContext.resolveInjections(
+    messages: List<UIMessage>,
+): Pair<List<String>, List<LoreTrigger>> {
+    val injections = resolveInjectionList(messages)
     val constant = mutableListOf<PromptInjection>()
     val triggered = mutableListOf<PromptInjection>()
     injections.forEach { injection ->
@@ -189,11 +204,13 @@ private fun ChatTurnContext.resolveInjections(
         if (alwaysOn && injection.position in STATIC_POSITIONS) constant += injection
         else triggered += injection
     }
+    // 同位置同优先级保持条目原有顺序（sortedWith 是稳定排序）。按 id 排会把预设的先后打乱：
+    // id 是导入时随机生成的 UUID，「初始化变量」这类必须靠前的条目会被排到后面。
     val constantText = constant
-        .sortedWith(compareBy({ it.position.ordinal }, { -it.priority }, { it.id.toString() }))
+        .sortedWith(compareBy({ it.position.ordinal }, { -it.priority }))
         .map { it.content }
     val triggers = triggered
-        .sortedWith(compareBy({ it.position.ordinal }, { -it.priority }, { it.id.toString() }))
+        .sortedWith(compareBy({ it.position.ordinal }, { -it.priority }))
         .map { LoreTrigger(it.id.toString(), it.content, it.injectDepth) }
     return constantText to triggers
 }
@@ -241,7 +258,7 @@ private fun ChatTurnContext.authorNoteText(userTurns: Int): String? {
     return lines.joinToString("\n\n")
 }
 
-private fun ChatTurnContext.tailTime(): String? {
+internal fun ChatTurnContext.tailTime(): String? {
     if (!assistant.enableTimeReminder) return null
     val now = LocalDateTime.now()
     val stamp = if (assistant.cacheFriendlyTimeMacros) {
@@ -252,12 +269,12 @@ private fun ChatTurnContext.tailTime(): String? {
     return "<time_reminder>Current time: ${stamp.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}</time_reminder>"
 }
 
-private fun ChatTurnContext.memoryText(): String? {
+internal fun ChatTurnContext.memoryText(): String? {
     if (!assistant.enableMemory || memories.isEmpty()) return null
     return buildMemoryPrompt(memories)
 }
 
-private fun ChatTurnContext.toolText(messages: List<UIMessage>): String? {
+internal fun ChatTurnContext.toolText(messages: List<UIMessage>): String? {
     val lines = tools.sortedWith(compareBy({ it.name }, { it.description }))
         .map { it.systemPrompt(model, messages) }
         .filter { it.isNotBlank() }
@@ -265,7 +282,7 @@ private fun ChatTurnContext.toolText(messages: List<UIMessage>): String? {
     return lines.joinToString("\n")
 }
 
-private fun ChatTurnContext.stateVarText(latestMessageId: String?): String? {
+internal fun ChatTurnContext.stateVarText(latestMessageId: String?): String? {
     val id = conversationId.toString()
     val chat = settings.macroChatVariables[id].orEmpty().toSortedMap()
     val global = settings.macroGlobalVariables.toSortedMap()
@@ -295,7 +312,7 @@ private fun PromptPiece.toUiMessage(): UIMessage {
     )
 }
 
-private fun UIMessage.withPromptRegex(
+internal fun UIMessage.withPromptRegex(
     assistant: Assistant,
     globalRegexes: List<me.rerere.rikkahub.data.model.AssistantRegex>,
     depth: Int,
