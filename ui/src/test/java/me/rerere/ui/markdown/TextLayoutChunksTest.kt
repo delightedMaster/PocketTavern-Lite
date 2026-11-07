@@ -1,8 +1,10 @@
 package me.rerere.ui.markdown
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -58,5 +60,27 @@ class TextLayoutChunksTest {
             if (start in 1 until text.length) assertTrue(!text[start].isLowSurrogate())
             if (end in 1 until text.length) assertTrue(!text[end].isLowSurrogate())
         }
+    }
+
+    @Test
+    fun `chunking keeps newlines and a link that sits on the boundary`() {
+        val text = buildAnnotatedString {
+            append("甲".repeat(40))
+            withLink(LinkAnnotation.Url("https://example.com/a")) { append("链接文字") }
+            append("\n")
+            withStyle(SpanStyle(color = Color(0xFF1565C0))) { append("乙".repeat(80)) }
+        }
+        val chunks = text.splitForTextLayout(maxChars = 50)
+        assertTrue(chunks.size > 1)
+        assertEquals(text.text, chunks.joinToString("") { it.text })
+        val urls = chunks.flatMap { chunk ->
+            chunk.getLinkAnnotations(0, chunk.length).map { it.item }
+        }
+        assertTrue(urls.filterIsInstance<LinkAnnotation.Url>().any { it.url == "https://example.com/a" })
+        val blue = chunks.flatMap { chunk -> chunk.spanStyles.map { it to chunk } }
+            .filter { (span, _) -> span.item.color == Color(0xFF1565C0) }
+        assertEquals("乙".repeat(80), blue.joinToString("") { (span, chunk) ->
+            chunk.text.substring(span.start, span.end)
+        })
     }
 }

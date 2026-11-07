@@ -29,6 +29,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.launch
 import me.rerere.rikkahub.data.ai.cards.cardDocument
 import me.rerere.rikkahub.data.ai.cards.cardRequestAllowed
+import me.rerere.rikkahub.data.ai.cards.htmlCardCapturesParentScroll
 import me.rerere.rikkahub.data.ai.cards.htmlCardLayoutHeight
 import me.rerere.rikkahub.ui.theme.LocalDarkMode
 import java.io.ByteArrayInputStream
@@ -87,11 +88,27 @@ fun HtmlCardView(
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     settings.isAlgorithmicDarkeningAllowed = false
                 }
+                var lastY = 0f
                 setOnTouchListener { view, event ->
-                    if (overflows.value &&
-                        (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_MOVE)
-                    ) {
-                        view.parent?.requestDisallowInterceptTouchEvent(true)
+                    when (event.actionMasked) {
+                        MotionEvent.ACTION_DOWN -> lastY = event.y
+                        MotionEvent.ACTION_MOVE -> {
+                            val dy = event.y - lastY
+                            lastY = event.y
+                            val direction = when {
+                                dy > 0f -> -1
+                                dy < 0f -> 1
+                                else -> 0
+                            }
+                            val capture = htmlCardCapturesParentScroll(
+                                overflows = overflows.value,
+                                canScrollInDragDirection = direction != 0 && view.canScrollVertically(direction),
+                            )
+                            view.parent?.requestDisallowInterceptTouchEvent(capture)
+                        }
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                            view.parent?.requestDisallowInterceptTouchEvent(false)
+                        }
                     }
                     false
                 }

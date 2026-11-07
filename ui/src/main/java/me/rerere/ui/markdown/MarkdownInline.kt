@@ -2,12 +2,16 @@ package me.rerere.ui.markdown
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.takeOrElse
@@ -54,8 +58,14 @@ internal fun InlineText(content: List<MarkdownInline>, modifier: Modifier = Modi
         // 段与段之间的换行已经留在上一截末尾，这里不再加间距，避免多出空行
         Column(modifier) {
             chunks.forEachIndexed { index, chunk ->
-                val shown = chunk.withoutTrailingBreak(drop = index < chunks.lastIndex)
-                LayoutText(shown, rendered.inlineContent, textStyle, contentColor)
+                LayoutText(
+                    text = chunk,
+                    inlineContent = rendered.inlineContent,
+                    style = textStyle,
+                    contentColor = contentColor,
+                    // 换行留在字符串里，复制和选择才不会在分段处丢行。末行是这个换行撑出来的空行，布局时收掉。
+                    clipTrailingBreak = index < chunks.lastIndex && chunk.text.endsWith('\n'),
+                )
             }
         }
     }
@@ -68,20 +78,31 @@ private fun LayoutText(
     style: TextStyle,
     contentColor: Color,
     modifier: Modifier = Modifier,
+    clipTrailingBreak: Boolean = false,
 ) {
+    var trailingBreakPx by remember(text) { mutableIntStateOf(0) }
     Text(
         text = text,
-        modifier = modifier,
+        modifier = modifier.layout { measurable, constraints ->
+            val placeable = measurable.measure(constraints)
+            val height = (placeable.height - trailingBreakPx).coerceAtLeast(0)
+            layout(placeable.width, height) { placeable.place(0, 0) }
+        },
         inlineContent = inlineContent,
         // 段落默认色跟随主题。Span 上的颜色（正则 / HTML / 链接）会盖过它；两边都没指定时不另填黑或白。
         color = contentColor,
         style = style,
+        onTextLayout = { result ->
+            val next = if (clipTrailingBreak && result.lineCount > 0) {
+                val last = result.lineCount - 1
+                (result.getLineBottom(last) - result.getLineTop(last)).toInt().coerceAtLeast(0)
+            } else {
+                0
+            }
+            if (next != trailingBreakPx) trailingBreakPx = next
+        },
     )
 }
-
-/** 切在换行上时，换行符留在上一截末尾。后面还有内容时去掉它，由下一段顶上来，避免多空一行。 */
-private fun AnnotatedString.withoutTrailingBreak(drop: Boolean) =
-    if (drop && text.endsWith('\n')) subSequence(0, length - 1) else this
 
 private class RenderedInlineText(
     val text: AnnotatedString,

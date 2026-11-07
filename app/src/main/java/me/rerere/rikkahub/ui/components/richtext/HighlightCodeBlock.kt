@@ -307,34 +307,36 @@ private fun CodeBlockDefault(
     val chunks = remember(displayLines) { chunkCodeForLayout(displayLines) }
     val lineNumberWidth = remember(displayLines.size) { displayLines.size.toString().length }
     var lineOffset = 0
-    Column(
-        modifier = Modifier.then(
-            if (autoWrap) {
-                Modifier
-            } else {
-                Modifier.horizontalScroll(scrollState)
-            }
-        )
-    ) {
-        chunks.forEach { group ->
-            val startLine = lineOffset
-            lineOffset += group.size
-            Row {
-                if (showLineNumbers) {
-                    Column(modifier = Modifier.padding(end = 8.dp)) {
-                        group.forEachIndexed { index, _ ->
-                            Text(
-                                text = (startLine + index + 1).toString().padStart(lineNumberWidth, ' '),
-                                fontSize = textStyle.fontSize,
-                                lineHeight = textStyle.lineHeight,
-                                fontFamily = JetbrainsMono,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                softWrap = false,
-                            )
+    SelectionContainer {
+        Column(
+            modifier = Modifier.then(
+                if (autoWrap) {
+                    Modifier
+                } else {
+                    Modifier.horizontalScroll(scrollState)
+                }
+            )
+        ) {
+            chunks.forEach { group ->
+                val startLine = lineOffset
+                lineOffset += group.size
+                Row {
+                    if (showLineNumbers) {
+                        DisableSelection {
+                            Column(modifier = Modifier.padding(end = 8.dp)) {
+                                group.forEachIndexed { index, _ ->
+                                    Text(
+                                        text = (startLine + index + 1).toString().padStart(lineNumberWidth, ' '),
+                                        fontSize = textStyle.fontSize,
+                                        lineHeight = textStyle.lineHeight,
+                                        fontFamily = JetbrainsMono,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                        softWrap = false,
+                                    )
+                                }
+                            }
                         }
                     }
-                }
-                SelectionContainer {
                     CodeHighlightText(
                         code = group.joinToString("\n"),
                         language = language,

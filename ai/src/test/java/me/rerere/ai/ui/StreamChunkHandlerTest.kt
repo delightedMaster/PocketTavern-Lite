@@ -34,7 +34,7 @@ class StreamChunkHandlerTest {
     }
 
     @Test
-    fun `a long stream is stored in full`() {
+    fun `a long stream stays intact in memory before it is persisted`() {
         val piece = "甲".repeat(500)
         var messages = listOf(UIMessage.user("q"))
         val handler = StreamChunkHandler(model)

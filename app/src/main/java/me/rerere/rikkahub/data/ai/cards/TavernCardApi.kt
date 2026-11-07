@@ -151,6 +151,13 @@ data class HtmlCardLayout(val heightCssPx: Int, val scrolls: Boolean)
  * [reportedCssPx] 是页面的 scrollHeight（CSS 像素，对应 dp）。
  * 高度按设备像素封顶；超出的部分 [HtmlCardLayout.scrolls] 为 true，调用方让 WebView 自己滚。
  */
+/**
+ * 卡片比视口高时，只有 WebView 自己还能沿该方向滚动，才把这次拖动从聊天列表里拿走。
+ * 已经滚到头时把事件还给列表，避免手指按在卡片上时整页都滑不动。
+ */
+fun htmlCardCapturesParentScroll(overflows: Boolean, canScrollInDragDirection: Boolean): Boolean =
+    overflows && canScrollInDragDirection
+
 fun htmlCardLayoutHeight(
     reportedCssPx: Int,
     density: Float,

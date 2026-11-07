@@ -149,6 +149,13 @@ class TavernCardApiTest {
     }
 
     @Test
+    fun `an overflowing card only keeps the drag while it can still scroll`() {
+        assertFalse(htmlCardCapturesParentScroll(overflows = false, canScrollInDragDirection = true))
+        assertFalse(htmlCardCapturesParentScroll(overflows = true, canScrollInDragDirection = false))
+        assertTrue(htmlCardCapturesParentScroll(overflows = true, canScrollInDragDirection = true))
+    }
+
+    @Test
     fun shimProvidesSendTextareaAndSendButton() {
         assertTrue(TAVERN_CARD_SHIM.contains("send_textarea"))
         assertTrue(TAVERN_CARD_SHIM.contains("send_but"))
