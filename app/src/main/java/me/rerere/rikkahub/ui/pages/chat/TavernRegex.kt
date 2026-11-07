@@ -46,8 +46,8 @@ fun AssistantRegex.toTavernRegexJson(scope: String): JsonObject = buildJsonObjec
             put("prompt", JsonPrimitive(!visualOnly))
         },
     )
-    put("min_depth", if (minDepth > 0) JsonPrimitive(minDepth) else kotlinx.serialization.json.JsonNull)
-    put("max_depth", if (maxDepth > 0) JsonPrimitive(maxDepth) else kotlinx.serialization.json.JsonNull)
+    put("min_depth", effectiveMinDepth?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull)
+    put("max_depth", effectiveMaxDepth?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull)
 }
 
 fun jsonToAssistantRegex(obj: JsonObject, fallback: AssistantRegex? = null): AssistantRegex {
@@ -70,8 +70,9 @@ fun jsonToAssistantRegex(obj: JsonObject, fallback: AssistantRegex? = null): Ass
         affectingScope = if (source == null) base.affectingScope else scopes,
         visualOnly = display && !prompt,
         promptOnly = prompt && !display,
-        minDepth = (obj["min_depth"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0,
-        maxDepth = (obj["max_depth"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0,
+    ).withDepth(
+        (obj["min_depth"] as? JsonPrimitive)?.content?.toIntOrNull(),
+        (obj["max_depth"] as? JsonPrimitive)?.content?.toIntOrNull(),
     )
 }
 

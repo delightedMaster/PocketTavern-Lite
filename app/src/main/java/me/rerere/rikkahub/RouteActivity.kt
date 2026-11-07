@@ -72,7 +72,10 @@ import me.rerere.rikkahub.ui.hooks.readStringPreference
 import me.rerere.rikkahub.ui.pages.assistant.AssistantPage
 import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantBasicPage
 import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantDetailPage
+import me.rerere.rikkahub.data.model.LorebookKind
 import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantExtensionsPage
+import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantLorebookBindingPage
+import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantRegexPage
 import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantLocalToolPage
 import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantMcpPage
 import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantMemoryPage
@@ -342,6 +345,18 @@ class RouteActivity : ComponentActivity() {
                                 AssistantExtensionsPage(key.id)
                             }
 
+                            entry<Screen.AssistantLorebooks> { key ->
+                                AssistantLorebookBindingPage(key.id, LorebookKind.WORLD_BOOK)
+                            }
+
+                            entry<Screen.AssistantPresets> { key ->
+                                AssistantLorebookBindingPage(key.id, LorebookKind.PRESET)
+                            }
+
+                            entry<Screen.AssistantRegex> { key ->
+                                AssistantRegexPage(key.id)
+                            }
+
                             entry<Screen.Setting> {
                                 SettingPage()
                             }
@@ -571,6 +586,15 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data class AssistantInjections(val id: String) : Screen
+
+    @Serializable
+    data class AssistantLorebooks(val id: String) : Screen
+
+    @Serializable
+    data class AssistantPresets(val id: String) : Screen
+
+    @Serializable
+    data class AssistantRegex(val id: String) : Screen
 
     @Serializable
     data object Setting : Screen

@@ -33,8 +33,8 @@ internal fun List<UIMessage>.replaceRegexesForDisplay(
         null
     }
     return mapIndexed { index, message ->
-        // 官方深度语义：1 = 最新一条消息
-        val depth = memo?.getOrPut(message.id.toString()) { size - index } ?: (size - index)
+        // 酒馆深度语义：0 = 最新一条消息
+        val depth = memo?.getOrPut(message.id.toString()) { size - index - 1 } ?: (size - index - 1)
         if (message.role != MessageRole.ASSISTANT) return@mapIndexed message
         message.copy(
             parts = message.parts.map { part ->

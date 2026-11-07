@@ -524,6 +524,8 @@ internal fun collectInjections(
 
                 // 官方：disable 条目跳过（在 triggers 过滤之前；官方 disable 字段导入后映射为 enabled）
                 if (!entry.enabled) continue
+                // 酒馆预设的占位条目（chatHistory 等）没有内容，只在有序组装里有意义
+                if (entry.stPrompt?.marker == true) continue
 
                 // 生成类型过滤（酒馆 triggers）
                 if (entry.triggers.isNotEmpty() && generationType.value !in entry.triggers) continue

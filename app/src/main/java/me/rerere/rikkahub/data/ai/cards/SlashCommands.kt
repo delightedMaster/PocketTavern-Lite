@@ -10,12 +10,13 @@ package me.rerere.rikkahub.data.ai.cards
  * - `/getvar key` puts the value into the composer
  * - `/gen` generates if the last message is from the user; `/gen text` sends that text
  * - `/input prompt` asks for a line and puts it in the composer
+ * - `/setinput text` puts text in the composer without sending
  *
  * A line without a slash is sent as a user message.
  */
 const val SLASH_MAX_DEPTH = 4
 
-val SUPPORTED_SLASH_COMMANDS = setOf("send", "trigger", "setvar", "getvar", "gen", "input")
+val SUPPORTED_SLASH_COMMANDS = setOf("send", "trigger", "setvar", "getvar", "gen", "input", "setinput")
 
 sealed interface SlashAction {
     data class Send(val text: String) : SlashAction
@@ -50,6 +51,7 @@ private fun compileLine(line: String, context: SlashContext): List<SlashAction> 
         "send" -> listOf(SlashAction.Send(args))
         "gen" -> listOf(SlashAction.Generate(args.ifBlank { null }))
         "input" -> listOf(SlashAction.AskInput(args.ifBlank { "" }))
+        "setinput" -> listOf(SlashAction.FillInput(args))
         "getvar" -> listOf(SlashAction.FillInput(context.variables[args].orEmpty()))
         "setvar" -> {
             val (key, value) = splitSetVar(args) ?: return listOf(SlashAction.Unknown(line))

@@ -72,6 +72,10 @@ data class PromptCacheState(
     val divergeCurrent: String = "",
     /** Per-message variables written by HTML cards. The assembler copies only the latest into the tail. */
     val messageVariables: Map<String, Map<String, String>> = emptyMap(),
+    /** SillyTavern preset path: the user turn whose lore activation is frozen in [frozenInjections]. */
+    val frozenInjectionsTurnId: String = "",
+    /** Lore and mode injections activated for [frozenInjectionsTurnId], reused by later agent steps. */
+    val frozenInjections: List<me.rerere.rikkahub.data.model.PromptInjection> = emptyList(),
 )
 
 data class HistoryMessage(

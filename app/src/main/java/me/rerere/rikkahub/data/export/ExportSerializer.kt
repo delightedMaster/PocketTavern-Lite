@@ -24,6 +24,8 @@ import me.rerere.rikkahub.data.model.Lorebook
 import me.rerere.rikkahub.data.model.LorebookKind
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.QuickMessage
+import me.rerere.rikkahub.data.model.StPresetSettings
+import me.rerere.rikkahub.data.model.StPromptMeta
 import me.rerere.rikkahub.ui.pages.assistant.detail.mapSelectiveLogic
 import me.rerere.rikkahub.ui.pages.assistant.detail.parseDelayUntilRecursionInt
 import me.rerere.rikkahub.ui.pages.assistant.detail.mapTavernRole
@@ -259,6 +261,7 @@ object LorebookSerializer : ExportSerializer<Lorebook> {
                 kind = LorebookKind.PRESET,
                 enabled = true,
                 entries = entries,
+                stPreset = if (entries.any { it.stPrompt != null }) tryImportPresetSettings(json) else null,
             )
         }.getOrNull()
     }
@@ -267,10 +270,20 @@ object LorebookSerializer : ExportSerializer<Lorebook> {
     private fun JsonObject.stringField(key: String): String? =
         (this[key] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
 
-    /** 新版预设（prompts + prompt_order）解析 */
     /**
-     * 新版预设（prompts + prompt_order）解析。
-     * internal 供单测直接跑真实解析流程（issue #5 的回归覆盖：未启用条目要保留）。
+     * 新版预设（prompts + prompt_order）解析，保留酒馆 Prompt Manager 的完整结构：
+     *
+     * - 条目按 prompt_order 的顺序输出，marker（chatHistory、charDescription…）也作为条目保留，
+     *   带 [StPromptMeta]，生成时由 assembleTavernPreset 按这个顺序组装。
+     * - 开关只看 prompt_order 里的 enabled（PromptManager.js 只读 order 项，prompts[].enabled 不参与）。
+     *   prompt_order 项缺 enabled 字段视为启用。
+     * - injection_position：0 = 相对位置（按顺序原地排列），1 = 绝对位置（按 injection_depth 插进聊天记录）。
+     * - prompts 里有、但没列进 prompt_order 的条目，酒馆不会发送；这里保留为禁用，用户仍可手动打开。
+     *
+     * [position] 仍按旧语义给出近似值（chatHistory 之前 → 系统区，之后 → 聊天末尾，绝对 → AT_DEPTH），
+     * 只在不走有序组装的旧路径（如导出、旧界面）里使用。
+     *
+     * internal 供单测直接跑真实解析流程。
      */
     internal fun tryImportPresetOrdered(json: String): List<PromptInjection.RegexInjection>? {
         val obj = runCatching { ExportSerializer.DefaultJson.parseToJsonElement(json) }.getOrNull() as? JsonObject
@@ -283,72 +296,67 @@ object LorebookSerializer : ExportSerializer<Lorebook> {
             ?: preset.promptOrder.maxByOrNull { it.order.size }?.order
             ?: return null
 
-        // chatHistory 标记位置：绝对定位条目在它之前/之后决定落点
-        val chatHistoryIndex = order.indexOfFirst { promptsById[it.identifier]?.marker == true && it.identifier == "chatHistory" }
+        val chatHistoryIndex = order.indexOfFirst { it.identifier == "chatHistory" }
+
+        fun roleOf(prompt: StPresetPrompt) = when (prompt.role?.lowercase()) {
+            "user", "1" -> me.rerere.ai.core.MessageRole.USER
+            "assistant", "2" -> me.rerere.ai.core.MessageRole.ASSISTANT
+            else -> me.rerere.ai.core.MessageRole.SYSTEM
+        }
+
+        fun entryOf(prompt: StPresetPrompt, enabled: Boolean, afterHistory: Boolean) =
+            PromptInjection.RegexInjection(
+                id = Uuid.random(),
+                name = prompt.name.ifBlank { prompt.identifier },
+                enabled = enabled,
+                position = when {
+                    prompt.injectionPosition == 1 -> InjectionPosition.AT_DEPTH
+                    prompt.identifier == "main" -> InjectionPosition.BEFORE_SYSTEM_PROMPT
+                    afterHistory -> InjectionPosition.BOTTOM_OF_CHAT
+                    else -> InjectionPosition.AFTER_SYSTEM_PROMPT
+                },
+                injectDepth = prompt.injectionDepth ?: 4,
+                content = if (prompt.marker) "" else prompt.content,
+                role = roleOf(prompt),
+                constantActive = true, // 预设条目无条件注入
+                stPrompt = StPromptMeta(
+                    identifier = prompt.identifier,
+                    marker = prompt.marker,
+                    absolute = prompt.injectionPosition == 1,
+                    injectionOrder = prompt.injectionOrder ?: 100,
+                ),
+            )
 
         val ordered = order.mapIndexedNotNull { index, entry ->
             val prompt = promptsById[entry.identifier] ?: return@mapIndexedNotNull null
-            if (prompt.marker) return@mapIndexedNotNull null
-            // 未启用条目要保留，只是导入为禁用状态。此前这里直接 return null，
-            // 结果是「多选一」的备选项（备用越狱词、临时关掉的条目）整个消失，
-            // 用户再也找不回来——只能回去翻原始预设。酒馆自己的行为是把条目
-            // 留在列表里、保持关闭，本地注入逻辑同样尊重 enabled
-            // （PromptInjectionTransformer 有 `if (!entry.enabled) continue`），
-            // 所以保留是安全的：关着就不会被注入。
-            if (prompt.content.isBlank() && entry.enabled) return@mapIndexedNotNull null
-            val role = when (prompt.role?.lowercase()) {
-                "user", "1" -> me.rerere.ai.core.MessageRole.USER
-                "assistant", "2" -> me.rerere.ai.core.MessageRole.ASSISTANT
-                else -> me.rerere.ai.core.MessageRole.SYSTEM
-            }
-            val position = when {
-                prompt.identifier == "main" -> InjectionPosition.BEFORE_SYSTEM_PROMPT
-                prompt.identifier == "nsfw" -> InjectionPosition.AFTER_SYSTEM_PROMPT
-                prompt.identifier == "jailbreak" -> InjectionPosition.BOTTOM_OF_CHAT
-                // 相对深度注入：injection_depth=0 表示聊天最末尾，与本地 AT_DEPTH 语义一致
-                prompt.injectionPosition == 0 -> InjectionPosition.AT_DEPTH
-                // 绝对定位：chatHistory 之前 → 角色卡区，之后 → 聊天末尾
-                chatHistoryIndex < 0 || index < chatHistoryIndex -> InjectionPosition.AFTER_SYSTEM_PROMPT
-                else -> InjectionPosition.BOTTOM_OF_CHAT
-            }
-            PromptInjection.RegexInjection(
-                id = Uuid.random(),
-                name = prompt.name.ifBlank { prompt.identifier },
-                // 透传原状态：order 与 prompts 条目两处开关任一关即视为未激活，
-                // 写死 true 会让预设里明确关掉的条目直接开始注入
-                enabled = entry.enabled && prompt.enabled,
-                position = position,
-                injectDepth = prompt.injectionDepth ?: 4,
-                content = prompt.content,
-                role = role,
-                constantActive = true, // 预设条目无条件注入
-            )
+            // 未启用条目保留为禁用（issue #5）；只丢弃「启用但没有内容」的普通条目，酒馆也会跳过它们
+            if (!prompt.marker && prompt.content.isBlank() && entry.enabled) return@mapIndexedNotNull null
+            entryOf(prompt, enabled = entry.enabled, afterHistory = chatHistoryIndex in 0 until index)
         }
-        // prompts 里存在但未列进 prompt_order 的条目（酒馆的"未加入顺序"区）。
-        // 二创预设常把大量备选条目留在这里，只按 order 导入会让它们整批消失。
-        // 位置统一给角色卡区，状态沿用条目自身开关。
         val orderedIds = order.map { it.identifier }.toSet()
         val extra = preset.prompts.mapNotNull { prompt ->
-            if (prompt.identifier in orderedIds) return@mapNotNull null
-            if (prompt.marker) return@mapNotNull null
+            if (prompt.identifier in orderedIds || prompt.marker) return@mapNotNull null
             if (prompt.content.isBlank() && prompt.enabled) return@mapNotNull null
-            val role = when (prompt.role?.lowercase()) {
-                "user", "1" -> me.rerere.ai.core.MessageRole.USER
-                "assistant", "2" -> me.rerere.ai.core.MessageRole.ASSISTANT
-                else -> me.rerere.ai.core.MessageRole.SYSTEM
-            }
-            PromptInjection.RegexInjection(
-                id = Uuid.random(),
-                name = prompt.name.ifBlank { prompt.identifier },
-                enabled = prompt.enabled,
-                position = if (prompt.injectionPosition == 0) InjectionPosition.AT_DEPTH else InjectionPosition.AFTER_SYSTEM_PROMPT,
-                injectDepth = prompt.injectionDepth ?: 4,
-                content = prompt.content,
-                role = role,
-                constantActive = true,
-            )
+            entryOf(prompt, enabled = false, afterHistory = false)
         }
         return ordered + extra
+    }
+
+    /** 预设里影响提示词结构的设置；不是新版有序预设时返回 null */
+    internal fun tryImportPresetSettings(json: String): StPresetSettings? {
+        val obj = runCatching { ExportSerializer.DefaultJson.parseToJsonElement(json) }.getOrNull() as? JsonObject
+            ?: return null
+        if (obj["prompts"] !is kotlinx.serialization.json.JsonArray || obj["prompt_order"] !is kotlinx.serialization.json.JsonArray) {
+            return null
+        }
+        fun str(key: String) = (obj[key] as? JsonPrimitive)?.contentOrNull
+        val defaults = StPresetSettings()
+        return StPresetSettings(
+            squashSystemMessages = (obj["squash_system_messages"] as? JsonPrimitive)?.booleanOrNull ?: false,
+            scenarioFormat = str("scenario_format") ?: defaults.scenarioFormat,
+            personalityFormat = str("personality_format") ?: defaults.personalityFormat,
+            wiFormat = str("wi_format") ?: defaults.wiFormat,
+        )
     }
 
     /** 旧版预设（main_prompt 平铺字段）解析 */
@@ -462,11 +470,12 @@ private data class StPresetPrompt(
     val name: String = "",
     val content: String = "",
     val marker: Boolean = false,
-    // 部分二创预设把激活状态标在 prompts 条目上；order 缺省时以它为准
+    // 只对没列进 prompt_order 的条目有意义（酒馆 Prompt Manager 不读这个字段）
     val enabled: Boolean = true,
     val role: String? = null,
     @SerialName("injection_position") val injectionPosition: Int? = null,
     @SerialName("injection_depth") val injectionDepth: Int? = null,
+    @SerialName("injection_order") val injectionOrder: Int? = null,
 )
 
 @Serializable
@@ -543,9 +552,9 @@ object SillyTavernRegexImporter {
         val rawPromptOnly = obj["promptOnly"]?.jsonPrimitive?.booleanOrNull ?: false
         val visualOnly = markdownOnly && !rawPromptOnly
         val promptOnly = rawPromptOnly && !markdownOnly
-        // 官方深度过滤：minDepth/maxDepth 为 null 时不限制（本地 0 表示不限制）
-        val minDepth = obj["minDepth"]?.jsonPrimitive?.intOrNull ?: 0
-        val maxDepth = obj["maxDepth"]?.jsonPrimitive?.intOrNull ?: 0
+        // 酒馆深度过滤：原值照搬，null = 不限制（maxDepth = 0 是「只作用于最新一条」，不能当成未设置）
+        val minDepth = obj["minDepth"]?.jsonPrimitive?.intOrNull
+        val maxDepth = obj["maxDepth"]?.jsonPrimitive?.intOrNull
         return AssistantRegex(
             id = Uuid.random(),
             name = name,

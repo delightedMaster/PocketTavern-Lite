@@ -108,16 +108,20 @@ fun RegexScriptEditor(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        value = if (draft.minDepth > 0) draft.minDepth.toString() else "",
-                        onValueChange = { draft = draft.copy(minDepth = it.toIntOrNull()?.coerceAtLeast(0) ?: 0) },
+                        value = draft.effectiveMinDepth?.toString().orEmpty(),
+                        onValueChange = {
+                            draft = draft.withDepth(it.trim().toIntOrNull()?.coerceAtLeast(-1), draft.effectiveMaxDepth)
+                        },
                         label = { Text(stringResource(R.string.assistant_page_regex_min_depth)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
                     OutlinedTextField(
-                        value = if (draft.maxDepth > 0) draft.maxDepth.toString() else "",
-                        onValueChange = { draft = draft.copy(maxDepth = it.toIntOrNull()?.coerceAtLeast(0) ?: 0) },
+                        value = draft.effectiveMaxDepth?.toString().orEmpty(),
+                        onValueChange = {
+                            draft = draft.withDepth(draft.effectiveMinDepth, it.trim().toIntOrNull()?.coerceAtLeast(0))
+                        },
                         label = { Text(stringResource(R.string.assistant_page_regex_max_depth)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,

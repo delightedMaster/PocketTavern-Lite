@@ -27,6 +27,10 @@ import java.net.URI
  * - `triggerSlash(command)` — the same basic slash commands as quick replies.
  * - `Mvu.getMvuData({type})` and `Mvu.replaceMvuData(data, {type})` — `chat` or `message`.
  *   The JSON is stored as the variable `mvu.stat_data`.
+ * - `#send_textarea` / `#send_but`: SillyTavern cards write to the host composer through
+ *   `window.parent.document.querySelector('#send_textarea')`. The card is the top-level page
+ *   here, so the shim adds a hidden textarea whose `value` reads and writes the app's
+ *   composer, and a hidden `#send_but` whose click sends it.
  *
  * Chat, global, and the latest message's variables are rendered in the dynamic
  * tail. They are not written into the system prompt or the character card.
@@ -53,6 +57,37 @@ const val TAVERN_CARD_SHIM = """
     getMvuData: function (options) { return call('mvuGet', options || { type: 'chat' }); },
     replaceMvuData: function (data, options) { return call('mvuReplace', { data: data, type: (options && options.type) || 'message' }); }
   };
+  function installComposer() {
+    if (document.getElementById('send_textarea')) return;
+    var root = document.body || document.documentElement;
+    if (!root) return;
+    var area = document.createElement('textarea');
+    area.id = 'send_textarea';
+    area.setAttribute('aria-hidden', 'true');
+    area.style.display = 'none';
+    var native = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+    Object.defineProperty(area, 'value', {
+      configurable: true,
+      get: function () {
+        try { var v = call('getInput'); return v == null ? '' : String(v); }
+        catch (e) { return native.get.call(area); }
+      },
+      set: function (v) {
+        var text = v == null ? '' : String(v);
+        native.set.call(area, text);
+        try { call('setInput', { text: text }); } catch (e) {}
+      }
+    });
+    var send = document.createElement('div');
+    send.id = 'send_but';
+    send.setAttribute('aria-hidden', 'true');
+    send.style.display = 'none';
+    send.addEventListener('click', function () { try { call('sendInput'); } catch (e) {} });
+    root.appendChild(area);
+    root.appendChild(send);
+  }
+  installComposer();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installComposer, {once:true});
   function report() {
     var body = document.body;
     var root = document.documentElement;
@@ -158,6 +193,8 @@ data class CardWorld(
     val globalVariables: Map<String, String> = emptyMap(),
     val messageVariables: Map<String, Map<String, String>> = emptyMap(),
     val currentMessageId: String,
+    /** Current composer text, read by the card's `#send_textarea`. */
+    val input: String = "",
 )
 
 data class CardEffect(
@@ -166,6 +203,10 @@ data class CardEffect(
     val globalVariables: Map<String, String>? = null,
     val messageVariables: Map<String, Map<String, String>>? = null,
     val slash: String? = null,
+    /** New composer text written by the card's `#send_textarea`. */
+    val fillInput: String? = null,
+    /** The card clicked `#send_but`: send the composer. */
+    val sendInput: Boolean = false,
 )
 
 fun handleCardRequest(world: CardWorld, requestJson: String): CardEffect {
@@ -181,6 +222,12 @@ fun handleCardRequest(world: CardWorld, requestJson: String): CardEffect {
             responseJson = okJson(JsonPrimitive(true)),
             slash = payload["command"]?.jsonPrimitive?.contentOrNull.orEmpty(),
         )
+        "getInput" -> CardEffect(okJson(JsonPrimitive(world.input)))
+        "setInput" -> CardEffect(
+            responseJson = okJson(JsonPrimitive(true)),
+            fillInput = payload["text"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+        )
+        "sendInput" -> CardEffect(responseJson = okJson(JsonPrimitive(true)), sendInput = true)
         "mvuGet" -> {
             val raw = variablesOf(world, mvuScope(payload))[MVU_VARIABLE]
             val parsed = raw?.let { runCatching { kotlinx.serialization.json.Json.parseToJsonElement(it) }.getOrNull() }

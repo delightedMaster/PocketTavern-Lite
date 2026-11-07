@@ -166,7 +166,7 @@ object DefaultPlaceholderProvider : PlaceholderProvider {
             it.lastRealMessage(MessageRole.USER)?.let(::textOf) ?: ""
         }
         placeholder("lastMessage", { Text(stringResource(R.string.placeholder_last_message)) }) {
-            it.messages.lastOrNull { msg -> !msg.isInjectedBlock() && msg.annotations.none { a -> a is UIMessageAnnotation.ExampleMessage } }
+            it.messages.lastOrNull { msg -> !msg.isSynthetic && !msg.isInjectedBlock() && msg.annotations.none { a -> a is UIMessageAnnotation.ExampleMessage } }
                 ?.let(::textOf) ?: ""
         }
         placeholder("firstMessage", { Text(stringResource(R.string.placeholder_first_message)) }) {
@@ -316,7 +316,8 @@ object DefaultPlaceholderProvider : PlaceholderProvider {
     private fun PlaceholderCtx.lastRealMessage(role: MessageRole): UIMessage? =
         messages.lastOrNull { m ->
             if (m.role != role) return@lastOrNull false
-            !m.isInjectedBlock() &&
+            // 预设条目、世界书等合成消息不是聊天记录（例如末尾的 assistant 预填充）
+            !m.isSynthetic && !m.isInjectedBlock() &&
                 m.annotations.none { a -> a is UIMessageAnnotation.ExampleMessage }
         }
 
@@ -433,7 +434,7 @@ object PlaceholderTransformer : InputMessageTransformer, KoinComponent {
 
         // 按用户轮冻结：首步建快照，后续步骤复用（见 frozenTurnMacros 注释）
         val turnKey = "${ctx.assistant.id}:${ctx.conversationId ?: "no-conversation"}"
-        val lastUserMsgId = messages.lastOrNull { it.role == MessageRole.USER }?.id?.toString()
+        val lastUserMsgId = messages.lastOrNull { it.role == MessageRole.USER && !it.isSynthetic }?.id?.toString()
         val cached = frozenTurnMacros[turnKey]?.takeIf { it.first == lastUserMsgId }?.second
         val reusedFrozen = cached != null
         val frozen = cached ?: run {
@@ -445,7 +446,7 @@ object PlaceholderTransformer : InputMessageTransformer, KoinComponent {
                     frozenTime = aligned,
                     frozenLastIndex = messages.lastIndex,
                     frozenLastCharText = messages.lastOrNull { msg ->
-                        msg.role == MessageRole.ASSISTANT &&
+                        msg.role == MessageRole.ASSISTANT && !msg.isSynthetic &&
                             !msg.isInjectedBlock() &&
                             msg.annotations.none { a -> a is UIMessageAnnotation.ExampleMessage }
                     }?.let { msg ->
