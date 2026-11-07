@@ -1,5 +1,6 @@
 package me.rerere.ui.markdown
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.LocalContentColor
@@ -13,6 +14,8 @@ import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.LinkInteractionListener
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -43,14 +46,42 @@ internal fun InlineText(content: List<MarkdownInline>, modifier: Modifier = Modi
     val rendered = remember(content, context, style, density, contentColor) {
         InlineTextBuilder(context, MarkdownInlineScope(style, density, contentColor)).build(content)
     }
+    val chunks = remember(rendered.text) { rendered.text.splitForTextLayout() }
+    val textStyle = if (rendered.hasMathWidget) style.copy(lineHeight = TextUnit.Unspecified) else style
+    if (chunks.size == 1) {
+        LayoutText(chunks.first(), rendered.inlineContent, textStyle, contentColor, modifier)
+    } else {
+        // 段与段之间的换行已经留在上一截末尾，这里不再加间距，避免多出空行
+        Column(modifier) {
+            chunks.forEachIndexed { index, chunk ->
+                val shown = chunk.withoutTrailingBreak(drop = index < chunks.lastIndex)
+                LayoutText(shown, rendered.inlineContent, textStyle, contentColor)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LayoutText(
+    text: AnnotatedString,
+    inlineContent: Map<String, InlineTextContent>,
+    style: TextStyle,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+) {
     Text(
-        text = rendered.text,
+        text = text,
         modifier = modifier,
-        inlineContent = rendered.inlineContent,
-        // 行内公式可能比一行文字高，固定行高会让它和上下行叠在一起
-        style = if (rendered.hasMathWidget) style.copy(lineHeight = TextUnit.Unspecified) else style,
+        inlineContent = inlineContent,
+        // 段落默认色跟随主题。Span 上的颜色（正则 / HTML / 链接）会盖过它；两边都没指定时不另填黑或白。
+        color = contentColor,
+        style = style,
     )
 }
+
+/** 切在换行上时，换行符留在上一截末尾。后面还有内容时去掉它，由下一段顶上来，避免多空一行。 */
+private fun AnnotatedString.withoutTrailingBreak(drop: Boolean) =
+    if (drop && text.endsWith('\n')) subSequence(0, length - 1) else this
 
 private class RenderedInlineText(
     val text: AnnotatedString,

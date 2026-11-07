@@ -323,6 +323,26 @@ class MarkdownParserTest {
     }
 
     @Test
+    fun `long chinese prose a single paragraph and a code fence all round trip`() {
+        val paragraph = "甲".repeat(4_000)
+        val many = List(40) { "第${it}段：" + "乙".repeat(80) }.joinToString("\n\n")
+        val fence = "```kotlin\n" + List(80) { "val v$it = ${it}" }.joinToString("\n") + "\n```"
+        val source = "$paragraph\n\n$many\n\n$fence\n\n结尾"
+        val rendered = blocks(source).joinToString("\n") { block ->
+            when (block) {
+                is Paragraph -> block.content.plainText()
+                is MarkdownBlock.CodeBlock -> block.code
+                else -> error("unexpected ${block::class.simpleName}")
+            }
+        }
+        assertTrue(rendered.contains(paragraph))
+        assertTrue(rendered.contains("第39段："))
+        assertTrue(rendered.contains("val v79 = 79"))
+        assertTrue(rendered.contains("结尾"))
+        assertEquals(source.length, parseMarkdown(source).source.length)
+    }
+
+    @Test
     fun `css values`() {
         assertEquals(Color(0x80, 0x00, 0xFF, 0x80), parseCssColor("rgba(128, 0, 255, 0.5)"))
         assertEquals(Color(0x11, 0x22, 0x33, 0xFF), parseCssColor("#123"))

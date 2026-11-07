@@ -119,10 +119,13 @@ To build a signed release APK, configure the signing properties in `local.proper
   - Option buttons in front-end cards fill the input box (SillyTavern `#send_textarea` / `#send_but` compatible); added `/setinput`.
   - Assistant details now have separate Lorebooks / Regex / Presets entries matching global Settings; Extensions keeps quick messages, prompt injections and skills.
   - Gemini no longer drops system messages after the first one.
-- **0.1.10** (Current):
+- **0.1.10**:
   - Fixed Vertex AI / Gemini and DeepSeek thinking-mode errors with SillyTavern presets in 0.1.9: a preset's trailing assistant prefill is kept only for Claude without extended thinking and is otherwise sent as a user turn.
   - Izumi 1029 option panel works: added `getCurrentMessageId()` / `getLastMessageId()` to the 酒馆助手 bridge; `message_id` is now the floor index.
   - The preset import report names 酒馆助手 scripts that will not run.
+- **0.1.11** (Current):
+  - Long replies stay fully visible: HTML cards are no longer capped at 720dp, and very long prose or code is laid out in pieces so streaming does not clip it.
+  - Reply text without its own color follows the light or dark theme. Explicit regex / HTML colors and syntax highlighting stay.
 
 ---
 

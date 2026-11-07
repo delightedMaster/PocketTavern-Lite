@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -59,6 +58,7 @@ import me.rerere.highlight.HighlightTextColorPalette
 import me.rerere.highlight.buildHighlightText
 import me.rerere.highlight.CodeHighlightText
 import me.rerere.highlight.CodeHighlighter
+import me.rerere.highlight.chunkCodeForLayout
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.ArrowDown01
 import me.rerere.hugeicons.stroke.ArrowUp01
@@ -198,7 +198,6 @@ fun HighlightCodeBlock(
                         }
                         else -> {
                             CodeBlockDefault(
-                                displayCode = displayCode,
                                 displayLines = displayLines,
                                 language = language,
                                 textStyle = textStyle,
@@ -297,7 +296,6 @@ private fun CodeBlockWithLineNumbersWrapped(
 
 @Composable
 private fun CodeBlockDefault(
-    displayCode: String,
     displayLines: List<String>,
     language: String,
     textStyle: TextStyle,
@@ -306,7 +304,10 @@ private fun CodeBlockDefault(
     showLineNumbers: Boolean,
     scrollState: ScrollState,
 ) {
-    Row(
+    val chunks = remember(displayLines) { chunkCodeForLayout(displayLines) }
+    val lineNumberWidth = remember(displayLines.size) { displayLines.size.toString().length }
+    var lineOffset = 0
+    Column(
         modifier = Modifier.then(
             if (autoWrap) {
                 Modifier
@@ -315,40 +316,37 @@ private fun CodeBlockDefault(
             }
         )
     ) {
-        // 行号列
-        if (showLineNumbers) {
-            val lineNumberWidth = remember(displayLines.size) {
-                displayLines.size.toString().length
-            }
-            Column(
-                modifier = Modifier.padding(end = 8.dp)
-            ) {
-                displayLines.forEachIndexed { index, _ ->
-                    Text(
-                        text = (index + 1).toString().padStart(lineNumberWidth, ' '),
+        chunks.forEach { group ->
+            val startLine = lineOffset
+            lineOffset += group.size
+            Row {
+                if (showLineNumbers) {
+                    Column(modifier = Modifier.padding(end = 8.dp)) {
+                        group.forEachIndexed { index, _ ->
+                            Text(
+                                text = (startLine + index + 1).toString().padStart(lineNumberWidth, ' '),
+                                fontSize = textStyle.fontSize,
+                                lineHeight = textStyle.lineHeight,
+                                fontFamily = JetbrainsMono,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                softWrap = false,
+                            )
+                        }
+                    }
+                }
+                SelectionContainer {
+                    CodeHighlightText(
+                        code = group.joinToString("\n"),
+                        language = language,
                         fontSize = textStyle.fontSize,
                         lineHeight = textStyle.lineHeight,
+                        colors = colorPalette,
+                        overflow = TextOverflow.Visible,
+                        softWrap = autoWrap,
                         fontFamily = JetbrainsMono,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                        softWrap = false,
                     )
                 }
             }
-        }
-
-        // 代码列
-        SelectionContainer {
-            CodeHighlightText(
-                code = displayCode,
-                language = language,
-                modifier = Modifier.animateContentSize(),
-                fontSize = textStyle.fontSize,
-                lineHeight = textStyle.lineHeight,
-                colors = colorPalette,
-                overflow = TextOverflow.Visible,
-                softWrap = autoWrap,
-                fontFamily = JetbrainsMono
-            )
         }
     }
 }

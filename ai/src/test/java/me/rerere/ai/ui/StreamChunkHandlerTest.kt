@@ -34,6 +34,23 @@ class StreamChunkHandlerTest {
     }
 
     @Test
+    fun `a long stream is stored in full`() {
+        val piece = "甲".repeat(500)
+        var messages = listOf(UIMessage.user("q"))
+        val handler = StreamChunkHandler(model)
+        messages = handler.handle(messages, StreamChunk.TextStart("t"))
+        repeat(40) {
+            messages = handler.handle(messages, StreamChunk.TextDelta("t", piece))
+        }
+        messages = handler.handle(messages, StreamChunk.TextEnd("t"))
+        messages = handler.handle(messages, StreamChunk.Finish(finishReason = "stop"))
+        assertEquals(piece.repeat(40), messages.last().toText())
+        assertEquals(20_000, messages.last().toText().length)
+        assertEquals(model.id, messages.last().modelId)
+        assertNotNull(messages.last().finishedAt)
+    }
+
+    @Test
     fun `reasoning tool and usage events should preserve semantic order`() {
         var messages = listOf(UIMessage.user("use a tool"))
         val handler = StreamChunkHandler(model)

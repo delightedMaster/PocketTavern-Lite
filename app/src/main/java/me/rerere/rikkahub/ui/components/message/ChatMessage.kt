@@ -20,12 +20,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -86,6 +88,7 @@ import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.modifier.shimmer
 import me.rerere.rikkahub.ui.context.LocalSettings
 import me.rerere.rikkahub.ui.theme.LocalChatFontFamily
+import me.rerere.ui.text.resolveMessageTextColor
 import me.rerere.rikkahub.ui.theme.rememberChatFontFamily
 import me.rerere.rikkahub.utils.JsonInstant
 import me.rerere.rikkahub.utils.openUrl
@@ -429,11 +432,10 @@ private fun MessagePartsBlock(
                                 ChatMessageBubble(
                                     role = role,
                                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = settings.displaySetting.bubbleOpacity),
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                                     onClick = { onUserMessageClick?.invoke() },
                                     // 用户气泡不占满整行，和助手的回复错开
-                                    modifier = Modifier
-                                        .padding(start = 48.dp)
-                                        .animateContentSize(),
+                                    modifier = Modifier.padding(start = 48.dp),
                                 ) {
                                     renderedText(Modifier)
                                 }
@@ -442,12 +444,13 @@ private fun MessagePartsBlock(
                                     ChatMessageBubble(
                                         role = role,
                                         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = settings.displaySetting.bubbleOpacity),
-                                        modifier = Modifier.animateContentSize(),
+                                        contentColor = MaterialTheme.colorScheme.onSurface,
                                     ) {
                                         renderedText(Modifier)
                                     }
                                 } else {
-                                    renderedText(Modifier.animateContentSize())
+                                    // 不用 animateContentSize：它会 clipToBounds，长回复在动画高度和图层裁切里被切掉
+                                    renderedText(Modifier)
                                 }
                             }
                         }
@@ -455,12 +458,19 @@ private fun MessagePartsBlock(
                         // 流式生成期间不启用 SelectionContainer：Markdown 在不断重渲染，
                         // 内部可选择的 Text 会频繁注册/注销，与 Compose 选择工具栏在绘制阶段
                         // 对 selectable 列表的排序产生并发修改，导致 ConcurrentModificationException。
-                        // 生成结束后内容稳定，再启用文本选择。
-                        if (loading) {
-                            textContent()
-                        } else {
-                            SelectionContainer {
+                        // 生成结束后内容稳定，再启用文本选择。这里只差「能不能选择」，颜色用同一套解析。
+                        val textColor = resolveMessageTextColor(
+                            styleColor = LocalTextStyle.current.color,
+                            contentColor = LocalContentColor.current,
+                            themeColor = MaterialTheme.colorScheme.onSurface,
+                        )
+                        CompositionLocalProvider(LocalContentColor provides textColor) {
+                            if (loading) {
                                 textContent()
+                            } else {
+                                SelectionContainer {
+                                    textContent()
+                                }
                             }
                         }
                     }
@@ -561,6 +571,7 @@ private fun ChatMessageBubble(
     role: MessageRole,
     color: Color,
     modifier: Modifier = Modifier,
+    contentColor: Color = Color.Unspecified,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
@@ -580,6 +591,7 @@ private fun ChatMessageBubble(
             modifier = modifier,
             shape = shape,
             color = color,
+            contentColor = contentColor,
             interactionSource = interactionSource,
         ) {
             Box(modifier = contentModifier) { content() }
@@ -589,6 +601,7 @@ private fun ChatMessageBubble(
             modifier = modifier,
             shape = shape,
             color = color,
+            contentColor = contentColor,
         ) {
             Box(modifier = contentModifier) { content() }
         }

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.1.11
+
+更新内容:
+
+- **长回复不再被裁掉一截**：HTML 卡片以前最高只有 720dp，正则美化或状态栏把整段回复包进卡片时，超出的正文不在布局里，外层列表又抢走了滑动。现在卡片按内容增高，只在超过单个视图的安全高度后才在卡片内部滚动。普通 Markdown（长中文、多段、超长单段）和代码块拆成多段排版，避免一个文本布局高到画不出来；流式输出不再用会裁切内容的尺寸动画。已保存的消息原文不变。
+- **输出文字跟随当前主题**：这不是有意把生成结束画成黑色。流式过程中正文走主题色；生成结束只是打开文本选择，并在这时才把完整 HTML 卡片交给 WebView。选择层没有自己的文字色，WebView 以前也没写主题色，缺省就落到纯黑，所以流式是白的、刚结束变黑。重新打开历史时选择从第一帧就在，Markdown 仍用主题色，所以又是白的。现在这三种状态共用同一套颜色：没写颜色的正文和卡片用主题色，正则 / HTML 写明的颜色和代码高亮保留。
+
+Updates:
+
+- **Long replies stay visible**: HTML cards were capped at 720dp, so a regex-beautified reply or status block taller than that was outside the layout and the chat list took the scroll. Cards now grow with their content and scroll inside only past a safe view height. Markdown (long Chinese, many paragraphs, one huge paragraph) and code blocks are split into several layouts so one text layout cannot grow past what can be drawn. Streaming no longer clips the body with a size animation. Saved message text is unchanged.
+- **Reply text follows the theme**: turning the finished reply black was not intentional. While streaming, the body uses the theme color; when generation ends the code only enables text selection and, at that moment, hands a finished HTML card to a WebView. Selection does not set a text color, and the WebView previously set none either, so the default is pure black: white while streaming, black the moment it finishes. Reloading history composes selection from the first frame and Markdown keeps the theme color, so it is white again. All three states now share one rule: text and cards without their own color use the theme; explicit regex / HTML colors and syntax highlighting stay.
+
 ## 0.1.10
 
 更新内容:

@@ -138,20 +138,59 @@ private fun containsFullHtmlPage(code: String): Boolean =
     (code.contains("<body", ignoreCase = true) && code.contains("</body>", ignoreCase = true)) ||
         (code.contains("<html", ignoreCase = true) && code.contains("</html>", ignoreCase = true))
 
-/** Full document with the shim in the head. The card cannot see app storage or keys. */
-fun cardDocument(source: String): String {
+/**
+ * 一张卡片在 WebView 里最多铺多高（设备像素）。再高的部分改由卡片内部滚动，
+ * 避免单个硬件图层超过常见的纹理上限后整段画不出来。
+ */
+const val HTML_CARD_MAX_DEVICE_PX = 8192
+private const val HTML_CARD_MIN_CSS_PX = 32
+
+data class HtmlCardLayout(val heightCssPx: Int, val scrolls: Boolean)
+
+/**
+ * [reportedCssPx] 是页面的 scrollHeight（CSS 像素，对应 dp）。
+ * 高度按设备像素封顶；超出的部分 [HtmlCardLayout.scrolls] 为 true，调用方让 WebView 自己滚。
+ */
+fun htmlCardLayoutHeight(
+    reportedCssPx: Int,
+    density: Float,
+    maxDevicePx: Int = HTML_CARD_MAX_DEVICE_PX,
+): HtmlCardLayout {
+    val reported = reportedCssPx.coerceAtLeast(HTML_CARD_MIN_CSS_PX)
+    val safeDensity = if (density.isFinite() && density > 0f) density else 1f
+    val maxCssPx = (maxDevicePx / safeDensity).toInt().coerceAtLeast(HTML_CARD_MIN_CSS_PX)
+    val height = reported.coerceAtMost(maxCssPx)
+    return HtmlCardLayout(heightCssPx = height, scrolls = reported > height)
+}
+
+/**
+ * Full document with the shim in the head. The card cannot see app storage or keys.
+ *
+ * [textColor] is the theme default for text that the card does not color itself (`#RRGGBB`).
+ * It is inserted before the card's own styles, so an explicit regex / HTML color still wins.
+ * [dark] sets `color-scheme`, which makes `prefers-color-scheme` follow the app theme.
+ */
+fun cardDocument(source: String, textColor: String = "", dark: Boolean = false): String {
     val shim = "<script>$TAVERN_CARD_SHIM</script>"
+    val themeStyle = cardThemeStyle(textColor, dark)
+    val headInjection = "$themeStyle$shim"
     val trimmed = source.trim()
     val head = Regex("<head[^>]*>", RegexOption.IGNORE_CASE)
     val html = Regex("<html[^>]*>", RegexOption.IGNORE_CASE)
     if (html.containsMatchIn(trimmed)) {
         return if (head.containsMatchIn(trimmed)) {
-            head.replaceFirst(trimmed, "$0$shim")
+            head.replaceFirst(trimmed, "$0$headInjection")
         } else {
-            html.replaceFirst(trimmed, "$0<head>$shim</head>")
+            html.replaceFirst(trimmed, "$0<head>$headInjection</head>")
         }
     }
-    return """<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">$shim<style>html,body{margin:0;padding:0;background:transparent;}</style></head><body>$trimmed</body></html>"""
+    return """<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">$headInjection</head><body>$trimmed</body></html>"""
+}
+
+private fun cardThemeStyle(textColor: String, dark: Boolean): String {
+    val scheme = if (dark) "dark" else "light"
+    val color = textColor.trim().takeIf { it.startsWith("#") && it.length in 4..9 }?.let { "color:$it;" }.orEmpty()
+    return """<style id="pockettavern-theme">html{color-scheme:$scheme;}html,body{margin:0;padding:0;background:transparent;$color}</style>"""
 }
 
 /**
