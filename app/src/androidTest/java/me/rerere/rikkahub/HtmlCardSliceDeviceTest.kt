@@ -28,10 +28,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import me.rerere.rikkahub.ui.components.message.HTML_CARD_SOURCE_TAG
-import me.rerere.rikkahub.ui.components.message.HTML_CARD_TILE_TAG
 import me.rerere.rikkahub.ui.components.message.HtmlCardView
 import me.rerere.rikkahub.ui.components.message.LocalTavernCardBridge
 import me.rerere.rikkahub.ui.components.message.TavernCardBridge
@@ -52,31 +54,25 @@ class HtmlCardSliceDeviceTest {
     @Test
     fun slicesAreOneDocumentAndTheBottomBandIsPainted() {
         val scenario = ActivityScenario.launch(HtmlCardProbeActivity::class.java)
-        show(scenario, bandDocument(BANDS, BAND))
+        val states = arrayOfNulls<ScrollState>(1)
+        show(scenario, bandDocument(BANDS, BAND), states)
         val web = waitFor<WebView>(scenario) { findTagged(it, HTML_CARD_SOURCE_TAG).filterIsInstance<WebView>() }
         val boots = waitText(scenario, web, "String(window.__boots||0)", "\"1\"")
         assertEquals("script ran once", "\"1\"", boots)
         assertEquals(1, countTagged(scenario, HTML_CARD_SOURCE_TAG))
-        val tiles = waitTagged(scenario, HTML_CARD_TILE_TAG, minHeight = 400, minCount = 2)
-        assertTrue("expected several slices, got ${tiles.size}", tiles.size >= 2)
-        val density = ui(scenario) { web.resources.displayMetrics.density }
-        val origin = location(scenario, tiles.minBy { location(scenario, it)[1] })
-        for (band in listOf(0, BANDS / 2, BANDS - 1)) {
-            val deviceY = ((band * BAND + BAND / 2) * density).roundToInt()
-            val tile = tiles.firstOrNull { view ->
-                val top = location(scenario, view)[1] - origin[1]
-                deviceY in top until top + view.height
-            } ?: error("no slice covers band $band at y=$deviceY")
-            val localY = deviceY - (location(scenario, tile)[1] - origin[1])
-            val color = ui(scenario) { drawPixel(tile, localY) }
-            assertTrue(
-                "band $band pixel ${hex(color)} expected ${bandHex(band)}",
-                close(color, bandHex(band)),
-            )
+        val latch = CountDownLatch(1)
+        ui(scenario) { activity ->
+            activity.lifecycleScope.launch {
+                states[0]?.scrollTo(states[0]?.maxValue ?: 0)
+                latch.countDown()
+            }
         }
-        val visible = tiles.minBy { location(scenario, it)[1] }
-        val copied = pixelCopy(scenario, visible, 48)
-        assertTrue("on-screen slice was ${hex(copied)}", close(copied, bandHex(0)))
+        assertTrue(latch.await(8, TimeUnit.SECONDS))
+        Thread.sleep(300)
+        val copied = pixelCopyBottom(scenario, 64)
+        assertTrue("bottom band was ${hex(copied)}", close(copied, bandHex(BANDS - 1)))
+        val inner = ui(scenario) { web.scrollY }
+        assertEquals("the reply webview scrolled vertically", 0, inner)
         scenario.close()
     }
 
@@ -87,9 +83,9 @@ class HtmlCardSliceDeviceTest {
         val states = arrayOfNulls<ScrollState>(1)
         show(scenario, INTERACTIVE, states) { scroll[0] = it }
         val web = waitFor<WebView>(scenario) { findTagged(it, HTML_CARD_SOURCE_TAG).filterIsInstance<WebView>() }
-        waitTagged(scenario, HTML_CARD_TILE_TAG, minHeight = 800, minCount = 1)
+        waitUntil(scenario) { findTagged(it, HTML_CARD_SOURCE_TAG).any { view -> view.height > 800 } }
         val compose = ui(scenario) { it.root.getChildAt(0) }
-        val tileTop = location(scenario, findTagged(scenario) { it.tag == HTML_CARD_TILE_TAG }.minBy { location(scenario, it)[1] })
+        val tileTop = location(scenario, web)
         val composeTop = location(scenario, compose)
         val density = ui(scenario) { web.resources.displayMetrics.density }
         fun documentY(css: Float): Float = tileTop[1] - composeTop[1] + css * density
@@ -116,11 +112,11 @@ class HtmlCardSliceDeviceTest {
         assertTrue("list scroll $beforeList -> $direct", direct > beforeList + 20)
 
         show(scenario, "<style>html,body{margin:0}body{min-height:100vh}</style><div style='height:80px;background:#abc'></div>")
-        waitTagged(scenario, HTML_CARD_TILE_TAG, minHeight = 40, minCount = 1)
+        val short = waitForWeb(scenario, "String(document.body && document.body.offsetHeight > 0)", "\"true\"")
         Thread.sleep(500)
-        val heightA = tileHeight(scenario)
+        val heightA = ui(scenario) { short.height }
         Thread.sleep(400)
-        val heightB = tileHeight(scenario)
+        val heightB = ui(scenario) { short.height }
         assertTrue("vh card grew $heightA -> $heightB", abs(heightA - heightB) <= 8)
         assertTrue("vh card is $heightB px", heightB in 40..500)
         show(scenario, "<div id=\"spin\" style=\"transform:rotate(8deg);height:40px\">x</div>")
@@ -129,6 +125,110 @@ class HtmlCardSliceDeviceTest {
         val body = eval(scenario, transformWeb, "getComputedStyle(document.body).transform")
         assertTrue("author transform=$rotated", rotated.contains("0.139") || rotated.contains("0.990"))
         assertTrue("body transform was replaced: $body", !body.contains("matrix(1, 0, 0, 1, 0,"))
+        scenario.close()
+    }
+
+    @Test
+    fun horizontalOverflowCanvasInputAndLongPressStayOnTheLiveWebView() {
+        val scenario = ActivityScenario.launch(HtmlCardProbeActivity::class.java)
+        val states = arrayOfNulls<ScrollState>(1)
+        show(scenario, LIVE, states)
+        val web = waitForWeb(scenario, "String(!!document.getElementById('field'))", "\"true\"")
+        waitUntil(scenario) { findTagged(it, HTML_CARD_SOURCE_TAG).any { view -> view.height > 200 } }
+        val compose = ui(scenario) { it.root.getChildAt(0) }
+        val origin = location(scenario, web)
+        val composeTop = location(scenario, compose)
+        val density = ui(scenario) { web.resources.displayMetrics.density }
+        fun yOf(css: Float) = origin[1] - composeTop[1] + css * density
+
+        val beforeLeft = eval(scenario, web, "document.getElementById('h').scrollLeft").trim('"').toFloat()
+        dragHorizontal(scenario, compose, y = yOf(24f), fromX = 260f, toX = 40f)
+        Thread.sleep(200)
+        val afterLeft = eval(scenario, web, "document.getElementById('h').scrollLeft").trim('"').toFloat()
+        val listDuringHorizontal = ui(scenario) { states[0]?.value ?: -1 }
+        assertTrue("horizontal scrollLeft $beforeLeft -> $afterLeft", afterLeft > beforeLeft + 10f)
+        assertTrue("list moved during horizontal drag: $listDuringHorizontal", listDuringHorizontal < 20)
+
+        val first = pixelAt(scenario, origin[0] + 12, origin[1] + (70 * density).roundToInt())
+        Thread.sleep(350)
+        val second = pixelAt(scenario, origin[0] + 12, origin[1] + (70 * density).roundToInt())
+        assertTrue("canvas stayed $first", first != second)
+
+        tap(scenario, compose, x = 40f, y = yOf(64f + 48f + 16f))
+        Thread.sleep(300)
+        val active = eval(scenario, web, "document.activeElement && document.activeElement.id")
+        assertEquals("\"field\"", active)
+
+        longPress(scenario, compose, x = 40f, y = yOf(64f + 48f + 36f + 12f))
+        Thread.sleep(200)
+        val selected = eval(scenario, web, "String((window.getSelection && window.getSelection().toString()) || '')")
+        assertTrue("selection=$selected", selected.length > 2)
+
+        tap(scenario, compose, x = 40f, y = yOf(64f + 48f + 36f + 28f + 10f))
+        Thread.sleep(250)
+        val link = eval(scenario, web, "String(window.__link||0)")
+        assertEquals("\"1\"", link)
+        scenario.close()
+    }
+
+    @Test
+    fun aLiveWebViewTallerThanTheTextureLimitStaysOnScreen() {
+        val scenario = ActivityScenario.launch(HtmlCardProbeActivity::class.java)
+        val states = arrayOfNulls<ScrollState>(1)
+        ui(scenario) { activity ->
+            val compose = ComposeView(activity).apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+                setContent {
+                    val state = rememberScrollState()
+                    SideEffect { states[0] = state }
+                    MaterialTheme {
+                        Column(Modifier.fillMaxWidth().height(420.dp).verticalScroll(state)) {
+                            AndroidView(
+                                modifier = Modifier.fillMaxWidth().height(8000.dp),
+                                factory = { context ->
+                                    WebView(context).apply {
+                                        settings.javaScriptEnabled = true
+                                        setBackgroundColor(Color.MAGENTA)
+                                        loadDataWithBaseURL(
+                                            null,
+                                            bandDocument(BANDS, BAND),
+                                            "text/html",
+                                            "utf-8",
+                                            null,
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+            activity.root.addView(
+                compose,
+                FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
+            )
+        }
+        val web = waitForAnyWeb(scenario, "String(document.body && document.body.scrollHeight > 1000)", "\"true\"")
+        val latch = CountDownLatch(1)
+        var scrollError: Throwable? = null
+        ui(scenario) { activity ->
+            activity.lifecycleScope.launch {
+                try {
+                    val state = states[0] ?: error("scroll state missing")
+                    state.scrollTo(state.maxValue)
+                } catch (error: Throwable) {
+                    scrollError = error
+                } finally {
+                    latch.countDown()
+                }
+            }
+        }
+        assertTrue(latch.await(8, TimeUnit.SECONDS))
+        scrollError?.let { throw it }
+        Thread.sleep(400)
+        val copied = pixelCopyBottom(scenario, 64)
+        assertTrue("bottom of a live WebView was ${hex(copied)}", close(copied, bandHex(BANDS - 1)))
+        assertTrue("page scrolled", (states[0]?.value ?: 0) > 1000)
         scenario.close()
     }
 
@@ -205,6 +305,30 @@ class HtmlCardSliceDeviceTest {
         return color
     }
 
+    private fun pixelCopyBottom(scenario: ActivityScenario<HtmlCardProbeActivity>, inset: Int): Int {
+        val latch = CountDownLatch(1)
+        val bitmap = Bitmap.createBitmap(120, inset, Bitmap.Config.ARGB_8888)
+        var code = PixelCopy.ERROR_SOURCE_INVALID
+        ui(scenario) { activity ->
+            val compose = activity.root.getChildAt(0)
+            val loc = IntArray(2)
+            compose.getLocationInWindow(loc)
+            val density = activity.resources.displayMetrics.density
+            val viewport = (420 * density).roundToInt()
+            val bottom = loc[1] + viewport
+            val rect = Rect(loc[0] + 24, bottom - inset, loc[0] + 144, bottom - 4)
+            PixelCopy.request(activity.window, rect, bitmap, { result ->
+                code = result
+                latch.countDown()
+            }, Handler(Looper.getMainLooper()))
+        }
+        assertTrue("pixel copy $code", latch.await(5, TimeUnit.SECONDS))
+        val color = bitmap.getPixel(60, inset / 2)
+        bitmap.recycle()
+        assertEquals(PixelCopy.SUCCESS, code)
+        return color
+    }
+
     private fun tap(scenario: ActivityScenario<HtmlCardProbeActivity>, target: View, x: Float, y: Float) {
         ui(scenario) {
             val down = SystemClock.uptimeMillis()
@@ -218,6 +342,66 @@ class HtmlCardSliceDeviceTest {
             target.dispatchTouchEvent(up)
             press.recycle()
             up.recycle()
+        }
+    }
+
+    private fun pixelAt(scenario: ActivityScenario<HtmlCardProbeActivity>, x: Int, y: Int): Int {
+        val latch = CountDownLatch(1)
+        val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+        var code = PixelCopy.ERROR_SOURCE_INVALID
+        ui(scenario) { activity ->
+            val rect = Rect(x, y, x + 8, y + 8)
+            PixelCopy.request(activity.window, rect, bitmap, { result ->
+                code = result
+                latch.countDown()
+            }, Handler(Looper.getMainLooper()))
+        }
+        assertTrue(latch.await(5, TimeUnit.SECONDS))
+        val color = bitmap.getPixel(4, 4)
+        bitmap.recycle()
+        assertEquals(PixelCopy.SUCCESS, code)
+        return color
+    }
+
+    private fun dragHorizontal(
+        scenario: ActivityScenario<HtmlCardProbeActivity>,
+        target: View,
+        y: Float,
+        fromX: Float,
+        toX: Float,
+    ) {
+        ui(scenario) {
+            val down = SystemClock.uptimeMillis()
+            fun send(action: Int, x: Float, time: Long) {
+                val event = MotionEvent.obtain(down, time, action, x, y, 0).apply {
+                    source = InputDevice.SOURCE_TOUCHSCREEN
+                }
+                target.dispatchTouchEvent(event)
+                event.recycle()
+            }
+            send(MotionEvent.ACTION_DOWN, fromX, down)
+            val steps = 8
+            for (step in 1..steps) send(MotionEvent.ACTION_MOVE, fromX + (toX - fromX) * step / steps, down + step * 16L)
+            send(MotionEvent.ACTION_UP, toX, down + 200)
+        }
+    }
+
+    private fun longPress(scenario: ActivityScenario<HtmlCardProbeActivity>, target: View, x: Float, y: Float) {
+        val down = SystemClock.uptimeMillis()
+        ui(scenario) {
+            val event = MotionEvent.obtain(down, down, MotionEvent.ACTION_DOWN, x, y, 0).apply {
+                source = InputDevice.SOURCE_TOUCHSCREEN
+            }
+            target.dispatchTouchEvent(event)
+            event.recycle()
+        }
+        Thread.sleep(700)
+        ui(scenario) {
+            val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, x, y, 0).apply {
+                source = InputDevice.SOURCE_TOUCHSCREEN
+            }
+            target.dispatchTouchEvent(event)
+            event.recycle()
         }
     }
 
@@ -245,11 +429,6 @@ class HtmlCardSliceDeviceTest {
             send(MotionEvent.ACTION_UP, toY, down + 200)
         }
     }
-
-    private fun tileHeight(scenario: ActivityScenario<HtmlCardProbeActivity>): Int =
-        ui(scenario) { activity ->
-            findTagged(activity, HTML_CARD_TILE_TAG).sumOf { it.height }
-        }
 
     private fun countTagged(scenario: ActivityScenario<HtmlCardProbeActivity>, tag: String): Int =
         ui(scenario) { findTagged(it, tag).size }
@@ -279,21 +458,43 @@ class HtmlCardSliceDeviceTest {
         return found
     }
 
-    private fun waitTagged(
+    private fun waitUntil(
         scenario: ActivityScenario<HtmlCardProbeActivity>,
-        tag: String,
-        minHeight: Int,
-        minCount: Int,
-    ): List<View> {
+        probe: (HtmlCardProbeActivity) -> Boolean,
+    ) {
         val deadline = SystemClock.uptimeMillis() + 12_000
         while (SystemClock.uptimeMillis() < deadline) {
-            val found = ui(scenario) {
-                findTagged(it, tag).filter { view -> view.isAttachedToWindow && view.width > 0 && view.height >= minHeight }
-            }
-            if (found.size >= minCount) return found
+            if (ui(scenario) { probe(it) }) return
             Thread.sleep(40)
         }
-        error("not enough views tagged $tag")
+        error("condition not met")
+    }
+
+    private fun waitForAnyWeb(
+        scenario: ActivityScenario<HtmlCardProbeActivity>,
+        js: String,
+        expected: String,
+    ): WebView {
+        val deadline = SystemClock.uptimeMillis() + 8_000
+        while (SystemClock.uptimeMillis() < deadline) {
+            val webs = ui(scenario) { activity ->
+                val found = ArrayList<WebView>()
+                fun walk(view: View) {
+                    if (view is WebView) found.add(view)
+                    if (view is ViewGroup) {
+                        for (index in 0 until view.childCount) walk(view.getChildAt(index))
+                    }
+                }
+                walk(activity.window.decorView)
+                found
+            }
+            for (web in webs) {
+                val value = runCatching { eval(scenario, web, js) }.getOrNull()
+                if (value == expected) return web
+            }
+            Thread.sleep(40)
+        }
+        error("no webview reached $expected for $js")
     }
 
     private fun waitForWeb(
@@ -395,6 +596,26 @@ class HtmlCardSliceDeviceTest {
     private companion object {
         const val BAND = 1000
         const val BANDS = 8
+        val LIVE = """
+            <style>html,body{margin:0;padding:0}</style>
+            <div id="h" style="overflow-x:auto;height:64px"><div style="width:3000px;height:64px;background:#2266cc"></div></div>
+            <canvas id="c" width="48" height="48" style="display:block"></canvas>
+            <script>
+            var n = 0;
+            function paint() {
+              var canvas = document.getElementById('c');
+              var g = canvas.getContext('2d');
+              n = (n + 50) % 256;
+              g.fillStyle = 'rgb(' + n + ',10,10)';
+              g.fillRect(0, 0, 48, 48);
+              requestAnimationFrame(paint);
+            }
+            paint();
+            </script>
+            <input id="field" style="display:block;width:180px;height:36px;margin:0;padding:0;border:0" />
+            <p id="copy" style="margin:0;height:28px">selectable words here</p>
+            <a id="lnk" href="https://example.com/card" style="display:block;height:28px" onclick="window.__link=1;return false">example link</a>
+        """.trimIndent()
         val INTERACTIVE = """
             <style>html,body{margin:0;padding:0}</style>
             <button id="btn" style="display:block;width:100%;height:70px" onclick="window.__clicks=(window.__clicks||0)+1;document.getElementById('mark').style.background='#ff0000'">go</button>

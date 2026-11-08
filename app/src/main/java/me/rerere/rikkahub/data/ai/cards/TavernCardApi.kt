@@ -119,9 +119,13 @@ const val TAVERN_CARD_SHIM = """
       var el = all[i];
       var style = window.getComputedStyle(el);
       var oy = style.overflowY;
-      if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') && el.scrollHeight > el.clientHeight + 1) {
+      var ox = style.overflowX;
+      var bits = 0;
+      if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') && el.scrollHeight > el.clientHeight + 1) bits |= 1;
+      if ((ox === 'auto' || ox === 'scroll' || ox === 'overlay') && el.scrollWidth > el.clientWidth + 1) bits |= 2;
+      if (bits) {
         var rect = el.getBoundingClientRect();
-        out.push(Math.round(rect.left), Math.round(rect.top), Math.round(rect.right), Math.round(rect.bottom));
+        out.push(Math.round(rect.left), Math.round(rect.top), Math.round(rect.right), Math.round(rect.bottom), bits);
       }
     }
     return out;
@@ -214,20 +218,29 @@ fun parseScrollableRects(csv: String): IntArray {
     return csv.split(',').mapNotNull { it.trim().toIntOrNull() }.toIntArray()
 }
 
-fun devicePointInScrollable(deviceX: Float, deviceY: Float, cssRects: IntArray, scale: Float): Boolean {
-    if (scale <= 0f || cssRects.size < 4) return false
+const val CARD_SCROLL_VERTICAL = 1
+const val CARD_SCROLL_HORIZONTAL = 2
+
+/**
+ * CSS boxes reported by the card, five numbers each: left, top, right, bottom, axis bits.
+ * [CARD_SCROLL_VERTICAL] and [CARD_SCROLL_HORIZONTAL] can both be set.
+ */
+fun scrollAxesAt(deviceX: Float, deviceY: Float, packed: IntArray, scale: Float): Int {
+    if (scale <= 0f || packed.size < 5) return 0
     val x = deviceX / scale
     val y = deviceY / scale
     var index = 0
-    while (index + 3 < cssRects.size) {
-        val left = cssRects[index]
-        val top = cssRects[index + 1]
-        val right = cssRects[index + 2]
-        val bottom = cssRects[index + 3]
-        if (x >= left && x < right && y >= top && y < bottom) return true
-        index += 4
+    var axes = 0
+    while (index + 4 < packed.size) {
+        val left = packed[index]
+        val top = packed[index + 1]
+        val right = packed[index + 2]
+        val bottom = packed[index + 3]
+        val flags = packed[index + 4]
+        if (x >= left && x < right && y >= top && y < bottom) axes = axes or flags
+        index += 5
     }
-    return false
+    return axes
 }
 
 /**

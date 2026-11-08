@@ -153,9 +153,10 @@ class TavernCardApiTest {
         assertFalse(shouldApplyCardHeight(appliedCssPx = 115, reportedCssPx = 117))
         assertTrue(shouldApplyCardHeight(appliedCssPx = 32, reportedCssPx = 24000))
         assertTrue(shouldApplyCardHeight(appliedCssPx = 24000, reportedCssPx = 80))
-        assertTrue(parseScrollableRects("1,2,3,4").contentEquals(intArrayOf(1, 2, 3, 4)))
-        assertTrue(devicePointInScrollable(10f, 30f, intArrayOf(0, 20, 40, 80), scale = 1f))
-        assertFalse(devicePointInScrollable(10f, 10f, intArrayOf(0, 20, 40, 80), scale = 1f))
+        assertTrue(parseScrollableRects("1,2,3,4,1").contentEquals(intArrayOf(1, 2, 3, 4, 1)))
+        val both = intArrayOf(0, 20, 40, 80, CARD_SCROLL_VERTICAL or CARD_SCROLL_HORIZONTAL)
+        assertEquals(CARD_SCROLL_VERTICAL or CARD_SCROLL_HORIZONTAL, scrollAxesAt(10f, 30f, both, scale = 1f))
+        assertEquals(0, scrollAxesAt(10f, 10f, both, scale = 1f))
     }
 
     @Test

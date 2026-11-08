@@ -2,7 +2,6 @@ package me.rerere.rikkahub
 
 import android.app.Application
 import android.util.Log
-import android.webkit.WebView
 import android.widget.Toast
 import androidx.compose.foundation.ComposeFoundationFlags
 import androidx.compose.runtime.Composer
@@ -51,9 +50,6 @@ const val APP_UPDATE_NOTIFICATION_CHANNEL_ID = "app_update"
 
 class RikkaHubApp : Application() {
     override fun onCreate() {
-        // Before any WebView. Painting one card as several slices calls WebView.draw()
-        // for parts that are outside the window; without this, those parts stay blank.
-        WebView.enableSlowWholeDocumentDraw()
         super.onCreate()
         // Restore files and settings before eager Koin singletons or workers can access them.
         try {
