@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.1.12
+
+更新内容:
+
+- **回复在聊天列表里完整展开，卡片仍是一个活的 WebView**：没有整卡竖向滚动条，也没有「展开」按钮，也不再把回复画成一组位图。页面和视图一样高，文档自己的 `scrollY` 保持 0。脚本、定时器、canvas 动画、选择、链接和输入都还在这个 WebView 上。超长消息不会为每个切片分配一整张 ARGB 位图；离开组合时 WebView 销毁。
+- **竖向拖动和卡片自己的滚动分开**：普通正文上的竖向拖动交给聊天列表。`overflow-y` 区域仍竖向滚动，`overflow-x` 和横向拖动仍留给 WebView。因此在普通正文上用手指竖向拖出一大段选区，会变成滚动列表；长按选中词仍然可以。高度报告不再跟着视口每次加 1 像素。
+- API 34 模拟器（SwiftShader，纹理上限 8192）上，8000dp 的活 WebView 滚到末尾仍能看到最后一段颜色，没有 “Unable to create layer”。同一模拟器核对了横向 `scrollLeft`、不改 DOM 的 canvas 变色、输入框获得焦点、长按出现选区、链接点击。没有打开 TalkBack，所以没有无障碍树的实测；卡片重新是 WebView，走系统原来的无障碍通道。应用里没有卡片内文本搜索。没有真机。
+
+Updates:
+
+- **Replies stay expanded in the chat list, and the card stays one live WebView**: there is no whole-card vertical scrollbar and no expand button, and the reply is not painted as bitmaps. The view is as tall as the page and the document `scrollY` stays 0. Scripts, timers, canvas animation, selection, links, and inputs stay on that WebView. A long message does not allocate an ARGB bitmap per slice; the WebView is destroyed when it leaves composition.
+- **A vertical drag and the card's own scrolling are separate**: a vertical drag on ordinary text goes to the chat list. An `overflow-y` region still scrolls vertically, and `overflow-x` plus other horizontal drags stay in the WebView. A vertical finger-drag that tries to select a long run of ordinary text therefore scrolls the list; a long-press can still select a word. Height reports no longer grow by one pixel per viewport echo.
+- On an API 34 emulator (SwiftShader, texture limit 8192) an 8000dp live WebView still showed its last color band at the bottom of the list, with no “Unable to create layer”. The same emulator checked horizontal `scrollLeft`, a canvas recolor that does not touch the DOM, input focus, a long-press selection, and a link click. TalkBack was not enabled, so the accessibility tree was not measured; the card is a WebView again and uses the platform accessibility channel it had before the bitmap attempt. The app has no in-card text search. Not checked on a physical phone.
+
 ## 0.1.11
 
 更新内容:

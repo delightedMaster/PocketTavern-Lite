@@ -93,14 +93,54 @@ const val TAVERN_CARD_SHIM = """
   }
   installComposer();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installComposer, {once:true});
-  function report() {
+  function contentHeight() {
     var body = document.body;
     var root = document.documentElement;
-    var h = Math.max(body ? body.scrollHeight : 0, root ? root.scrollHeight : 0);
-    if (window.PocketTavern && window.PocketTavern.reportHeight) window.PocketTavern.reportHeight(h);
+    var viewport = window.innerHeight || 0;
+    var bottom = 0;
+    if (body) {
+      var kids = body.children;
+      for (var i = 0; i < kids.length; i++) {
+        var el = kids[i];
+        if (!el || el.id === 'send_textarea' || el.id === 'send_but') continue;
+        var edge = el.offsetTop + el.offsetHeight;
+        if (edge > bottom) bottom = edge;
+      }
+    }
+    var scroll = Math.max(body ? body.scrollHeight : 0, root ? root.scrollHeight : 0);
+    if (scroll > viewport + 2 && scroll > bottom) bottom = scroll;
+    return Math.ceil(bottom);
+  }
+  function scrollableRects() {
+    var out = [];
+    if (!document.body) return out;
+    var all = document.body.getElementsByTagName('*');
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      var style = window.getComputedStyle(el);
+      var oy = style.overflowY;
+      var ox = style.overflowX;
+      var bits = 0;
+      if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') && el.scrollHeight > el.clientHeight + 1) bits |= 1;
+      if ((ox === 'auto' || ox === 'scroll' || ox === 'overlay') && el.scrollWidth > el.clientWidth + 1) bits |= 2;
+      if (bits) {
+        var rect = el.getBoundingClientRect();
+        out.push(Math.round(rect.left), Math.round(rect.top), Math.round(rect.right), Math.round(rect.bottom), bits);
+      }
+    }
+    return out;
+  }
+  function report() {
+    if (!window.PocketTavern) return;
+    if (window.PocketTavern.reportHeight) window.PocketTavern.reportHeight(contentHeight());
+    if (window.PocketTavern.reportScrollables) window.PocketTavern.reportScrollables(scrollableRects().join(','));
   }
   function observeBody() {
-    if (window.ResizeObserver && document.body) new ResizeObserver(report).observe(document.body);
+    if (!document.body) return;
+    if (window.ResizeObserver) new ResizeObserver(report).observe(document.body);
+    if (window.MutationObserver) {
+      new MutationObserver(report).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+    }
     report();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', observeBody, {once:true});
@@ -138,36 +178,88 @@ private fun containsFullHtmlPage(code: String): Boolean =
     (code.contains("<body", ignoreCase = true) && code.contains("</body>", ignoreCase = true)) ||
         (code.contains("<html", ignoreCase = true) && code.contains("</html>", ignoreCase = true))
 
-/**
- * 一张卡片在 WebView 里最多铺多高（设备像素）。再高的部分改由卡片内部滚动，
- * 避免单个硬件图层超过常见的纹理上限后整段画不出来。
- */
-const val HTML_CARD_MAX_DEVICE_PX = 8192
 private const val HTML_CARD_MIN_CSS_PX = 32
 
-data class HtmlCardLayout(val heightCssPx: Int, val scrolls: Boolean)
+/** One vertical piece of a card. The chat list scrolls from piece to piece; the piece itself does not. */
+data class HtmlCardSlice(val offsetCssPx: Int, val heightCssPx: Int)
 
 /**
- * [reportedCssPx] 是页面的 scrollHeight（CSS 像素，对应 dp）。
- * 高度按设备像素封顶；超出的部分 [HtmlCardLayout.scrolls] 为 true，调用方让 WebView 自己滚。
+ * Largest device-pixel height of one painted slice.
+ *
+ * [android.graphics.Canvas.getMaximumBitmapHeight] and `GL_MAX_TEXTURE_SIZE` are different numbers.
+ * On an API 34 emulator they were 32766 and 8192. A slice has to stay under both, or the GPU
+ * layer for that slice is blank. Zero for both means the limits are unknown: do not invent one.
  */
-/**
- * 卡片比视口高时，只有 WebView 自己还能沿该方向滚动，才把这次拖动从聊天列表里拿走。
- * 已经滚到头时把事件还给列表，避免手指按在卡片上时整页都滑不动。
- */
-fun htmlCardCapturesParentScroll(overflows: Boolean, canScrollInDragDirection: Boolean): Boolean =
-    overflows && canScrollInDragDirection
+fun htmlCardDeviceSliceLimit(maxBitmapPx: Int, glMaxTexturePx: Int): Int {
+    val caps = intArrayOf(maxBitmapPx, glMaxTexturePx).filter { it > 1 }
+    if (caps.isEmpty()) return Int.MAX_VALUE
+    return (caps.min() - 1).coerceAtLeast(1)
+}
 
-fun htmlCardLayoutHeight(
-    reportedCssPx: Int,
-    density: Float,
-    maxDevicePx: Int = HTML_CARD_MAX_DEVICE_PX,
-): HtmlCardLayout {
-    val reported = reportedCssPx.coerceAtLeast(HTML_CARD_MIN_CSS_PX)
-    val safeDensity = if (density.isFinite() && density > 0f) density else 1f
-    val maxCssPx = (maxDevicePx / safeDensity).toInt().coerceAtLeast(HTML_CARD_MIN_CSS_PX)
-    val height = reported.coerceAtMost(maxCssPx)
-    return HtmlCardLayout(heightCssPx = height, scrolls = reported > height)
+/** CSS-pixel height of one slice. A bad density means "do not split". */
+fun htmlCardMaxSliceCssPx(maxBitmapPx: Int, glMaxTexturePx: Int, density: Float): Int {
+    val device = htmlCardDeviceSliceLimit(maxBitmapPx, glMaxTexturePx)
+    if (device == Int.MAX_VALUE || !density.isFinite() || density <= 0f) return Int.MAX_VALUE
+    return (device / density).toInt().coerceAtLeast(1)
+}
+
+/**
+ * Ignore a height report that only echoes the viewport. Resizing the WebView to `scrollHeight`
+ * on a `min-height: 100vh` page grew by one CSS pixel per report on the API 34 emulator.
+ */
+fun shouldApplyCardHeight(appliedCssPx: Int, reportedCssPx: Int): Boolean {
+    if (reportedCssPx <= 0) return false
+    return reportedCssPx > appliedCssPx + 2 || reportedCssPx + 8 < appliedCssPx
+}
+
+/** CSS pixel boxes (`left, top, right, bottom` repeating) reported by the card document. */
+fun parseScrollableRects(csv: String): IntArray {
+    if (csv.isBlank()) return IntArray(0)
+    return csv.split(',').mapNotNull { it.trim().toIntOrNull() }.toIntArray()
+}
+
+const val CARD_SCROLL_VERTICAL = 1
+const val CARD_SCROLL_HORIZONTAL = 2
+
+/**
+ * CSS boxes reported by the card, five numbers each: left, top, right, bottom, axis bits.
+ * [CARD_SCROLL_VERTICAL] and [CARD_SCROLL_HORIZONTAL] can both be set.
+ */
+fun scrollAxesAt(deviceX: Float, deviceY: Float, packed: IntArray, scale: Float): Int {
+    if (scale <= 0f || packed.size < 5) return 0
+    val x = deviceX / scale
+    val y = deviceY / scale
+    var index = 0
+    var axes = 0
+    while (index + 4 < packed.size) {
+        val left = packed[index]
+        val top = packed[index + 1]
+        val right = packed[index + 2]
+        val bottom = packed[index + 3]
+        val flags = packed[index + 4]
+        if (x >= left && x < right && y >= top && y < bottom) axes = axes or flags
+        index += 5
+    }
+    return axes
+}
+
+/**
+ * Splits [contentCssPx] into contiguous pieces no taller than [maxSliceCssPx].
+ * Heights add up to the whole document, so nothing is left for an inner scrollbar.
+ */
+fun htmlCardSlices(contentCssPx: Int, maxSliceCssPx: Int): List<HtmlCardSlice> {
+    val content = contentCssPx.coerceAtLeast(HTML_CARD_MIN_CSS_PX)
+    if (maxSliceCssPx <= 0 || content <= maxSliceCssPx) {
+        return listOf(HtmlCardSlice(offsetCssPx = 0, heightCssPx = content))
+    }
+    val slices = mutableListOf<HtmlCardSlice>()
+    var offset = 0
+    while (offset < content) {
+        val height = minOf(maxSliceCssPx, content - offset)
+        slices += HtmlCardSlice(offsetCssPx = offset, heightCssPx = height)
+        offset += height
+    }
+    return slices
 }
 
 /**
