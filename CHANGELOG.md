@@ -6,13 +6,15 @@
 
 更新内容:
 
-- **回复在聊天列表里完整展开**：HTML 卡片不再自己竖向滚动，也没有「展开」按钮。卡片高度跟内容走，上下滑动只滚动整个聊天列表。卡片内部作者自己写的局部滚动（例如一块 `overflow` 区域）仍然留给那一块。
-- **超过单块 WebView 可绘制高度时上下拼接**：切分上限用系统 `Canvas.getMaximumBitmapHeight()`（文档里通常就是最大纹理尺寸），不使用写死的 8192。更高的内容分成上下相接的几块，每块都不滚动，仍由聊天列表往下看。没有在真机或模拟器上验证拼接后的点击和滑动。按钮、正则样式和主题色保持原样。
+- **回复在聊天列表里完整展开，并且整张卡片仍是同一份页面**：HTML 卡片不再自己竖向滚动，也没有「展开」按钮。脚本、定时器和按钮只在一个 WebView 里运行。超过单块可绘制高度时，把这一份页面画成上下相接的几块；每块都短于 `GL_MAX_TEXTURE_SIZE` 和 `Canvas.getMaximumBitmapHeight()` 里更小的那个（API 34 模拟器上分别是 8192 和 32766，不能只用后者）。不改作者写在 `body` 上的 transform。
+- **作者自己的竖向局部滚动和聊天列表分开**：手指落在 `overflow-y: auto/scroll` 的区域时，滚的是那一块；落在其余正文上时，滚的是聊天列表。只横向滚动的区域不单独接管。高度报告不再跟着视口每次加 1 像素（`min-height: 100vh` 在模拟器上会这样）。
+- 以上在 API 34 模拟器（SwiftShader）上核对过绘制、单次初始化、按钮、局部滚动和列表滚动。没有在真机上核对。只改 DOM 或正在拖动的局部滚动会刷新画面；不改 DOM 的 canvas 动画可能要到下一次文档变化才更新。
 
 Updates:
 
-- **Replies stay expanded in the chat list**: an HTML card no longer scrolls vertically on its own, and there is no expand button. The card is as tall as its content; vertical movement scrolls the chat list. A scroll area the card author wrote (an `overflow` region) stays on that region.
-- **Taller than one WebView can draw, the card is stacked**: the slice limit is `Canvas.getMaximumBitmapHeight()` (documented as the usual maximum texture size), not a fixed 8192. Anything taller is stacked in pieces that do not scroll, and the chat list moves through them. Clicks and scrolling of those pieces were not checked on a device or emulator. Buttons, regex styles, and the theme color stay.
+- **Replies stay expanded in the chat list, and the card stays one document**: an HTML card no longer scrolls vertically on its own, and there is no expand button. Scripts, timers, and buttons run in one WebView. Past the height one piece can draw, that same page is painted as stacked slices. Each slice is shorter than the smaller of `GL_MAX_TEXTURE_SIZE` and `Canvas.getMaximumBitmapHeight()` (8192 and 32766 on an API 34 emulator; the bitmap number alone is too tall). An author `transform` on `body` is left alone.
+- **An author-made vertical scroller and the chat list are separate**: a finger on an `overflow-y: auto/scroll` region scrolls that region; a finger on the rest of the reply scrolls the chat list. A horizontal-only scroller is not claimed. Height reports no longer grow by one pixel per viewport echo (`min-height: 100vh` did that on the emulator).
+- Checked on an API 34 emulator (SwiftShader): painting, a single script init, buttons, the inner scroller, and list scrolling. Not checked on a physical phone. DOM edits and an active inner drag refresh the picture; a canvas animation that does not touch the DOM can wait until the next document change.
 
 ## 0.1.11
 

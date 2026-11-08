@@ -137,10 +137,25 @@ class TavernCardApiTest {
     }
 
     @Test
-    fun sliceLimitFollowsTheReportedBitmapHeight() {
-        assertEquals(Int.MAX_VALUE, htmlCardMaxSliceCssPx(maxBitmapPx = 0, density = 3f))
-        assertEquals(Int.MAX_VALUE, htmlCardMaxSliceCssPx(maxBitmapPx = 16384, density = 0f))
-        assertEquals(4096, htmlCardMaxSliceCssPx(maxBitmapPx = 16384, density = 4f))
+    fun sliceLimitUsesTheSmallerOfBitmapAndTexture() {
+        assertEquals(Int.MAX_VALUE, htmlCardDeviceSliceLimit(maxBitmapPx = 0, glMaxTexturePx = 0))
+        assertEquals(8191, htmlCardDeviceSliceLimit(maxBitmapPx = 32766, glMaxTexturePx = 8192))
+        assertEquals(4095, htmlCardDeviceSliceLimit(maxBitmapPx = 4096, glMaxTexturePx = 16384))
+        assertEquals(Int.MAX_VALUE, htmlCardMaxSliceCssPx(maxBitmapPx = 0, glMaxTexturePx = 0, density = 3f))
+        assertEquals(Int.MAX_VALUE, htmlCardMaxSliceCssPx(maxBitmapPx = 16384, glMaxTexturePx = 8192, density = 0f))
+        // 8191 device px at density 4 is 2047 CSS px, not bitmap/density.
+        assertEquals(2047, htmlCardMaxSliceCssPx(maxBitmapPx = 32766, glMaxTexturePx = 8192, density = 4f))
+    }
+
+    @Test
+    fun viewportEchoDoesNotChangeTheAppliedHeight() {
+        assertFalse(shouldApplyCardHeight(appliedCssPx = 115, reportedCssPx = 116))
+        assertFalse(shouldApplyCardHeight(appliedCssPx = 115, reportedCssPx = 117))
+        assertTrue(shouldApplyCardHeight(appliedCssPx = 32, reportedCssPx = 24000))
+        assertTrue(shouldApplyCardHeight(appliedCssPx = 24000, reportedCssPx = 80))
+        assertTrue(parseScrollableRects("1,2,3,4").contentEquals(intArrayOf(1, 2, 3, 4)))
+        assertTrue(devicePointInScrollable(10f, 30f, intArrayOf(0, 20, 40, 80), scale = 1f))
+        assertFalse(devicePointInScrollable(10f, 10f, intArrayOf(0, 20, 40, 80), scale = 1f))
     }
 
     @Test

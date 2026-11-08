@@ -93,14 +93,50 @@ const val TAVERN_CARD_SHIM = """
   }
   installComposer();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installComposer, {once:true});
-  function report() {
+  function contentHeight() {
     var body = document.body;
     var root = document.documentElement;
-    var h = Math.max(body ? body.scrollHeight : 0, root ? root.scrollHeight : 0);
-    if (window.PocketTavern && window.PocketTavern.reportHeight) window.PocketTavern.reportHeight(h);
+    var viewport = window.innerHeight || 0;
+    var bottom = 0;
+    if (body) {
+      var kids = body.children;
+      for (var i = 0; i < kids.length; i++) {
+        var el = kids[i];
+        if (!el || el.id === 'send_textarea' || el.id === 'send_but') continue;
+        var edge = el.offsetTop + el.offsetHeight;
+        if (edge > bottom) bottom = edge;
+      }
+    }
+    var scroll = Math.max(body ? body.scrollHeight : 0, root ? root.scrollHeight : 0);
+    if (scroll > viewport + 2 && scroll > bottom) bottom = scroll;
+    return Math.ceil(bottom);
+  }
+  function scrollableRects() {
+    var out = [];
+    if (!document.body) return out;
+    var all = document.body.getElementsByTagName('*');
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      var style = window.getComputedStyle(el);
+      var oy = style.overflowY;
+      if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') && el.scrollHeight > el.clientHeight + 1) {
+        var rect = el.getBoundingClientRect();
+        out.push(Math.round(rect.left), Math.round(rect.top), Math.round(rect.right), Math.round(rect.bottom));
+      }
+    }
+    return out;
+  }
+  function report() {
+    if (!window.PocketTavern) return;
+    if (window.PocketTavern.reportHeight) window.PocketTavern.reportHeight(contentHeight());
+    if (window.PocketTavern.reportScrollables) window.PocketTavern.reportScrollables(scrollableRects().join(','));
   }
   function observeBody() {
-    if (window.ResizeObserver && document.body) new ResizeObserver(report).observe(document.body);
+    if (!document.body) return;
+    if (window.ResizeObserver) new ResizeObserver(report).observe(document.body);
+    if (window.MutationObserver) {
+      new MutationObserver(report).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+    }
     report();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', observeBody, {once:true});
@@ -144,13 +180,54 @@ private const val HTML_CARD_MIN_CSS_PX = 32
 data class HtmlCardSlice(val offsetCssPx: Int, val heightCssPx: Int)
 
 /**
- * Turns a device bitmap-height limit into CSS pixels. [Canvas.getMaximumBitmapHeight] is what
- * Android documents as the usual maximum texture size. Zero or a bad density means "do not split":
- * guessing a fixed pixel cap is not a hardware measurement.
+ * Largest device-pixel height of one painted slice.
+ *
+ * [android.graphics.Canvas.getMaximumBitmapHeight] and `GL_MAX_TEXTURE_SIZE` are different numbers.
+ * On an API 34 emulator they were 32766 and 8192. A slice has to stay under both, or the GPU
+ * layer for that slice is blank. Zero for both means the limits are unknown: do not invent one.
  */
-fun htmlCardMaxSliceCssPx(maxBitmapPx: Int, density: Float): Int {
-    if (maxBitmapPx <= 0 || !density.isFinite() || density <= 0f) return Int.MAX_VALUE
-    return (maxBitmapPx / density).toInt().coerceAtLeast(1)
+fun htmlCardDeviceSliceLimit(maxBitmapPx: Int, glMaxTexturePx: Int): Int {
+    val caps = intArrayOf(maxBitmapPx, glMaxTexturePx).filter { it > 1 }
+    if (caps.isEmpty()) return Int.MAX_VALUE
+    return (caps.min() - 1).coerceAtLeast(1)
+}
+
+/** CSS-pixel height of one slice. A bad density means "do not split". */
+fun htmlCardMaxSliceCssPx(maxBitmapPx: Int, glMaxTexturePx: Int, density: Float): Int {
+    val device = htmlCardDeviceSliceLimit(maxBitmapPx, glMaxTexturePx)
+    if (device == Int.MAX_VALUE || !density.isFinite() || density <= 0f) return Int.MAX_VALUE
+    return (device / density).toInt().coerceAtLeast(1)
+}
+
+/**
+ * Ignore a height report that only echoes the viewport. Resizing the WebView to `scrollHeight`
+ * on a `min-height: 100vh` page grew by one CSS pixel per report on the API 34 emulator.
+ */
+fun shouldApplyCardHeight(appliedCssPx: Int, reportedCssPx: Int): Boolean {
+    if (reportedCssPx <= 0) return false
+    return reportedCssPx > appliedCssPx + 2 || reportedCssPx + 8 < appliedCssPx
+}
+
+/** CSS pixel boxes (`left, top, right, bottom` repeating) reported by the card document. */
+fun parseScrollableRects(csv: String): IntArray {
+    if (csv.isBlank()) return IntArray(0)
+    return csv.split(',').mapNotNull { it.trim().toIntOrNull() }.toIntArray()
+}
+
+fun devicePointInScrollable(deviceX: Float, deviceY: Float, cssRects: IntArray, scale: Float): Boolean {
+    if (scale <= 0f || cssRects.size < 4) return false
+    val x = deviceX / scale
+    val y = deviceY / scale
+    var index = 0
+    while (index + 3 < cssRects.size) {
+        val left = cssRects[index]
+        val top = cssRects[index + 1]
+        val right = cssRects[index + 2]
+        val bottom = cssRects[index + 3]
+        if (x >= left && x < right && y >= top && y < bottom) return true
+        index += 4
+    }
+    return false
 }
 
 /**
