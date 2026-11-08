@@ -137,22 +137,28 @@ class TavernCardApiTest {
     }
 
     @Test
-    fun cardHeightFollowsContentUntilTheDevicePixelCeiling() {
-        assertEquals(HtmlCardLayout(200, false), htmlCardLayoutHeight(200, density = 3f))
-        assertEquals(HtmlCardLayout(32, false), htmlCardLayoutHeight(0, density = 2f))
-        // 旧实现把高度钳在 720dp，2000 像素的正文后半段不在布局里
-        assertEquals(HtmlCardLayout(2000, false), htmlCardLayoutHeight(2000, density = 3f))
-        val capped = htmlCardLayoutHeight(20_000, density = 2.5f)
-        assertTrue(capped.scrolls)
-        assertEquals((HTML_CARD_MAX_DEVICE_PX / 2.5f).toInt(), capped.heightCssPx)
-        assertTrue(capped.heightCssPx > 720)
+    fun sliceLimitFollowsTheReportedBitmapHeight() {
+        assertEquals(Int.MAX_VALUE, htmlCardMaxSliceCssPx(maxBitmapPx = 0, density = 3f))
+        assertEquals(Int.MAX_VALUE, htmlCardMaxSliceCssPx(maxBitmapPx = 16384, density = 0f))
+        assertEquals(4096, htmlCardMaxSliceCssPx(maxBitmapPx = 16384, density = 4f))
     }
 
     @Test
-    fun `an overflowing card only keeps the drag while it can still scroll`() {
-        assertFalse(htmlCardCapturesParentScroll(overflows = false, canScrollInDragDirection = true))
-        assertFalse(htmlCardCapturesParentScroll(overflows = true, canScrollInDragDirection = false))
-        assertTrue(htmlCardCapturesParentScroll(overflows = true, canScrollInDragDirection = true))
+    fun `a card is one full piece until it passes the device bitmap limit`() {
+        assertEquals(listOf(HtmlCardSlice(0, 20_000)), htmlCardSlices(20_000, maxSliceCssPx = 32_768))
+        assertEquals(listOf(HtmlCardSlice(0, 32)), htmlCardSlices(0, maxSliceCssPx = 100))
+        assertEquals(listOf(HtmlCardSlice(0, 5_000)), htmlCardSlices(5_000, maxSliceCssPx = 0))
+    }
+
+    @Test
+    fun `content above the bitmap limit is stacked with nothing left over`() {
+        val slices = htmlCardSlices(20_000, maxSliceCssPx = 8_192)
+        assertEquals(20_000, slices.sumOf { it.heightCssPx })
+        assertTrue(slices.all { it.heightCssPx <= 8_192 })
+        slices.zipWithNext().forEach { (prev, next) ->
+            assertEquals(prev.offsetCssPx + prev.heightCssPx, next.offsetCssPx)
+        }
+        assertEquals(0, slices.first().offsetCssPx)
     }
 
     @Test

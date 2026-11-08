@@ -86,49 +86,6 @@ To build a signed release APK, configure the signing properties in `local.proper
 
 ---
 
-## Development Roadmap
-
-- **0.1.0**: Baseline established on RikkaHub 3.0.0; deep integration of SillyTavern assets (character cards, lorebooks, presets, regex, and Author's Notes).
-- **0.1.1**: Trimmed non-essential modules, streamlined roleplay client identity, and enhanced GitHub Releases update checking.
-- **0.1.2**: Implemented import compatibility diagnostic reports; revamped model provider management and connection tests.
-- **0.1.3**: In-chat HTML codeblock rendering, context and max token budget controls, and joint preset/regex importing.
-- **0.1.4**: In-place post-story HTML rendering, full-page codeblock detection, and built-in front-end CDN/font/image whitelists.
-- **0.1.5**:
-  - In-app update engine overhaul (proxy support, mirror acceleration, notification progress, and auto-install trigger).
-  - Interactive in-app Regex Script Editor with live model output replacement preview.
-  - CI/CD build artifact naming standardization (version tag + ABI suffix) with SHA-256 checksum generation.
-  - Bilingual documentation rewrite and modernization.
-- **0.1.6**:
-  - Lorebooks, regex scripts and presets moved to their own settings entries; the Prompts page keeps only prompt injections and author's note.
-  - The release workflow can be triggered manually from Actions and creates the version tag itself.
-- **0.1.7**:
-  - Fixed imported SillyTavern presets and regex beautification not applying in chat; new conversation greetings properly substitute `{{user}}`, `{{char}}` and persist conversation-scoped variable macros.
-  - Split world books and presets in the chat extension picker, allowing presets to be attached directly to assistants.
-  - Added a "Delete all" button with confirmation to clear all assistant message regex rules at once.
-  - Removed the duplicate standalone "Google Vertex AI" built-in provider in favor of the Vertex AI toggle inside the "Gemini" preset (existing configured entries are preserved as custom providers).
-  - Completed missing translations across locales and fixed Android Lint and stability issues.
-- **0.1.8**:
-  - Shared Regex Editor in Assistant Prompt Page: Integrated `RegexScriptEditor` with live sample replacement preview and syntax validation into assistant-level regex rules; refined list view into compact monospace rows.
-  - Robust Regex Flag Validation: Unified `/pattern/flags` parser with explicit compile errors for unknown flags, preventing silent failures.
-  - Regex Group Deletion & Synchronized Cleanup: Added manual deletion with confirmation for preset regex groups in Settings; deleting a preset now automatically cleans up its associated regex rules.
-  - Two-Way Preset Synchronization in Started Chats: Presets in existing conversations now consistently follow assistant bindings upon next send; toggling presets in the chat extension picker persists back to the assistant.
-  - Preset Import & Update Enhancements: SillyTavern preset import prioritizes embedded JSON name and description metadata; release metadata checks fall back to `gh-proxy.com` mirror under restricted networks; scrollable extension empty states prevent button clipping.
-- **0.1.9**:
-  - SillyTavern presets are assembled exactly like the Prompt Manager: toggles come from `prompt_order` only, relative/absolute positions fixed, marker entries expand in place, entries after chat history and an assistant prefill work. Complex presets such as Izumi now reach the model intact, so option cards and other beautification regexes match without edits. **Re-import existing presets once.**
-  - Regex depth matches SillyTavern (0 = newest message); fixed variable-length lookbehind regexes duplicating text.
-  - Option buttons in front-end cards fill the input box (SillyTavern `#send_textarea` / `#send_but` compatible); added `/setinput`.
-  - Assistant details now have separate Lorebooks / Regex / Presets entries matching global Settings; Extensions keeps quick messages, prompt injections and skills.
-  - Gemini no longer drops system messages after the first one.
-- **0.1.10**:
-  - Fixed Vertex AI / Gemini and DeepSeek thinking-mode errors with SillyTavern presets in 0.1.9: a preset's trailing assistant prefill is kept only for Claude without extended thinking and is otherwise sent as a user turn.
-  - Izumi 1029 option panel works: added `getCurrentMessageId()` / `getLastMessageId()` to the 酒馆助手 bridge; `message_id` is now the floor index.
-  - The preset import report names 酒馆助手 scripts that will not run.
-- **0.1.11** (Current):
-  - Long replies stay fully visible: HTML cards are no longer capped at 720dp, and very long prose or code is laid out in pieces so streaming does not clip it.
-  - Reply text without its own color follows the light or dark theme. Explicit regex / HTML colors and syntax highlighting stay.
-
----
-
 ## Acknowledgements & Upstream Projects
 
 - [RikkaHub](https://github.com/rikkahub/rikkahub): Excellent native Android LLM client baseline. This project maintains RikkaHub's Git history and upstream copyright notices.

@@ -138,36 +138,38 @@ private fun containsFullHtmlPage(code: String): Boolean =
     (code.contains("<body", ignoreCase = true) && code.contains("</body>", ignoreCase = true)) ||
         (code.contains("<html", ignoreCase = true) && code.contains("</html>", ignoreCase = true))
 
-/**
- * 一张卡片在 WebView 里最多铺多高（设备像素）。再高的部分改由卡片内部滚动，
- * 避免单个硬件图层超过常见的纹理上限后整段画不出来。
- */
-const val HTML_CARD_MAX_DEVICE_PX = 8192
 private const val HTML_CARD_MIN_CSS_PX = 32
 
-data class HtmlCardLayout(val heightCssPx: Int, val scrolls: Boolean)
+/** One vertical piece of a card. The chat list scrolls from piece to piece; the piece itself does not. */
+data class HtmlCardSlice(val offsetCssPx: Int, val heightCssPx: Int)
 
 /**
- * [reportedCssPx] 是页面的 scrollHeight（CSS 像素，对应 dp）。
- * 高度按设备像素封顶；超出的部分 [HtmlCardLayout.scrolls] 为 true，调用方让 WebView 自己滚。
+ * Turns a device bitmap-height limit into CSS pixels. [Canvas.getMaximumBitmapHeight] is what
+ * Android documents as the usual maximum texture size. Zero or a bad density means "do not split":
+ * guessing a fixed pixel cap is not a hardware measurement.
  */
-/**
- * 卡片比视口高时，只有 WebView 自己还能沿该方向滚动，才把这次拖动从聊天列表里拿走。
- * 已经滚到头时把事件还给列表，避免手指按在卡片上时整页都滑不动。
- */
-fun htmlCardCapturesParentScroll(overflows: Boolean, canScrollInDragDirection: Boolean): Boolean =
-    overflows && canScrollInDragDirection
+fun htmlCardMaxSliceCssPx(maxBitmapPx: Int, density: Float): Int {
+    if (maxBitmapPx <= 0 || !density.isFinite() || density <= 0f) return Int.MAX_VALUE
+    return (maxBitmapPx / density).toInt().coerceAtLeast(1)
+}
 
-fun htmlCardLayoutHeight(
-    reportedCssPx: Int,
-    density: Float,
-    maxDevicePx: Int = HTML_CARD_MAX_DEVICE_PX,
-): HtmlCardLayout {
-    val reported = reportedCssPx.coerceAtLeast(HTML_CARD_MIN_CSS_PX)
-    val safeDensity = if (density.isFinite() && density > 0f) density else 1f
-    val maxCssPx = (maxDevicePx / safeDensity).toInt().coerceAtLeast(HTML_CARD_MIN_CSS_PX)
-    val height = reported.coerceAtMost(maxCssPx)
-    return HtmlCardLayout(heightCssPx = height, scrolls = reported > height)
+/**
+ * Splits [contentCssPx] into contiguous pieces no taller than [maxSliceCssPx].
+ * Heights add up to the whole document, so nothing is left for an inner scrollbar.
+ */
+fun htmlCardSlices(contentCssPx: Int, maxSliceCssPx: Int): List<HtmlCardSlice> {
+    val content = contentCssPx.coerceAtLeast(HTML_CARD_MIN_CSS_PX)
+    if (maxSliceCssPx <= 0 || content <= maxSliceCssPx) {
+        return listOf(HtmlCardSlice(offsetCssPx = 0, heightCssPx = content))
+    }
+    val slices = mutableListOf<HtmlCardSlice>()
+    var offset = 0
+    while (offset < content) {
+        val height = minOf(maxSliceCssPx, content - offset)
+        slices += HtmlCardSlice(offsetCssPx = offset, heightCssPx = height)
+        offset += height
+    }
+    return slices
 }
 
 /**

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.1.12
+
+更新内容:
+
+- **回复在聊天列表里完整展开**：HTML 卡片不再自己竖向滚动，也没有「展开」按钮。卡片高度跟内容走，上下滑动只滚动整个聊天列表。卡片内部作者自己写的局部滚动（例如一块 `overflow` 区域）仍然留给那一块。
+- **超过单块 WebView 可绘制高度时上下拼接**：切分上限用系统 `Canvas.getMaximumBitmapHeight()`（文档里通常就是最大纹理尺寸），不使用写死的 8192。更高的内容分成上下相接的几块，每块都不滚动，仍由聊天列表往下看。没有在真机或模拟器上验证拼接后的点击和滑动。按钮、正则样式和主题色保持原样。
+
+Updates:
+
+- **Replies stay expanded in the chat list**: an HTML card no longer scrolls vertically on its own, and there is no expand button. The card is as tall as its content; vertical movement scrolls the chat list. A scroll area the card author wrote (an `overflow` region) stays on that region.
+- **Taller than one WebView can draw, the card is stacked**: the slice limit is `Canvas.getMaximumBitmapHeight()` (documented as the usual maximum texture size), not a fixed 8192. Anything taller is stacked in pieces that do not scroll, and the chat list moves through them. Clicks and scrolling of those pieces were not checked on a device or emulator. Buttons, regex styles, and the theme color stay.
+
 ## 0.1.11
 
 更新内容:
