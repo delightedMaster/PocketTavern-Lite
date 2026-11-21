@@ -715,7 +715,7 @@
   <string name="setting_display_page_enable_latex_rendering_title">启用 LaTeX 渲染</string>
   <string name="setting_display_page_enable_message_generation_haptic_effect_desc">消息生成时启用触觉反馈效果</string>
   <string name="setting_display_page_enable_message_generation_haptic_effect_title">消息生成触觉反馈</string>
-  <string name="setting_display_page_font_size_preview">凌晨四点钟，看到海棠花未眠。我常常这样，在无人的夜里独自醒着，想，若有人此刻也在想我，那就好了。</string>
+  <string name="setting_display_page_font_size_preview">凌晨四点钟，看到海棠花未眠。（轻声叹了口气）我常常这样，在无人的夜里独自醒着，低声说：“若有人此刻也在想我，那就好了。”</string>
   <string name="setting_display_page_font_size_title">聊天字体大小</string>
   <string name="setting_display_page_live_update_notification">实时更新通知</string>
   <string name="setting_display_page_live_update_notification_desc">在生成消息时显示实时通知更新（Android 15+）</string>
@@ -1803,6 +1803,11 @@ mDNS 地址：使用 .local 主机名，同一网络中的其他设备可通过�
   <string name="tavern_regex_intro">正则规则用于查找、替换或隐藏文字，例如去掉回复中的固定前缀。全局规则对所有角色生效；自建或单独导入的规则放在“自定义”，随预设导入的按预设分组。角色卡自带的规则仍保存在卡内。</string>
   <string name="tavern_regex_preset_folder">预设</string>
   <string name="tavern_regex_unnamed_group">未命名文件夹</string>
+  <string name="tavern_regex_group_status_disabled">已关闭</string>
+  <string name="tavern_regex_group_status_preset_removed">关联预设已移除</string>
+  <string name="tavern_regex_group_status_preset_disabled">关联预设已停用</string>
+  <string name="tavern_regex_group_status_follows_preset">随预设生效</string>
+  <string name="tavern_regex_delete_group">删除分组</string>
   <string name="prompt_page_html_allowlist">HTML 卡片域名</string>
   <string name="prompt_page_html_allowlist_desc">这些域名及其子域名可以加载，默认包含常用 CDN、字体和图床。清空则拦截所有网络请求。</string>
   <string name="quick_messages_page_import">导入 JSON</string>

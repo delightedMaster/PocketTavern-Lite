@@ -193,36 +193,30 @@ private class InlineTextBuilder(
     ): ByteArray {
         val roles = ByteArray(text.length)
 
-        // 先匹配中文全角括号（…）：支持嵌套计数，仅隐藏最外层已闭合括号且内容非空白
+        // 先匹配中文全角括号（…）：用下标栈就近配对，既支持嵌套（外层闭合时自动恢复内层括号，
+        // 仅隐藏最外层），也避免前面孤立的未闭合（导致后续合法的（…）全部失效。
         if (enableParens) {
-            var depth = 0
-            var openPos = -1
+            val openStack = ArrayDeque<Int>()
+            val bracketRole = if (hideParens) ROLE_HIDDEN else ROLE_PAREN
             for (i in 0 until text.length) {
                 when (text[i]) {
-                    OPEN_FULLWIDTH_PAREN -> {
-                        if (depth == 0) openPos = i
-                        depth++
-                    }
+                    OPEN_FULLWIDTH_PAREN -> openStack.addLast(i)
                     CLOSE_FULLWIDTH_PAREN -> {
-                        if (depth > 0) {
-                            depth--
-                            if (depth == 0 && openPos >= 0) {
-                                var hasVisibleContent = false
+                        if (openStack.isNotEmpty()) {
+                            val openPos = openStack.removeLast()
+                            var hasVisibleContent = false
+                            for (k in (openPos + 1) until i) {
+                                if (!text[k].isWhitespace()) {
+                                    hasVisibleContent = true
+                                    break
+                                }
+                            }
+                            if (hasVisibleContent) {
                                 for (k in (openPos + 1) until i) {
-                                    if (!text[k].isWhitespace()) {
-                                        hasVisibleContent = true
-                                        break
-                                    }
+                                    roles[k] = ROLE_PAREN
                                 }
-                                if (hasVisibleContent) {
-                                    for (k in (openPos + 1) until i) {
-                                        roles[k] = ROLE_PAREN
-                                    }
-                                    val bracketRole = if (hideParens) ROLE_HIDDEN else ROLE_PAREN
-                                    roles[openPos] = bracketRole
-                                    roles[i] = bracketRole
-                                }
-                                openPos = -1
+                                roles[openPos] = bracketRole
+                                roles[i] = bracketRole
                             }
                         }
                     }

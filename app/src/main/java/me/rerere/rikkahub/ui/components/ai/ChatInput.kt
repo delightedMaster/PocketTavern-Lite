@@ -34,9 +34,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -198,6 +201,10 @@ fun ChatInput(
                 onResume = onResumeMessageQueue,
             )
             if (speakerChoices.isNotEmpty() || quickMessages.isNotEmpty() || onBindQuickReplies != null) {
+                val chipSurfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
+                val filterChipColors = FilterChipDefaults.filterChipColors(
+                    containerColor = chipSurfaceColor,
+                )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -209,6 +216,7 @@ fun ChatInput(
                         FilterChip(
                             selected = id == selectedSpeakerId,
                             onClick = { onSelectSpeaker(id) },
+                            colors = filterChipColors,
                             label = { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         )
                     }
@@ -216,6 +224,7 @@ fun ChatInput(
                         FilterChip(
                             selected = false,
                             onClick = { onRunQuickReply(quickMessage.content) },
+                            colors = filterChipColors,
                             label = {
                                 Text(
                                     text = quickReplyLabel(quickMessage),
@@ -226,9 +235,14 @@ fun ChatInput(
                         )
                     }
                     if (onBindQuickReplies != null) {
-                        TextButton(onClick = onBindQuickReplies) {
-                            Text(stringResource(R.string.chat_page_bind_quick_replies))
-                        }
+                        AssistChip(
+                            onClick = onBindQuickReplies,
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = chipSurfaceColor,
+                                labelColor = MaterialTheme.colorScheme.primary,
+                            ),
+                            label = { Text(stringResource(R.string.chat_page_bind_quick_replies), maxLines = 1) },
+                        )
                     }
                 }
             }

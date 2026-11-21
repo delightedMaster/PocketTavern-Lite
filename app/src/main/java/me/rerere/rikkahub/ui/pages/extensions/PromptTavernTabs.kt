@@ -418,18 +418,16 @@ private fun RegexGroupCard(
     var expanded by rememberSaveable(group.id.toString()) { mutableStateOf(group.enabled) }
     val arrowRotation by animateFloatAsState(if (expanded) 0f else -90f, label = "regexGroupArrow")
     val countText = stringResource(R.string.tavern_regex_group_count, group.regexes.size)
-    val subtitle = buildString {
-        append(countText)
-        if (!group.enabled) {
-            append(" · 已关闭")
-        } else if (group.source == RegexGroupSource.PRESET && group.presetId != null) {
-            when {
-                linkedPreset == null -> append(" · 关联预设已移除")
-                !linkedPreset.enabled -> append(" · 关联预设已停用")
-                else -> append(" · 随预设生效")
-            }
+    val statusText = when {
+        !group.enabled -> stringResource(R.string.tavern_regex_group_status_disabled)
+        group.source == RegexGroupSource.PRESET && group.presetId != null -> when {
+            linkedPreset == null -> stringResource(R.string.tavern_regex_group_status_preset_removed)
+            !linkedPreset.enabled -> stringResource(R.string.tavern_regex_group_status_preset_disabled)
+            else -> stringResource(R.string.tavern_regex_group_status_follows_preset)
         }
+        else -> null
     }
+    val subtitle = if (statusText != null) "$countText · $statusText" else countText
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = CustomColors.listItemColors.containerColor),
@@ -475,7 +473,7 @@ private fun RegexGroupCard(
                     IconButton(onClick = { confirmingDelete = true }) {
                         Icon(
                             imageVector = HugeIcons.Delete01,
-                            contentDescription = "删除分组",
+                            contentDescription = stringResource(R.string.tavern_regex_delete_group),
                             tint = MaterialTheme.colorScheme.error,
                         )
                     }

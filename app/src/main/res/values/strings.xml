@@ -708,7 +708,7 @@
   <string name="setting_display_page_enable_latex_rendering_title">Enable LaTeX Rendering</string>
   <string name="setting_display_page_enable_message_generation_haptic_effect_desc">Enable haptic feedback when messages are being generated</string>
   <string name="setting_display_page_enable_message_generation_haptic_effect_title">Message Generation Haptic Effect</string>
-  <string name="setting_display_page_font_size_preview">At four in the morning, I saw the begonia flowers still awake. I am often like this — lying awake alone in the quiet night, thinking: if someone is thinking of me at this moment, that would be wonderful.</string>
+  <string name="setting_display_page_font_size_preview">At four in the morning, I saw the begonia flowers still awake. （sighing softly） Lying awake alone in the quiet night, I whispered, \"If someone is thinking of me at this moment, that would be wonderful.\"</string>
   <string name="setting_display_page_font_size_title">Chat Font Size</string>
   <string name="setting_display_page_live_update_notification">Live Update Notification</string>
   <string name="setting_display_page_live_update_notification_desc">Show real-time notification updates during message generation (Android 15+)</string>
@@ -1833,6 +1833,11 @@
   <string name="tavern_regex_intro">Global regex is organized into folders: global scripts apply to every card, manually added/imported ones land in "Custom", and importing a SillyTavern preset creates a folder named after it. Scripts bundled in a character card still live on that card.</string>
   <string name="tavern_regex_preset_folder">Preset</string>
   <string name="tavern_regex_unnamed_group">Untitled folder</string>
+  <string name="tavern_regex_group_status_disabled">Disabled</string>
+  <string name="tavern_regex_group_status_preset_removed">Linked preset removed</string>
+  <string name="tavern_regex_group_status_preset_disabled">Linked preset disabled</string>
+  <string name="tavern_regex_group_status_follows_preset">Follows active preset</string>
+  <string name="tavern_regex_delete_group">Delete group</string>
   <string name="prompt_page_html_allowlist">HTML card hosts</string>
   <string name="prompt_page_html_allowlist_desc">A host here, or its subdomains, may load. Defaults to common CDNs, fonts and image hosts. Empty blocks every network request.</string>
   <string name="quick_messages_page_import">Import JSON</string>

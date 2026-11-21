@@ -597,6 +597,7 @@ private fun ChatListNormal(
             MessageJumper(
                 show = isRecentScroll && !state.isScrollInProgress && settings.displaySetting.showMessageJumper && !captureProgress,
                 onLeft = settings.displaySetting.messageJumperOnLeft,
+                innerPadding = innerPadding,
                 scope = scope,
                 state = state
             )
@@ -834,12 +835,18 @@ private fun ChatSuggestionsRow(
 private fun BoxScope.MessageJumper(
     show: Boolean,
     onLeft: Boolean,
+    innerPadding: PaddingValues,
     scope: CoroutineScope,
     state: LazyListState
 ) {
     AnimatedVisibility(
         visible = show,
-        modifier = Modifier.align(if (onLeft) Alignment.CenterStart else Alignment.CenterEnd),
+        modifier = Modifier
+            .align(if (onLeft) Alignment.CenterStart else Alignment.CenterEnd)
+            .padding(
+                top = innerPadding.calculateTopPadding(),
+                bottom = innerPadding.calculateBottomPadding(),
+            ),
         enter = slideInHorizontally(
             initialOffsetX = { if (onLeft) -it * 2 else it * 2 },
         ),
@@ -848,8 +855,8 @@ private fun BoxScope.MessageJumper(
         )
     ) {
         Column(
-            modifier = Modifier.padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Surface(
                 onClick = {
@@ -861,13 +868,14 @@ private fun BoxScope.MessageJumper(
                 tonalElevation = 4.dp,
                 color = MaterialTheme.colorScheme.surfaceColorAtElevation(
                     4.dp
-                ).copy(alpha = 0.65f)
+                ).copy(alpha = 0.72f)
             ) {
                 Icon(
                     imageVector = HugeIcons.ArrowUpDouble,
                     contentDescription = null,
                     modifier = Modifier
                         .padding(4.dp)
+                        .size(18.dp)
                 )
             }
             Surface(
@@ -884,13 +892,14 @@ private fun BoxScope.MessageJumper(
                 tonalElevation = 4.dp,
                 color = MaterialTheme.colorScheme.surfaceColorAtElevation(
                     4.dp
-                ).copy(alpha = 0.65f)
+                ).copy(alpha = 0.72f)
             ) {
                 Icon(
                     imageVector = HugeIcons.ArrowUp01,
                     contentDescription = null,
                     modifier = Modifier
                         .padding(4.dp)
+                        .size(18.dp)
                 )
             }
             Surface(
@@ -902,13 +911,14 @@ private fun BoxScope.MessageJumper(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceColorAtElevation(
                     4.dp
-                ).copy(alpha = 0.65f)
+                ).copy(alpha = 0.72f)
             ) {
                 Icon(
                     imageVector = HugeIcons.ArrowDown01,
                     contentDescription = null,
                     modifier = Modifier
                         .padding(4.dp)
+                        .size(18.dp)
                 )
             }
             Surface(
@@ -920,13 +930,14 @@ private fun BoxScope.MessageJumper(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceColorAtElevation(
                     4.dp
-                ).copy(alpha = 0.65f),
+                ).copy(alpha = 0.72f),
             ) {
                 Icon(
                     imageVector = HugeIcons.ArrowDownDouble,
                     contentDescription = stringResource(R.string.chat_page_scroll_to_bottom),
                     modifier = Modifier
                         .padding(4.dp)
+                        .size(18.dp)
                 )
             }
         }

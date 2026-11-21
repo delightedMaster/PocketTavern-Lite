@@ -119,6 +119,14 @@ class MarkdownInlineTest {
     }
 
     @Test
+    fun `unclosed opening full-width parenthesis does not break subsequent closed pair`() {
+        val rendered = render("前面有孤立括号（后面再出现（完整旁白）")
+        assertEquals("前面有孤立括号（后面再出现完整旁白", rendered.text)
+        assertEquals(Color.Unspecified, rendered.colorOf("前面有孤立括号（后面再出现"))
+        assertEquals(gray, rendered.colorOf("完整旁白"))
+    }
+
+    @Test
     fun `does not override inline code or explicit html colors`() {
         val rendered = render("""`（代码）` 和 <span style="color: #ff0000">“红色警告”</span>""")
         assertEquals("（代码） 和 “红色警告”", rendered.text)
