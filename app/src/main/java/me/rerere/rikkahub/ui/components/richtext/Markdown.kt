@@ -65,6 +65,8 @@ import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.ui.context.LocalSettings
 import me.rerere.rikkahub.ui.modifier.onClick
 import me.rerere.rikkahub.ui.theme.JetbrainsMono
+import me.rerere.rikkahub.ui.theme.LocalDarkMode
+import me.rerere.rikkahub.ui.theme.extendColors
 import me.rerere.ui.markdown.Markdown
 import me.rerere.ui.markdown.MarkdownBlock
 import me.rerere.ui.markdown.MarkdownComponents
@@ -135,14 +137,29 @@ fun MarkdownBlock(
     style: TextStyle = LocalTextStyle.current,
     onClickCitation: (String) -> Unit = {},
     htmlMessageId: String? = null,
+    enableDialogueFormatting: Boolean = false,
 ) {
-    val enableLatexRendering = LocalSettings.current.displaySetting.enableLatexRendering
-    val enableQuoteHighlight = LocalSettings.current.displaySetting.enableQuoteHighlight
+    val displaySetting = LocalSettings.current.displaySetting
+    val enableLatexRendering = displaySetting.enableLatexRendering
+    val enableQuoteHighlight = enableDialogueFormatting && displaySetting.enableQuoteHighlight
+    val enableParenthesisHighlight = enableDialogueFormatting && displaySetting.enableParenthesisHighlight
     val fontSize = LocalTextStyle.current.merge(style).fontSize
     val density = LocalDensity.current
-    val quoteColor = MaterialTheme.colorScheme.tertiary
+    val darkMode = LocalDarkMode.current
+    val extendColors = MaterialTheme.extendColors
+    // 浅色底用偏深焦糖橙/中灰保证对比度，深色底用亮琥珀橙/柔灰
+    val quoteColor = if (darkMode) extendColors.orange6 else extendColors.orange7
+    val parenthesisColor = if (darkMode) extendColors.gray6 else extendColors.gray7
     val defaultTheme = MarkdownDefaults.theme(style)
-    val theme = remember(defaultTheme, fontSize, density, enableQuoteHighlight, quoteColor) {
+    val theme = remember(
+        defaultTheme,
+        fontSize,
+        density,
+        enableQuoteHighlight,
+        enableParenthesisHighlight,
+        quoteColor,
+        parenthesisColor,
+    ) {
         defaultTheme.copy(
             inlineCode = defaultTheme.inlineCode.copy(
                 fontFamily = JetbrainsMono,
@@ -151,6 +168,8 @@ fun MarkdownBlock(
             // 段落间距跟随字号，调整字体大小时保持比例
             blockSpacing = if (fontSize.isSp) with(density) { fontSize.toDp() } else defaultTheme.blockSpacing,
             quotedText = SpanStyle(color = quoteColor).takeIf { enableQuoteHighlight },
+            parenthesisText = SpanStyle(color = parenthesisColor).takeIf { enableParenthesisHighlight },
+            hideParentheses = true,
         )
     }
 

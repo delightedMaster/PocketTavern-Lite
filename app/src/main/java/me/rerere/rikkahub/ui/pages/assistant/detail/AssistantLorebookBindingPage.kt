@@ -92,7 +92,13 @@ fun AssistantLorebookBindingPage(id: String, kind: LorebookKind) {
                     onToggle = { bookId, checked ->
                         vm.update(
                             assistant.copy(
-                                lorebookIds = toggleLorebookBinding(assistant.lorebookIds, bookId, checked),
+                                lorebookIds = toggleLorebookBinding(
+                                    boundIds = assistant.lorebookIds,
+                                    id = bookId,
+                                    checked = checked,
+                                    kind = kind,
+                                    allLorebooks = settings.lorebooks,
+                                ),
                             ),
                         )
                     },

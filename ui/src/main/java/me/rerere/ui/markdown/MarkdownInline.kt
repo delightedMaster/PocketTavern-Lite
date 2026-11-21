@@ -115,6 +115,28 @@ private val MATH_SOURCE_STYLE = SpanStyle(fontFamily = FontFamily.Monospace)
 // 开引号 -> 闭引号。单引号常被当作撇号（don't、it’s）使用，不参与配对
 private val QUOTE_PAIRS = mapOf('"' to '"', '“' to '”', '「' to '」', '『' to '』')
 
+private const val OPEN_FULLWIDTH_PAREN = '（'
+private const val CLOSE_FULLWIDTH_PAREN = '）'
+
+private const val ROLE_NORMAL: Byte = 0
+private const val ROLE_QUOTE: Byte = 1
+private const val ROLE_PAREN: Byte = 2
+private const val ROLE_HIDDEN: Byte = 3
+
+/** 供单测直接验证行内引号上色与全角括号隐藏逻辑，不依赖 Compose 运行时。 */
+internal fun buildInlineAnnotatedText(
+    content: List<MarkdownInline>,
+    theme: MarkdownTheme,
+    components: MarkdownComponents = MarkdownDefaults.components,
+    linkListener: LinkInteractionListener? = null,
+    style: TextStyle = TextStyle.Default,
+    density: androidx.compose.ui.unit.Density = androidx.compose.ui.unit.Density(1f),
+    contentColor: Color = Color.Unspecified,
+): AnnotatedString = InlineTextBuilder(
+    context = MarkdownContext(theme, components, linkListener),
+    scope = MarkdownInlineScope(style, density, contentColor),
+).build(content).text
+
 private class InlineTextBuilder(
     private val context: MarkdownContext,
     private val scope: MarkdownInlineScope,
@@ -122,22 +144,132 @@ private class InlineTextBuilder(
     private val builder = AnnotatedString.Builder()
     private val inlineContent = mutableMapOf<String, InlineTextContent>()
     private var hasMathWidget = false
-
-    // 还没闭合的引号：等待的闭引号，以及开引号在输出文本里的位置。引号可以跨越加粗、链接等节点
-    private var pendingQuoteClose: Char? = null
-    private var pendingQuoteStart = 0
+    private var flatRoles: ByteArray? = null
+    private var flatCursor = 0
 
     fun build(content: List<MarkdownInline>): RenderedInlineText {
-        append(content)
+        val quoteStyle = context.theme.quotedText
+        val parenStyle = context.theme.parenthesisText
+        if (quoteStyle != null || parenStyle != null) {
+            val flat = StringBuilder()
+            collectFormattableText(content, flat)
+            if (flat.isNotEmpty()) {
+                flatRoles = computeCharRoles(
+                    text = flat,
+                    enableQuotes = quoteStyle != null,
+                    enableParens = parenStyle != null,
+                    hideParens = context.theme.hideParentheses,
+                )
+            }
+        }
+        append(content, allowFormatting = true)
         return RenderedInlineText(builder.toAnnotatedString(), inlineContent, hasMathWidget)
     }
 
-    private fun append(nodes: List<MarkdownInline>) = nodes.fastForEach { append(it) }
+    private fun collectFormattableText(nodes: List<MarkdownInline>, out: StringBuilder) {
+        nodes.fastForEach { node ->
+            when (node) {
+                is MarkdownInline.Text -> out.append(node.text)
+                is MarkdownInline.Styled -> {
+                    // 显式指定了文字颜色（如正则/HTML 着色）的子树保留自身颜色，不参与对话/括号重着色
+                    if (node.style.color == Color.Unspecified) {
+                        collectFormattableText(node.children, out)
+                    }
+                }
+                // 代码、链接、公式、图片保持原样，不参与对话/括号匹配
+                is MarkdownInline.Code,
+                is MarkdownInline.Link,
+                is MarkdownInline.Math,
+                is MarkdownInline.Image -> Unit
+            }
+        }
+    }
 
-    private fun append(node: MarkdownInline) {
+    private fun computeCharRoles(
+        text: CharSequence,
+        enableQuotes: Boolean,
+        enableParens: Boolean,
+        hideParens: Boolean,
+    ): ByteArray {
+        val roles = ByteArray(text.length)
+
+        // 先匹配中文全角括号（…）：支持嵌套计数，仅隐藏最外层已闭合括号且内容非空白
+        if (enableParens) {
+            var depth = 0
+            var openPos = -1
+            for (i in 0 until text.length) {
+                when (text[i]) {
+                    OPEN_FULLWIDTH_PAREN -> {
+                        if (depth == 0) openPos = i
+                        depth++
+                    }
+                    CLOSE_FULLWIDTH_PAREN -> {
+                        if (depth > 0) {
+                            depth--
+                            if (depth == 0 && openPos >= 0) {
+                                var hasVisibleContent = false
+                                for (k in (openPos + 1) until i) {
+                                    if (!text[k].isWhitespace()) {
+                                        hasVisibleContent = true
+                                        break
+                                    }
+                                }
+                                if (hasVisibleContent) {
+                                    for (k in (openPos + 1) until i) {
+                                        roles[k] = ROLE_PAREN
+                                    }
+                                    val bracketRole = if (hideParens) ROLE_HIDDEN else ROLE_PAREN
+                                    roles[openPos] = bracketRole
+                                    roles[i] = bracketRole
+                                }
+                                openPos = -1
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 再匹配对话引号：跳过已归属括号的区域，避免括号内的孤立引号打乱外部对话配对，
+        // 同时让引号内部夹杂的括号保持灰色且不破坏外层引号的闭合。
+        if (enableQuotes) {
+            var pendingClose: Char? = null
+            var pendingStart = -1
+            for (i in 0 until text.length) {
+                if (roles[i] == ROLE_PAREN || roles[i] == ROLE_HIDDEN) continue
+                val c = text[i]
+                val close = pendingClose
+                if (close == null) {
+                    QUOTE_PAIRS[c]?.let {
+                        pendingClose = it
+                        pendingStart = i
+                    }
+                } else if (c == close) {
+                    // 只高亮已经闭合的引号，避免流式输出时或孤立的引号把后面整段都染色
+                    for (k in pendingStart..i) {
+                        if (roles[k] == ROLE_NORMAL) {
+                            roles[k] = ROLE_QUOTE
+                        }
+                    }
+                    pendingClose = null
+                    pendingStart = -1
+                }
+            }
+        }
+
+        return roles
+    }
+
+    private fun append(nodes: List<MarkdownInline>, allowFormatting: Boolean) =
+        nodes.fastForEach { append(it, allowFormatting) }
+
+    private fun append(node: MarkdownInline, allowFormatting: Boolean) {
         when (node) {
-            is MarkdownInline.Text -> appendText(node.text)
-            is MarkdownInline.Styled -> builder.withStyle(node.style) { append(node.children) }
+            is MarkdownInline.Text -> appendText(node.text, allowFormatting)
+            is MarkdownInline.Styled -> {
+                val childAllowFormatting = allowFormatting && node.style.color == Color.Unspecified
+                builder.withStyle(node.style) { append(node.children, childAllowFormatting) }
+            }
             is MarkdownInline.Code -> builder.withStyle(context.theme.inlineCode) { append(node.code) }
             is MarkdownInline.Link -> appendLink(node)
             is MarkdownInline.Math -> appendMath(node)
@@ -146,22 +278,44 @@ private class InlineTextBuilder(
         }
     }
 
-    private fun appendText(text: String) {
-        val offset = builder.length
-        builder.append(text)
-        val quoteStyle = context.theme.quotedText ?: return
-        text.forEachIndexed { index, char ->
-            val close = pendingQuoteClose
-            if (close == null) {
-                QUOTE_PAIRS[char]?.let {
-                    pendingQuoteClose = it
-                    pendingQuoteStart = offset + index
-                }
-            } else if (char == close) {
-                // 只高亮已经闭合的引号，避免流式输出时或孤立的引号把后面整段都染色
-                builder.addStyle(quoteStyle, pendingQuoteStart, offset + index + 1)
-                pendingQuoteClose = null
+    private fun appendText(text: String, allowFormatting: Boolean) {
+        val roles = flatRoles
+        if (!allowFormatting || roles == null || text.isEmpty()) {
+            builder.append(text)
+            return
+        }
+        val base = flatCursor
+        flatCursor += text.length
+        val quoteStyle = context.theme.quotedText
+        val parenStyle = context.theme.parenthesisText
+
+        var i = 0
+        while (i < text.length) {
+            val role = roles[base + i]
+            var j = i + 1
+            while (j < text.length && roles[base + j] == role) {
+                j++
             }
+            val chunk = text.substring(i, j)
+            when (role) {
+                ROLE_HIDDEN -> Unit
+                ROLE_QUOTE -> {
+                    if (quoteStyle != null) {
+                        builder.withStyle(quoteStyle) { append(chunk) }
+                    } else {
+                        builder.append(chunk)
+                    }
+                }
+                ROLE_PAREN -> {
+                    if (parenStyle != null) {
+                        builder.withStyle(parenStyle) { append(chunk) }
+                    } else {
+                        builder.append(chunk)
+                    }
+                }
+                else -> builder.append(chunk)
+            }
+            i = j
         }
     }
 
@@ -176,7 +330,7 @@ private class InlineTextBuilder(
             styles = TextLinkStyles(style = context.theme.link),
             linkInteractionListener = context.linkListener,
         )
-        builder.withLink(annotation) { append(link.children) }
+        builder.withLink(annotation) { append(link.children, allowFormatting = false) }
     }
 
     private fun appendMath(math: MarkdownInline.Math) {
@@ -197,6 +351,6 @@ private class InlineTextBuilder(
         val id = "markdown:${inlineContent.size}"
         inlineContent[id] = widget.toInlineTextContent()
         // alternateText 不允许为空
-        builder.appendInlineContent(id, alternateText.ifEmpty { "�" })
+        builder.appendInlineContent(id, alternateText.ifEmpty { "\uFFFD" })
     }
 }

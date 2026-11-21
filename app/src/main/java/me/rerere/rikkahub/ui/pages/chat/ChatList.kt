@@ -98,10 +98,9 @@ import kotlinx.coroutines.launch
 import me.rerere.ai.ui.UIMessage
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.Settings
-import me.rerere.rikkahub.data.datastore.getAssistantById
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.MessageNode
-import me.rerere.rikkahub.data.model.withConversation
+import me.rerere.rikkahub.data.model.getAssistantOf
 import me.rerere.rikkahub.service.ChatError
 import me.rerere.rikkahub.ui.components.message.ChatMessage
 import me.rerere.rikkahub.ui.components.ui.ErrorCardsDisplay
@@ -322,13 +321,14 @@ private fun ChatListNormal(
 
     val assistant = remember(
         settings.assistants,
+        settings.lorebooks,
         conversation.assistantId,
         conversation.config,
         conversation.modeInjectionIds,
         conversation.lorebookIds,
     ) {
-        // 工作区等配置在会话开始后以会话上固定的为准
-        settings.getAssistantById(conversation.assistantId)?.withConversation(conversation)
+        // 工作区与世界书以会话固定配置为准，预设始终跟随助手当前绑定
+        if (settings.assistants.isEmpty()) null else settings.getAssistantOf(conversation)
     }
     val modelById = remember(settings.providers) {
         settings.providers

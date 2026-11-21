@@ -55,7 +55,7 @@ jobs:
           fi
 
       - name: Run regression tests
-        run: bash ./gradlew :app:testDebugUnitTest
+        run: bash ./gradlew :app:testDebugUnitTest :ui:testDebugUnitTest
 
       - name: Test provider diagnostics
         run: |
@@ -93,6 +93,7 @@ jobs:
           name: unit-test-results
           path: |
             app/build/reports/tests/
+            ui/build/reports/tests/
             ai/build/reports/tests/
           if-no-files-found: ignore
 

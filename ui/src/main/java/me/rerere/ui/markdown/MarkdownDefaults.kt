@@ -54,6 +54,10 @@ data class MarkdownTheme(
     val dividerColor: Color,
     /** 正文里引号（"…"、“…”、「…」、『…』）括起来的文字的样式，为 null 时不高亮 */
     val quotedText: SpanStyle? = null,
+    /** 正文里中文全角括号（（…））括起来的文字的样式，为 null 时不处理 */
+    val parenthesisText: SpanStyle? = null,
+    /** [parenthesisText] 生效时，是否隐藏已配对的中文全角括号字符本身 */
+    val hideParentheses: Boolean = true,
 )
 
 /** 嵌在文本流里的自定义内容，按 [placeholder] 的尺寸占位 */

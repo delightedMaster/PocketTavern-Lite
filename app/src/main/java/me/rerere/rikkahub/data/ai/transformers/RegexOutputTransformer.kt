@@ -74,6 +74,6 @@ object RegexVisualTransformer : OutputMessageTransformer {
         ctx: TransformerContext,
         messages: List<UIMessage>,
     ): List<UIMessage> = messages.replaceRegexesForDisplay(
-        ctx.assistant, ctx.conversationId, visual = true, globalRegexes = ctx.settings.globalRegexes,
+        ctx.assistant, ctx.conversationId, visual = true, globalRegexes = ctx.settings.globalRegexesFor(ctx.assistant),
     )
 }

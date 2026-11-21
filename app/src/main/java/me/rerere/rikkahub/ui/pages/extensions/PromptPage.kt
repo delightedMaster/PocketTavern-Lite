@@ -695,6 +695,9 @@ internal fun LorebookTab(
                             book = book,
                             modifier = longPressReorder(isDragging),
                             onEdit = { editState.open(book) },
+                            onEnabledChange = { enabled ->
+                                onUpdate(lorebooks.map { if (it.id == book.id) it.copy(enabled = enabled) else it })
+                            },
                             onDelete = { onUpdate(lorebooks - book) }
                         )
                     }
@@ -752,6 +755,7 @@ private fun LorebookCard(
     book: Lorebook,
     modifier: Modifier = Modifier,
     onEdit: () -> Unit,
+    onEnabledChange: (Boolean) -> Unit,
     onDelete: () -> Unit
 ) {
     var showExportDialog by remember { mutableStateOf(false) }
@@ -770,7 +774,7 @@ private fun LorebookCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = 16.dp, top = 12.dp, end = 4.dp, bottom = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 停用的条目图标褪成中性色
@@ -824,6 +828,10 @@ private fun LorebookCard(
                     }
                 }
             }
+            Switch(
+                checked = book.enabled,
+                onCheckedChange = onEnabledChange,
+            )
             ItemActionMenu(
                 actions = listOf(
                     ItemAction(

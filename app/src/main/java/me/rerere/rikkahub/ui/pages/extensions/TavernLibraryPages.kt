@@ -43,6 +43,7 @@ fun RegexScriptsPage(vm: PromptVM = koinViewModel()) {
     TavernLibraryScaffold(titleRes = R.string.setting_page_regex) {
         RegexScriptsTab(
             groups = settings.regexGroups,
+            lorebooks = settings.lorebooks,
             onUpdate = { groups ->
                 vm.updateSettings { latest -> latest.copy(regexGroups = groups) }
             },

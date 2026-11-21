@@ -8,7 +8,24 @@ internal fun lorebooksOfKind(lorebooks: List<Lorebook>, kind: LorebookKind): Lis
 
 /**
  * 绑定或解绑一条世界书/预设。
- * 两类共用 [Assistant.lorebookIds]，这里只改 [id]，另一类的 id 原样保留。
+ * 世界书支持多选；预设（[LorebookKind.PRESET]）单选互斥，开启新预设时自动关闭其他预设，
+ * 两类共用 [Assistant.lorebookIds]，另一类的绑定原样保留。
  */
-internal fun toggleLorebookBinding(boundIds: Set<Uuid>, id: Uuid, checked: Boolean): Set<Uuid> =
-    if (checked) boundIds + id else boundIds - id
+internal fun toggleLorebookBinding(
+    boundIds: Set<Uuid>,
+    id: Uuid,
+    checked: Boolean,
+    kind: LorebookKind = LorebookKind.WORLD_BOOK,
+    allLorebooks: List<Lorebook> = emptyList(),
+): Set<Uuid> {
+    if (!checked) return boundIds - id
+    if (kind == LorebookKind.PRESET) {
+        val otherPresetIds = allLorebooks
+            .asSequence()
+            .filter { it.kind == LorebookKind.PRESET && it.id != id }
+            .map { it.id }
+            .toSet()
+        return (boundIds - otherPresetIds) + id
+    }
+    return boundIds + id
+}

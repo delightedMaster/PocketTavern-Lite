@@ -152,7 +152,7 @@ fun ExtensionSelector(
                         manageLabel = stringResource(R.string.extension_selector_go_to_lorebooks),
                         icon = tab.icon,
                         onToggle = { id, checked ->
-                            onUpdate(assistant.withLorebookBinding(id, checked))
+                            onUpdate(assistant.withLorebookBinding(id, checked, LorebookKind.WORLD_BOOK, settings.lorebooks))
                         },
                         onManage = onNavigateToLorebooks,
                     )
@@ -166,7 +166,7 @@ fun ExtensionSelector(
                         manageLabel = stringResource(R.string.extension_selector_go_to_presets),
                         icon = tab.icon,
                         onToggle = { id, checked ->
-                            onUpdate(assistant.withLorebookBinding(id, checked))
+                            onUpdate(assistant.withLorebookBinding(id, checked, LorebookKind.PRESET, settings.lorebooks))
                         },
                         onManage = onNavigateToPresets,
                     )
@@ -201,9 +201,21 @@ fun ExtensionSelector(
     }
 }
 
-// 世界书和预设共用 lorebookIds。只增删当前这一条，另一类的绑定保持不变。
-private fun Assistant.withLorebookBinding(id: Uuid, checked: Boolean): Assistant =
-    copy(lorebookIds = toggleLorebookBinding(lorebookIds, id, checked))
+// 世界书和预设共用 lorebookIds；世界书多选，预设单选互斥，另一类的绑定保持不变。
+private fun Assistant.withLorebookBinding(
+    id: Uuid,
+    checked: Boolean,
+    kind: LorebookKind,
+    allLorebooks: List<Lorebook>,
+): Assistant = copy(
+    lorebookIds = toggleLorebookBinding(
+        boundIds = lorebookIds,
+        id = id,
+        checked = checked,
+        kind = kind,
+        allLorebooks = allLorebooks,
+    )
+)
 
 @Composable
 private fun LorebookBindingTab(

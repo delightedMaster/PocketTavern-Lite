@@ -83,4 +83,62 @@ class GlobalRegexesTest {
 
         assertEquals(listOf(customRegex), settings.globalRegexes)
     }
+
+    @Test
+    fun `disabled regex group is excluded for both custom and preset sources`() {
+        val settings = Settings(
+            lorebooks = listOf(preset(presetId, enabled = true)),
+            regexGroups = listOf(
+                RegexGroup(name = "自定义", enabled = false, source = RegexGroupSource.CUSTOM, regexes = listOf(customRegex)),
+                presetGroup(presetId, regexFromGroup).copy(enabled = false),
+            ),
+        )
+
+        assertEquals(emptyList<AssistantRegex>(), settings.globalRegexes)
+        val assistant = me.rerere.rikkahub.data.model.Assistant(lorebookIds = setOf(presetId))
+        assertEquals(emptyList<AssistantRegex>(), settings.globalRegexesFor(assistant))
+    }
+
+    @Test
+    fun `assistant only activates regex group matching its active preset`() {
+        val presetA = Uuid.random()
+        val presetB = Uuid.random()
+        val regexA = AssistantRegex(id = Uuid.random(), name = "预设A正则")
+        val regexB = AssistantRegex(id = Uuid.random(), name = "预设B正则")
+        val cardRegex = AssistantRegex(id = Uuid.random(), name = "角色卡正则")
+        val settings = Settings(
+            lorebooks = listOf(
+                preset(presetA, enabled = true),
+                preset(presetB, enabled = true),
+            ),
+            regexGroups = listOf(
+                RegexGroup(name = "自定义", source = RegexGroupSource.CUSTOM, regexes = listOf(customRegex)),
+                presetGroup(presetA, regexA),
+                presetGroup(presetB, regexB),
+            ),
+        )
+
+        val assistantUsingA = me.rerere.rikkahub.data.model.Assistant(
+            regexes = listOf(cardRegex),
+            lorebookIds = setOf(presetA),
+        )
+        assertEquals(listOf(cardRegex, customRegex, regexA), settings.allRegexesOf(assistantUsingA))
+
+        val assistantUsingB = assistantUsingA.copy(lorebookIds = setOf(presetB))
+        assertEquals(listOf(cardRegex, customRegex, regexB), settings.allRegexesOf(assistantUsingB))
+
+        val assistantUsingNone = assistantUsingA.copy(lorebookIds = emptySet())
+        assertEquals(listOf(cardRegex, customRegex), settings.allRegexesOf(assistantUsingNone))
+    }
+
+    @Test
+    fun `bound preset disabled globally does not activate its regex group`() {
+        val settings = Settings(
+            lorebooks = listOf(preset(presetId, enabled = false)),
+            regexGroups = listOf(presetGroup(presetId, regexFromGroup)),
+        )
+        val assistant = me.rerere.rikkahub.data.model.Assistant(lorebookIds = setOf(presetId))
+
+        assertEquals(emptyList<AssistantRegex>(), settings.globalRegexesFor(assistant))
+    }
 }
