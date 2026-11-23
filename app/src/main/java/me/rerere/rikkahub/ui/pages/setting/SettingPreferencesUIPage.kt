@@ -217,6 +217,12 @@ fun SettingPreferencesUIPage(vm: SettingVM = koinViewModel()) {
                         supportingContent = { Text(stringResource(R.string.setting_display_page_enable_quote_highlight_desc)) },
                         headlineContent = { Text(stringResource(R.string.setting_display_page_enable_quote_highlight_title)) },
                     )
+                    switchItem(
+                        checked = displaySetting.enableParenthesisHighlight,
+                        onCheckedChange = { updateDisplaySetting(displaySetting.copy(enableParenthesisHighlight = it)) },
+                        supportingContent = { Text(stringResource(R.string.setting_display_page_enable_parenthesis_highlight_desc)) },
+                        headlineContent = { Text(stringResource(R.string.setting_display_page_enable_parenthesis_highlight_title)) },
+                    )
                 }
             }
 
@@ -329,7 +335,8 @@ fun SettingPreferencesUIPage(vm: SettingVM = koinViewModel()) {
                                     fontSize = LocalTextStyle.current.fontSize * displaySetting.fontSizeRatio,
                                     lineHeight = LocalTextStyle.current.lineHeight * displaySetting.fontSizeRatio,
                                     fontFamily = chatFontFamily
-                                )
+                                ),
+                                enableDialogueFormatting = true,
                             )
                         }
                     }

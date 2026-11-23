@@ -413,6 +413,7 @@ private fun MessagePartsBlock(
                                                     content = segment.text,
                                                     htmlMessageId = messageId,
                                                     onClickCitation = handleClickCitation,
+                                                    enableDialogueFormatting = true,
                                                 )
                                             }
                                         }
@@ -424,6 +425,7 @@ private fun MessagePartsBlock(
                                     htmlMessageId = messageId,
                                     onClickCitation = handleClickCitation,
                                     modifier = textModifier,
+                                    enableDialogueFormatting = true,
                                 )
                             }
                         }

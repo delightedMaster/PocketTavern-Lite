@@ -14,7 +14,7 @@ import kotlin.uuid.Uuid
  */
 /** Card scripts run first, then global groups, matching SillyTavern's local-then-global order. */
 fun Settings.allRegexesOf(assistant: Assistant?): List<AssistantRegex> =
-    assistant?.regexes.orEmpty() + globalRegexes
+    assistant?.regexes.orEmpty() + globalRegexesFor(assistant)
 
 fun Settings.authorNoteEntriesOrLegacy(): List<AuthorNoteEntry> {
     authorNoteEntries?.let { return it }

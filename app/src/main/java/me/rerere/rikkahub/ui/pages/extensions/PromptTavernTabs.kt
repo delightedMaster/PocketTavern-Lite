@@ -5,6 +5,8 @@ import me.rerere.rikkahub.data.export.ImportKind
 import me.rerere.rikkahub.ui.components.ui.ImportReportState
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,10 +37,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -53,6 +58,7 @@ import me.rerere.rikkahub.data.ai.prompts.SUMMARY_PROMPT_EN
 import me.rerere.rikkahub.data.ai.prompts.SUMMARY_PROMPT_ZH
 import me.rerere.rikkahub.data.ai.transformers.MacroEngine
 import me.rerere.hugeicons.HugeIcons
+import me.rerere.hugeicons.stroke.ArrowDown01
 import me.rerere.hugeicons.stroke.Delete01
 import me.rerere.rikkahub.ui.components.ai.ModelSelector
 import me.rerere.rikkahub.ui.components.ai.RegexScriptEditor
@@ -62,6 +68,7 @@ import me.rerere.rikkahub.data.export.SillyTavernRegexImporter
 import me.rerere.rikkahub.data.model.AssistantRegex
 import me.rerere.rikkahub.data.model.AuthorNoteEntry
 import me.rerere.rikkahub.data.model.AuthorNotePosition
+import me.rerere.rikkahub.data.model.Lorebook
 import me.rerere.rikkahub.data.model.RegexGroup
 import me.rerere.rikkahub.data.model.RegexGroupSource
 import me.rerere.rikkahub.ui.components.ui.CardGroup
@@ -301,6 +308,7 @@ private fun authorNotePositionLabel(position: AuthorNotePosition): String = when
 internal fun RegexScriptsTab(
     groups: List<RegexGroup>,
     onUpdate: (List<RegexGroup>) -> Unit,
+    lorebooks: List<Lorebook> = emptyList(),
 ) {
     val context = LocalContext.current
     val toaster = LocalToaster.current
@@ -345,6 +353,7 @@ internal fun RegexScriptsTab(
             }
         }
     }
+    val presetById = remember(lorebooks) { lorebooks.associateBy { it.id } }
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -374,8 +383,10 @@ internal fun RegexScriptsTab(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(groups, key = { it.id }) { group ->
+                    val linkedPreset = group.presetId?.let(presetById::get)
                     RegexGroupCard(
                         group = group,
+                        linkedPreset = linkedPreset,
                         onChange = { updated ->
                             onUpdate(
                                 groups.mapNotNull { existing ->
@@ -399,10 +410,24 @@ internal fun RegexScriptsTab(
 @Composable
 private fun RegexGroupCard(
     group: RegexGroup,
+    linkedPreset: Lorebook?,
     onChange: (RegexGroup) -> Unit,
     onDelete: () -> Unit,
 ) {
     var confirmingDelete by remember { mutableStateOf(false) }
+    var expanded by rememberSaveable(group.id.toString()) { mutableStateOf(group.enabled) }
+    val arrowRotation by animateFloatAsState(if (expanded) 0f else -90f, label = "regexGroupArrow")
+    val countText = stringResource(R.string.tavern_regex_group_count, group.regexes.size)
+    val statusText = when {
+        !group.enabled -> stringResource(R.string.tavern_regex_group_status_disabled)
+        group.source == RegexGroupSource.PRESET && group.presetId != null -> when {
+            linkedPreset == null -> stringResource(R.string.tavern_regex_group_status_preset_removed)
+            !linkedPreset.enabled -> stringResource(R.string.tavern_regex_group_status_preset_disabled)
+            else -> stringResource(R.string.tavern_regex_group_status_follows_preset)
+        }
+        else -> null
+    }
+    val subtitle = if (statusText != null) "$countText · $statusText" else countText
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = CustomColors.listItemColors.containerColor),
@@ -412,36 +437,63 @@ private fun RegexGroupCard(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+                    .clickable { expanded = !expanded }
+                    .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
+                Icon(
+                    imageVector = HugeIcons.ArrowDown01,
+                    contentDescription = null,
+                    modifier = Modifier.rotate(arrowRotation),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(group.name.ifBlank { stringResource(R.string.tavern_regex_unnamed_group) })
                     Text(
-                        stringResource(R.string.tavern_regex_group_count, group.regexes.size),
+                        text = group.name.ifBlank { stringResource(R.string.tavern_regex_unnamed_group) },
+                        style = MaterialTheme.typography.titleSmallEmphasized,
+                    )
+                    Text(
+                        text = subtitle,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                Switch(
+                    checked = group.enabled,
+                    onCheckedChange = { enabled ->
+                        onChange(group.copy(enabled = enabled))
+                    },
+                )
                 // 自定义分组始终存在，不提供删除入口
                 if (group.source != RegexGroupSource.CUSTOM) {
                     IconButton(onClick = { confirmingDelete = true }) {
                         Icon(
                             imageVector = HugeIcons.Delete01,
-                            contentDescription = "删除分组",
+                            contentDescription = stringResource(R.string.tavern_regex_delete_group),
                             tint = MaterialTheme.colorScheme.error,
                         )
                     }
                 }
             }
-            group.regexes.forEach { regex ->
-                RegexScriptRow(
-                    regex = regex,
-                    onChange = { updated ->
-                        onChange(group.copy(regexes = group.regexes.map { if (it.id == updated.id) updated else it }))
-                    },
-                    onDelete = { onChange(group.copy(regexes = group.regexes.filterNot { it.id == regex.id })) },
-                )
+            AnimatedVisibility(visible = expanded) {
+                Column(
+                    modifier = Modifier.alpha(if (group.enabled) 1f else 0.55f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    group.regexes.forEach { regex ->
+                        RegexScriptRow(
+                            regex = regex,
+                            onChange = { updated ->
+                                onChange(group.copy(regexes = group.regexes.map { if (it.id == updated.id) updated else it }))
+                            },
+                            onDelete = { onChange(group.copy(regexes = group.regexes.filterNot { it.id == regex.id })) },
+                        )
+                    }
+                }
             }
         }
     }

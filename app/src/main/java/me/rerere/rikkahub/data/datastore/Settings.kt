@@ -17,6 +17,7 @@ import me.rerere.rikkahub.data.model.AuthorNotePosition
 import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.data.model.GroupChat
 import me.rerere.rikkahub.data.model.Lorebook
+import me.rerere.rikkahub.data.model.LorebookKind
 import me.rerere.rikkahub.data.model.Persona
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.QuickMessage
@@ -106,13 +107,39 @@ data class Settings(
     val groupChats: List<GroupChat> = emptyList(),
     val backupReminderConfig: BackupReminderConfig = BackupReminderConfig(),
 ) {
+    /**
+     * 生效的全局正则列表。
+     *
+     * - 分组关闭（[RegexGroup.enabled] == false）时整组跳过。
+     * - 预设分组（[RegexGroupSource.PRESET] 且带 [RegexGroup.presetId]）：
+     *   - 指定 [assistant] 时，只启用该助手当前激活的那个预设（已绑定且全局启用）对应的分组；
+     *   - 未指定 [assistant] 时，只要对应预设仍存在且全局启用即包含。
+     * - 自定义分组和无 presetId 的旧分组只受 [RegexGroup.enabled] 控制。
+     */
+    fun globalRegexesFor(assistant: Assistant?): List<AssistantRegex> {
+        val activePresetId = if (assistant != null) {
+            lorebooks.firstOrNull { book ->
+                book.kind == LorebookKind.PRESET &&
+                    book.enabled &&
+                    book.id in assistant.lorebookIds
+            }?.id
+        } else {
+            null
+        }
+        return regexGroups.filter { group ->
+            if (!group.enabled) return@filter false
+            val presetId = group.presetId
+            when {
+                group.source != RegexGroupSource.PRESET || presetId == null -> true
+                assistant != null -> presetId == activePresetId
+                else -> lorebooks.any { it.id == presetId && it.enabled }
+            }
+        }.flatMap { it.regexes }
+    }
+
     /** 预设分组只在对应预设仍存在且启用时生效；无 presetId 的旧分组保持原行为。 */
     val globalRegexes: List<AssistantRegex>
-        get() = regexGroups.filter { group ->
-            val presetId = group.presetId
-            group.source != RegexGroupSource.PRESET || presetId == null ||
-                lorebooks.any { it.id == presetId && it.enabled }
-        }.flatMap { it.regexes }
+        get() = globalRegexesFor(null)
 
     companion object {
         // 构造一个用于初始化的settings, 但它不能用于保存，防止使用初始值存储
@@ -188,7 +215,8 @@ data class DisplaySetting(
     val sendOnEnter: Boolean = false,
     val enableAutoScroll: Boolean = true,
     val enableLatexRendering: Boolean = true,
-    val enableQuoteHighlight: Boolean = false,
+    val enableQuoteHighlight: Boolean = true,
+    val enableParenthesisHighlight: Boolean = true,
     val enableBlurEffect: Boolean = false,
     val backgroundEffectType: BackgroundEffectType = BackgroundEffectType.BLUR,
     val chatFontFamily: ChatFontFamily = ChatFontFamily.DEFAULT,

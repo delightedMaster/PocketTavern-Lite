@@ -61,7 +61,7 @@ internal fun ChatTurnContext.layeredPrompt(
     val assistant = this.assistant
     val userName = settings.displaySetting.userNickname.ifBlank { "User" }
     val promptMessages = messages.mapIndexed { index, message ->
-        message.withPromptRegex(assistant, settings.globalRegexes, messages.size - index - 1)
+        message.withPromptRegex(assistant, settings.globalRegexesFor(assistant), messages.size - index - 1)
     }
     val turnId = promptMessages.lastOrNull { it.role == MessageRole.USER }?.id?.toString().orEmpty()
     val (constant, triggered) = if (turnId.isNotEmpty() && promptState.frozenTurnId == turnId) {

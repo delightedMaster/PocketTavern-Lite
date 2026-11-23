@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyListState
@@ -48,6 +49,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -702,29 +704,44 @@ private fun TopBar(
                         style = MaterialTheme.typography.bodyMedium,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (chatModel != null && provider != null) {
-                        Text(
-                            text = "${assistant.name.ifBlank { stringResource(R.string.assistant_page_default_assistant) }} / ${chatModel.displayName} (${provider.name})",
-                            overflow = TextOverflow.Ellipsis,
-                            maxLines = 1,
-                            color = LocalContentColor.current.copy(0.65f),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 8.sp,
-                            )
-                        )
-                    }
-                    if (promptTokens > 0 || hasPrefix) {
-                        Text(
-                            text = if (promptTokens > 0) {
-                                stringResource(R.string.chat_page_cache_hit_rate, cachePercent)
-                            } else {
-                                stringResource(R.string.chat_page_prefix_diff)
-                            },
-                            modifier = Modifier.clickable { showPrefixDiff = true },
-                            maxLines = 1,
-                            color = LocalContentColor.current.copy(0.65f),
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-                        )
+                    if ((chatModel != null && provider != null) || promptTokens > 0 || hasPrefix) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            if (chatModel != null && provider != null) {
+                                Text(
+                                    text = "${assistant.name.ifBlank { stringResource(R.string.assistant_page_default_assistant) }} / ${chatModel.displayName} (${provider.name})",
+                                    modifier = Modifier.weight(1f, fill = false),
+                                    overflow = TextOverflow.Ellipsis,
+                                    maxLines = 1,
+                                    color = LocalContentColor.current.copy(0.65f),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 9.sp,
+                                        lineHeight = 12.sp,
+                                    )
+                                )
+                            }
+                            if (promptTokens > 0 || hasPrefix) {
+                                Text(
+                                    text = if (promptTokens > 0) {
+                                        stringResource(R.string.chat_page_cache_hit_rate, cachePercent)
+                                    } else {
+                                        stringResource(R.string.chat_page_prefix_diff)
+                                    },
+                                    modifier = Modifier
+                                        .clip(MaterialTheme.shapes.extraSmall)
+                                        .clickable { showPrefixDiff = true }
+                                        .padding(horizontal = 4.dp, vertical = 1.dp),
+                                    maxLines = 1,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 9.sp,
+                                        lineHeight = 12.sp,
+                                    ),
+                                )
+                            }
+                        }
                     }
                 }
             }

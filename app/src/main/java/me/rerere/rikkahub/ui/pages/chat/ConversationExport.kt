@@ -607,7 +607,8 @@ private fun ExportedChatMessage(
                                             ) {
                                                 MarkdownBlock(
                                                     content = part.text,
-                                                    modifier = Modifier.padding(8.dp)
+                                                    modifier = Modifier.padding(8.dp),
+                                                    enableDialogueFormatting = true,
                                                 )
                                             }
                                         } else {
@@ -620,12 +621,14 @@ private fun ExportedChatMessage(
                                                 ) {
                                                     MarkdownBlock(
                                                         content = part.text,
-                                                        modifier = Modifier.padding(8.dp)
+                                                        modifier = Modifier.padding(8.dp),
+                                                        enableDialogueFormatting = true,
                                                     )
                                                 }
                                             } else {
                                                 MarkdownBlock(
                                                     content = part.text,
+                                                    enableDialogueFormatting = true,
                                                 )
                                             }
                                         }
